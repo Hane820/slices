@@ -213,7 +213,6 @@
       closedReason: state.closedReason,
       opens: { calls: stats.calls, runs: stats.runs, failures: stats.failures },
       lastUpgradeAbort: upgradeAbort,
-      lastUpgradeAbort: upgradeAbort,
       lastError: state.lastError
         ? { name: state.lastError.name, message: state.lastError.message, code: state.lastError.code || null }
         : null
@@ -402,6 +401,9 @@
     state.closedReason = 'manual';
     var doClose = function () {
       if (db) { try { db.close(); } catch (e) {} }
+      /* 丢弃实例：关闭后的 Dexie 仍缓存着关闭时的 schema，若库被外部删除或重建，
+         复用它会拿到不存在的 store（NotFoundError）。下次 open() 重新构造即可。 */
+      db = null;
       state.status = 'closed';
       emit('closed');
       return api;
