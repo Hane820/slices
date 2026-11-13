@@ -84,9 +84,22 @@
     return Object.prototype.hasOwnProperty.call(obj, k);
   }
 
+  /* 显式建自有属性。普通 obj[k] = v 在 k === '__proto__' 时会走原型 setter：
+     字段丢失、且把值挂成原型（污染）。JSON.parse 出来的对象可以带 __proto__ 自有属性，
+     所以凡是从外部数据复制键的地方都必须走这里。 */
+  function defineOwn(obj, key, value) {
+    Object.defineProperty(obj, key, { value: value, enumerable: true, writable: true, configurable: true });
+  }
+
+  /* 有限数值的截止时间。NaN / Infinity 参与比较时不报错：
+     NaN < now 为 false（会放行），Infinity < now 也为 false（会永久占锁）。 */
+  function usableDeadline(v) {
+    return typeof v === 'number' && isFinite(v);
+  }
+
   function shallow(rec) {
     var out = {};
-    for (var k in rec) if (has(rec, k)) out[k] = rec[k];
+    for (var k in rec) if (has(rec, k)) defineOwn(out, k, rec[k]);
     return out;
   }
 
@@ -196,7 +209,7 @@
     for (i = 0; i < allTop.length; i++) {
       if (TOP_KEYS.indexOf(allTop[i]) < 0) {
         extraKeys.push(allTop[i]);
-        extraVal[allTop[i]] = S0[allTop[i]];
+        defineOwn(extraVal, allTop[i], S0[allTop[i]]);
       }
     }
     rows.extras = { present: extraKeys.length > 0, keys: extraKeys, value: extraVal };
@@ -487,6 +500,9 @@
       if (!m || m.status !== 'in_progress') throw leaseError('not-in-progress', '迁移状态不是 in_progress');
       if (m.ownerId !== ownerId) throw leaseError('owner-changed', '迁移锁已被其它标签页接管');
       if (m.epoch !== epoch) throw leaseError('epoch-changed', '迁移 epoch 不匹配');
+      if (!usableDeadline(m.leaseExpiresAt)) {
+        throw leaseError('lease-invalid', '迁移租约有效期不是有限数值：' + String(m.leaseExpiresAt));
+      }
       if (m.leaseExpiresAt < Date.now()) throw leaseError('lease-expired', '迁移租约已过期');
       return m;
     });
@@ -536,7 +552,9 @@
       return db.meta.get('migration').then(function (cur) {
         var now = Date.now();
         if (cur && cur.status === 'done') return 'already-done';
-        if (cur && cur.status === 'in_progress' && cur.leaseExpiresAt > now && cur.ownerId !== ownerId) return 'busy';
+        /* 非有限有效期不算有效租约：否则 Infinity 会让所有后续认领永久 busy */
+        if (cur && cur.status === 'in_progress' && usableDeadline(cur.leaseExpiresAt) &&
+            cur.leaseExpiresAt > now && cur.ownerId !== ownerId) return 'busy';
         if (cur && (cur.attempts || 0) >= MAX_ATTEMPTS) return 'too-many-attempts';
 
         attempts = ((cur && cur.attempts) || 0) + 1;
@@ -583,7 +601,10 @@
       if (w.status !== 'active') throw writeLeaseError('writer-inactive', '写入权状态不是 active：' + w.status);
       if (w.ownerId !== ownerId) throw writeLeaseError('writer-owner-changed', '写入权已被其它标签页接管');
       if (w.epoch !== epoch) throw writeLeaseError('writer-epoch-changed', '写入权 epoch 不匹配');
-      if (typeof w.leaseExpiresAt !== 'number' || w.leaseExpiresAt < Date.now()) {
+      if (!usableDeadline(w.leaseExpiresAt)) {
+        throw writeLeaseError('writer-lease-invalid', '写入权有效期不是有限数值：' + String(w.leaseExpiresAt));
+      }
+      if (w.leaseExpiresAt < Date.now()) {
         throw writeLeaseError('writer-lease-expired', '写入权租约已过期');
       }
       return w;
