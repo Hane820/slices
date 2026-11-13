@@ -1,10 +1,202 @@
 ---
-const { headings = [] } = Astro.props;
+interface Props {
+  headings?: Array<{ depth: number; slug: string; text: string }>;
+  variant?: 'inline' | 'rail';
+}
+const { headings = [], variant = 'inline' } = Astro.props;
+
+/* 只取 h1–h3；层级按「相对最浅标题」计算，最深显示两级缩进 */
+const items = (headings || []).filter((h) => h.depth >= 1 && h.depth <= 3);
+const base = items.length > 0 ? Math.min(...items.map((h) => h.depth)) : 2;
+const rows = items.map((h) => ({
+  slug: h.slug,
+  text: h.text,
+  level: Math.max(0, Math.min(h.depth - base, 2)),
+}));
 ---
-{headings.length > 0 && <details class="toc"><summary>目录</summary><ol>{headings.map((heading: any) => <li><a href={`#${heading.slug}`}>{heading.text}</a></li>)}</ol></details>}
+
+{rows.length > 0 && variant === 'inline' && (
+  <details class="toc">
+    <summary>目录</summary>
+    <ol class="toc-list">
+      {rows.map((row) => (
+        <li class={`lv${row.level}`}><a href={`#${row.slug}`}>{row.text}</a></li>
+      ))}
+    </ol>
+  </details>
+)}
+
+{rows.length > 0 && variant === 'rail' && (
+  <div class="toc-rail">
+    <button class="toc-tab" type="button" aria-expanded="false" aria-controls="toc-panel" aria-label="文章目录">
+      <span class="tab-line" aria-hidden="true"></span>
+    </button>
+    <nav class="toc-panel" id="toc-panel" aria-label="文章目录" aria-hidden="true">
+      <div class="toc-head">
+        <p class="toc-eyebrow">Contents</p>
+        <span class="toc-count">{String(rows.length).padStart(2, '0')}</span>
+      </div>
+      <ol class="toc-list">
+        {rows.map((row) => (
+          <li class={`lv${row.level}`}><a href={`#${row.slug}`}>{row.text}</a></li>
+        ))}
+      </ol>
+    </nav>
+  </div>
+)}
+
 <style>
-  .toc { margin:2rem 0; border-block:1px solid var(--line); padding:.8rem 0; color:var(--muted); }
-  .toc summary { cursor:pointer; color:var(--ink); }
-  .toc ol { margin:.8rem 0 0; padding-left:1.3rem; }
-  .toc a { color:inherit; }
+  .toc-list { margin: 0; padding: 0; list-style: none; }
+  .toc-list li { margin: .35rem 0; line-height: 1.45; }
+  .toc-list a { color: inherit; text-decoration: none; }
+  .toc-list a:hover { color: var(--ink); }
+
+  /* 层级：缩进 + 左侧引导线，层级深也不靠字号区分 */
+  .toc-list .lv1 { padding-left: .9rem; border-left: 1px solid var(--line); }
+  .toc-list .lv2 { padding-left: 1.8rem; border-left: 1px solid var(--line); }
+
+  /* 小屏：正文里的可折叠目录 */
+  .toc { margin: 2rem 0; border-block: 1px solid var(--line); padding: .8rem 0; color: var(--muted); }
+  .toc summary { cursor: pointer; color: var(--ink); }
+  .toc .toc-list { margin-top: .8rem; }
+
+  /* ---------- 右侧留白里的目录栏（≥1280px） ---------- */
+  .toc-rail {
+    --dur: 1400ms;
+    --ease: cubic-bezier(.4, 0, .2, 1);
+    position: fixed;
+    right: clamp(.9rem, 1.6vw, 1.75rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+  }
+  @media (max-width: 79.99rem) {
+    .toc-rail { display: none; }
+  }
+
+  /* 收起态只留一条竖线；按钮本体透明，扩大点击区 */
+  .toc-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.2rem .6rem;
+    background: none;
+    border: 0;
+    cursor: pointer;
+  }
+  .toc-tab:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+  .tab-line {
+    width: 2px;
+    height: 4.5rem;
+    background: var(--line);
+    transition: background .3s ease;
+  }
+  .toc-tab:hover .tab-line { background: var(--ink); }
+  .toc-rail.is-open .tab-line { background: var(--accent); }
+
+  .toc-panel {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    /* 面板只吃正文右侧的留白，宽度跟着窗口走，展开时不压住正文 */
+    width: clamp(8.5rem, calc((100vw - 48rem) / 2 - 7.5rem), 17rem);
+    max-height: min(70vh, 34rem);
+    overflow: auto;
+    padding: 1.3rem 1.15rem 1.5rem;
+    margin-right: 0;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(1.5rem, -50%);
+    transition:
+      opacity var(--dur) var(--ease),
+      transform var(--dur) var(--ease),
+      visibility 0s linear var(--dur);
+  }
+  .toc-rail.is-open .toc-panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(0, -50%);
+    transition:
+      opacity var(--dur) var(--ease),
+      transform var(--dur) var(--ease),
+      visibility 0s;
+  }
+
+  .toc-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: .5rem;
+    padding-bottom: .7rem;
+    margin-bottom: .9rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .toc-eyebrow {
+    margin: 0;
+    color: var(--accent);
+    font: 700 .75rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .toc-count {
+    color: var(--muted);
+    font: 400 .7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .toc-panel .toc-list { font-size: .88rem; }
+  .toc-panel .toc-list li { margin: .55rem 0; line-height: 1.4; }
+  .toc-panel .toc-list .lv1 { padding-left: .85rem; }
+  .toc-panel .toc-list .lv2 { padding-left: 1.7rem; }
+  .toc-panel .toc-list .lv1 a { font-size: .84rem; }
+  .toc-panel .toc-list a.is-active { color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toc-panel,
+    .toc-rail.is-open .toc-panel { transition: none; }
+  }
 </style>
+
+<script>
+  function setupTocRail() {
+    document.querySelectorAll('.toc-rail').forEach((rail) => {
+      const tab = rail.querySelector('.toc-tab') as HTMLElement;
+      const panel = rail.querySelector('.toc-panel') as HTMLElement;
+      if (!tab || !panel || tab.dataset.bound) return;
+      tab.dataset.bound = '1';
+      const setOpen = (open: boolean) => {
+        rail.classList.toggle('is-open', open);
+        tab.setAttribute('aria-expanded', String(open));
+        panel.setAttribute('aria-hidden', String(!open));
+      };
+      tab.addEventListener('click', () => setOpen(!rail.classList.contains('is-open')));
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && rail.classList.contains('is-open')) setOpen(false);
+      });
+
+      /* 滚动高亮：当前读到的小节在目录里变强调色 */
+      const links = Array.from(panel.querySelectorAll('a')) as HTMLAnchorElement[];
+      const targets = links
+        .map((a) => document.getElementById((a.getAttribute('href') || '').slice(1)))
+        .filter((el): el is HTMLElement => !!el);
+      if (targets.length === 0) return;
+      let ticking = false;
+      const update = () => {
+        ticking = false;
+        const fromTop = window.innerHeight * 0.35;
+        let active = -1;
+        targets.forEach((el, i) => {
+          if (el.getBoundingClientRect().top <= fromTop) active = i;
+        });
+        links.forEach((a, i) => a.classList.toggle('is-active', i === active));
+      };
+      const onScroll = () => {
+        if (!ticking) { ticking = true; requestAnimationFrame(update); }
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      update();
+    });
+  }
+  setupTocRail();
+  document.addEventListener('astro:page-load', setupTocRail);
+</script>
