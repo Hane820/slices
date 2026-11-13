@@ -1,0 +1,122 @@
+/* records.css — 记录页：项目 / 时间轴 / 月历 / 热力图 / 统计图表 */
+/* ---------- 项目切换条 ---------- */
+.item-cur{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);
+  padding:15px 17px;font-family:inherit;cursor:pointer;box-shadow:var(--sh1);margin-bottom:14px;
+  transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .4s var(--ease)}
+.item-cur:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:#E2D8C6}
+.item-cur .ic-n{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:600;color:var(--ink);letter-spacing:1px}
+.item-cur .ic-a{font-size:12px;color:var(--ink3);white-space:nowrap}
+
+/* ---------- 时间轴 ---------- */
+.tl{position:relative;padding-left:20px}
+.tl::before{content:"";position:absolute;left:4.5px;top:8px;bottom:14px;width:1px;background:var(--line)}
+.tl-item{position:relative;margin-bottom:18px}
+.tl-item::before{content:"";position:absolute;left:-19px;top:7px;width:8px;height:8px;border-radius:50%;background:var(--paper);border:1.6px solid #D7CDBC}
+.tl-item.today::before{background:var(--sage);border-color:var(--sage)}
+.tl-h{display:flex;align-items:baseline;gap:8px;margin-bottom:7px;cursor:pointer}
+.tl-date{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:600;letter-spacing:.3px}
+.tl-wd{font-size:11px;color:var(--ink3)}
+.tl-n{margin-left:auto;font-size:10.5px;color:var(--ink3);letter-spacing:.5px}
+.tl-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:4px 13px;box-shadow:var(--sh1)}
+.tl-row{display:flex;gap:9px;padding:8px 0;font-size:12.5px;line-height:1.6}
+.tl-row+.tl-row{border-top:1px solid var(--line2)}
+.tl-k{flex:0 0 42px;font-size:10.5px;color:var(--ink3);padding-top:2px;font-variant-numeric:tabular-nums}
+.tl-v{flex:1;min-width:0;color:var(--ink2);word-break:break-word;line-height:1.85}
+.tl-v b{font-weight:600;color:var(--ink)}
+.tl-load{width:100%;margin-top:4px;padding:12px;border:1px dashed var(--line);background:transparent;border-radius:var(--r1);font-family:inherit;font-size:12.5px;color:var(--ink2);cursor:pointer}
+.tl-load:active{background:var(--paper2)}
+
+/* ---------- 月历 ---------- */
+.mhead{display:flex;align-items:flex-start;justify-content:space-between;padding:0 2px 12px}
+.mtitle{font-family:var(--serif);font-size:calc(26px * var(--ui-scale));font-weight:700;letter-spacing:.5px;line-height:1.15}
+.mmeta{font-size:11px;color:var(--ink3);margin-top:5px}
+.mnav{display:flex;gap:6px}
+.mnav button{
+  width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:10px;color:var(--ink2);
+  font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;
+}
+.mnav button:active{background:var(--paper2)}
+.mf-hint{font-size:10.5px;color:var(--ink3);margin:10px 2px 12px;line-height:1.6}
+.wrow{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px}
+.wrow span{text-align:center;font-size:10px;color:var(--ink3);padding:3px 0}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.grid.anim{animation:calIn .65s var(--ease)}
+@keyframes calIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.day{
+  aspect-ratio:1;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-size:15px;cursor:pointer;position:relative;color:var(--ink);overflow:hidden;
+  transition:transform .14s ease,background .2s,opacity .25s;
+}
+.day:active{transform:scale(.9)}
+.day.blank{cursor:default;opacity:0}
+.day.dim{opacity:.3}
+.day.today{box-shadow:inset 0 0 0 1.4px var(--sage);font-weight:600}
+.day .emo{position:absolute;top:3px;left:0;right:0;text-align:center;font-size:12px;line-height:1;z-index:1}
+.day .dnum{position:relative;z-index:1;font-weight:600;color:var(--ink);text-shadow:0 0 3px rgba(255,253,249,.9)}
+/* 荧光笔道：压在数字后面，多支笔时粗细交替 */
+.day .swipes{position:absolute;inset:0;pointer-events:none}
+.day .swipe{position:absolute;left:6%;right:6%;border-radius:999px;opacity:.42}
+.day .swipe.s1{height:18%;top:60%}
+.day .swipe.s2{height:32%;top:42%}
+.day .swipe.s3{height:40%;top:34%}
+
+/* 多标记选择行 */
+.mksel{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:calc(13px * var(--ui-scale))}
+.mksel+.mksel{border-top:1px solid var(--line2)}
+.mksel-dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+.mksel-n{flex:1;min-width:0;color:var(--ink)}
+.mksel-sizes{display:flex;gap:4px}
+.mksel-sz{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:4px 9px;font-family:inherit;font-size:11px;color:var(--ink2);cursor:pointer;transition:all .16s}
+.mksel-sz.on{background:var(--sage-l);border-color:var(--sage);color:var(--sage-d);font-weight:600}
+.mksel-x{border:none;background:transparent;color:var(--ink3);font-size:15px;cursor:pointer;font-family:inherit;padding:0 2px}
+
+/* ---------- 热力图 ---------- */
+.heat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.heat-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:13px 12px 12px;box-shadow:var(--sh1)}
+.heat-h{display:flex;align-items:baseline;gap:6px;margin-bottom:7px}
+.heat-n{font-family:var(--serif);font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:54%}
+.heat-v{font-size:9px;color:var(--ink3);margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
+.heat-card .heat{gap:2px}
+.heat-card .heat .hc{font-size:7.5px;border-radius:3px}
+.heat{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.heat .hc{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9.5px;color:var(--ink3);background:var(--line2)}
+.heat .hc.blank{background:transparent}
+.heat .hc.lv1{background:rgba(var(--sage-rgb),.22);color:var(--ink2)}
+.heat .hc.lv2{background:rgba(var(--sage-rgb),.38);color:var(--ink2)}
+.heat .hc.lv3{background:rgba(var(--sage-rgb),.58);color:#fff}
+.heat .hc.lv4{background:rgba(var(--sage-rgb),.8);color:#fff}
+.heat-legend{display:flex;align-items:center;gap:5px;margin-top:10px;font-size:10px;color:var(--ink3)}
+.heat-legend .hl-sw{width:11px;height:11px;border-radius:3px;background:var(--line2);display:inline-block}
+.heat-legend .hl-sw.lv1{background:rgba(var(--sage-rgb),.22)}
+.heat-legend .hl-sw.lv2{background:rgba(var(--sage-rgb),.38)}
+.heat-legend .hl-sw.lv3{background:rgba(var(--sage-rgb),.58)}
+.heat-legend .hl-sw.lv4{background:rgba(var(--sage-rgb),.8)}
+.heat-legend .hl-t{font-size:10px}
+
+/* ---------- 统计 / 图表 / 记录列表 ---------- */
+.gym-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.gym-stat{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:12px;box-shadow:var(--sh1)}
+.gym-stat .l{font-size:10px;letter-spacing:1.2px;color:var(--ink3)}
+.gym-stat .v{font-family:var(--serif);font-size:calc(22px * var(--ui-scale));font-weight:600;margin-top:6px;line-height:1}
+.gym-stat .v em{font-style:normal;font-size:10px;font-family:inherit;font-weight:400;color:var(--ink3);margin-left:3px}
+.chart{display:flex;align-items:flex-end;gap:4px;height:74px;margin-top:6px;border-bottom:1px solid var(--line2);padding-bottom:1px}
+.bar{flex:1;border-radius:3px 3px 0 0;background:#EFE8DB;position:relative;transition:height .5s var(--ease);min-height:3px}
+.bar.has{background:var(--sage)}
+.bar.today{background:var(--clay)}
+.chart-x{display:flex;gap:4px;margin-top:6px}
+.chart-x span{flex:1;text-align:center;font-size:8.5px;color:var(--ink3)}
+.wk-item{display:flex;gap:10px;padding:11px 0;border-top:1px solid var(--line2);align-items:flex-start;cursor:pointer}
+.wk-item:first-child{border-top:none}
+.wk-d{flex:0 0 44px;font-size:11px;color:var(--ink3);padding-top:2px;line-height:1.5}
+.wk-main{flex:1;min-width:0}
+.wk-t{font-size:13.5px;line-height:1.4}
+.wk-s{font-size:10.5px;color:var(--ink3);margin-top:3px}
+.wk-v{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--sage-d);flex:0 0 auto}
+
+/* 记录页头部的导出入口 */
+.hd-pdf{display:inline-block;margin-top:10px;font-size:11.5px;color:var(--sage-d);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+
+@media(max-width:360px){
+  .day{font-size:12px}.day .emo{font-size:14px}
+}

@@ -1,0 +1,245 @@
+/* base.css — 全局骨架与通用组件：变量 / 布局 / 头部 / 卡片 / 按钮 / 弹层 */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#FAF7F1; --paper:#FFFFFF; --paper2:#F4EEE3;
+  --ink:#2E2C28; --ink2:#6D675E; --ink3:#A79F92;
+  --line:#EAE3D6; --line2:#F1EBE1;
+  --sage:#6F8F7E; --sage-d:#4E6A5B; --sage-l:#E8EFEA; --sage-rgb:111,143,126;
+  --primary:var(--sage); --primary-light:var(--sage-l); --text-accent:var(--sage-d); --surface:var(--paper);
+  --frame:#EDE7DD;
+  --clay:#BC8669; --clay-l:#F7EDE6;
+  --r1:12px; --r2:18px; --r3:26px;
+  --sh1:0 1px 2px rgba(46,44,40,.045);
+  --sh2:0 14px 34px -22px rgba(46,44,40,.45);
+  --serif:"Songti SC","Noto Serif SC","Source Han Serif SC",Georgia,serif;
+  --ease:cubic-bezier(.22,.72,.2,1);
+  --dur-3:1.05s;  /* 页面、卡片进场 */
+  --dur-2:.85s;  /* 浮层、弹窗 */
+  --dur-1:.55s;  /* 轻反馈 */
+  --ui-scale:1.2;
+}
+html{-webkit-text-size-adjust:100%}
+/* ---------- 主题色预设（莫兰迪；默认即当前灰绿，未列出变量沿用 ：root） ---------- */
+html.theme-mist{--sage:#61728D;--sage-d:#49566E;--sage-l:#E4E9F2;--sage-rgb:97,114,141;--bg:#F7F8FB;--paper:#FDFDFE;--paper2:#EBEEF4;--line:#E2E6EE;--line2:#EEF1F6;--frame:#E7EAF0}
+html.theme-clay{--sage:#B7715F;--sage-d:#995A49;--sage-l:#F7E6DE;--sage-rgb:183,113,95;--bg:#FAF5F1;--paper:#FFFEFD;--paper2:#F2E7DF;--line:#EFE2D9;--line2:#F6ECE5;--frame:#EEE1D9}
+html.theme-matcha{--sage:#5C7561;--sage-d:#465C4B;--sage-l:#E2EBE3;--sage-rgb:92,117,97;--bg:#F6FAF6;--paper:#FCFEFC;--paper2:#E8F0E9;--line:#DFE9E1;--line2:#EDF3EE;--frame:#E2ECE4}
+html.theme-lotus{--sage:#8E7A8E;--sage-d:#71606F;--sage-l:#F0E9F0;--sage-rgb:142,122,142;--bg:#F9F7F9;--paper:#FEFCFE;--paper2:#F1EBF1;--line:#EAE2EA;--line2:#F3EEF3;--frame:#E9E2E9}
+html.theme-warm{--sage:#6A5D57;--sage-d:#544842;--sage-l:#EFE7E1;--sage-rgb:106,93,87;--bg:#F9F6F3;--paper:#FEFDFB;--paper2:#F0EAE4;--line:#EAE2DB;--line2:#F4EFEA;--frame:#E8E1DA}
+/* 换主题时颜色平滑过渡（组件自带 transition 的不受影响） */
+body,.card,.nav,.chip,.btn,.mask,.sheet,.page{transition:background-color .3s ease,border-color .3s ease,color .3s ease}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;
+  background:var(--frame);color:var(--ink);display:flex;justify-content:center;
+  min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.7;letter-spacing:.15px;
+}
+#app{
+  width:100%;max-width:460px;min-height:100vh;position:relative;overflow-x:hidden;
+  background-color:var(--bg);
+  background-image:radial-gradient(rgba(170,150,120,.085) .8px,transparent .8px);
+  background-size:20px 20px;
+  padding-bottom:calc(86px + env(safe-area-inset-bottom));
+  box-shadow:0 0 60px rgba(60,50,40,.09);
+}
+.page{display:none;opacity:1}
+.page.on{display:block;animation:page-entry var(--dur-3) var(--ease) both}
+@keyframes page-entry{0%{opacity:0;transform:translateY(10px)}60%{opacity:.85}to{opacity:1;transform:none}}
+
+.pad{padding-left:18px;padding-right:18px}
+
+/* 模块之间的淡分割线 */
+.hr{height:1px;background:var(--line2);margin:26px 2px 0}
+
+/* 回到顶端：滚过一屏才出现 */
+.to-top{
+  position:fixed;right:14px;bottom:calc(94px + env(safe-area-inset-bottom));
+  width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
+  background:var(--paper);color:var(--ink2);font-size:18px;line-height:1;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:var(--sh2);z-index:40;font-family:inherit;
+  opacity:0;transform:translateY(12px) scale(.9);pointer-events:none;
+  transition:opacity .4s var(--ease),transform .4s var(--ease);
+}
+.to-top.on{opacity:1;transform:none;pointer-events:auto}
+body.pomo-on .to-top{opacity:0;pointer-events:none}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ---------- 头部 ---------- */
+.hd{padding-top:26px;padding-bottom:14px}
+.hd-date{font-size:calc(13px * var(--ui-scale));letter-spacing:2px;color:var(--ink2);text-transform:uppercase;font-weight:500}
+.hd-hi{font-family:var(--serif);font-size:calc(27px * var(--ui-scale));font-weight:600;letter-spacing:.5px;margin-top:8px;line-height:1.25}
+.hd-sub{font-size:calc(12.5px * var(--ui-scale));color:var(--ink2);margin-top:7px;letter-spacing:.3px}
+/* 进入页面时：日期 → 问候语 → 副题，依次平缓浮现（博客式） */
+.page.on .hd-date{animation:hdIn .9s var(--ease) both}
+.page.on .hd-hi{animation:hdIn 1.05s .14s var(--ease) both}
+.page.on .hd-sub{animation:hdIn 1.05s .26s var(--ease) both}
+@keyframes hdIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+/* ---------- 区块标题 ---------- */
+.sec{display:flex;align-items:center;gap:10px;margin:28px 0 12px}
+.sec-t{font-family:var(--serif);font-size:calc(18px * var(--ui-scale));letter-spacing:1.5px;color:var(--ink);font-weight:600;white-space:nowrap}
+.sec-line{flex:1;height:1px;background:var(--line2)}
+.sec-a{font-size:11.5px;color:var(--clay);cursor:pointer;padding:2px 0;white-space:nowrap;font-family:inherit}
+
+/* ---------- 卡片 ---------- */
+.card{
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);
+  box-shadow:var(--sh1);padding:6px 17px;
+  transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .4s var(--ease);
+}
+.card.plain{padding:18px}
+.card+.card{margin-top:13px}
+.card:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:#E2D8C6}
+
+/* ---------- 底部导航 ---------- */
+.nav{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:460px;z-index:40;
+  display:flex;background:var(--bg);
+  border-top:1px solid var(--line);padding:6px 4px calc(7px + env(safe-area-inset-bottom));
+}
+.nav button{
+  flex:1;border:none;background:none;font-family:inherit;cursor:pointer;color:var(--ink2);
+  display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0 4px;transition:color .25s var(--ease),transform .25s var(--ease);
+}
+.nav svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.nav span{font-size:11px;letter-spacing:.5px;font-weight:500}
+.nav button.on{color:var(--sage-d)}
+.nav button.on span{font-weight:600}
+.nav button.on svg{stroke-width:1.9}
+.nav button:active{opacity:.6}
+
+/* ---------- 分段切换 ---------- */
+.seg{display:flex;background:var(--paper2);border-radius:12px;padding:3px;gap:2px;margin:0 18px 14px}
+.seg button{
+  flex:1;border:none;background:transparent;font-family:inherit;font-size:12.5px;color:var(--ink2);
+  padding:8px 0;border-radius:9px;cursor:pointer;transition:all .2s;
+}
+.seg button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 4px rgba(46,44,40,.09)}
+
+/* ---------- 按钮 / 胶囊 ---------- */
+.btn{
+  border:none;border-radius:11px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  padding:11px 16px;transition:transform .25s var(--ease),background .2s,box-shadow .25s var(--ease);
+}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:scale(.97)}
+.btn.p{background:var(--sage);color:#fff;box-shadow:0 4px 14px -6px rgba(var(--sage-rgb),.7)}
+.btn.p:disabled{opacity:.4;cursor:default;box-shadow:none}
+.btn.g{background:var(--paper2);color:var(--ink)}
+.btn.o{background:transparent;border:1px solid var(--line);color:var(--ink2)}
+.btn.d{background:transparent;border:1px solid #E3C7BC;color:var(--clay)}
+.btn.sm{padding:8px 12px;font-size:12px}
+/* ---------- 全站唯一的 Chip 组件 ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  height:36px;padding:0 12px;white-space:nowrap;
+  border:1px solid var(--line);background:transparent;border-radius:100px;
+  font-family:inherit;font-size:12px;color:var(--ink2);cursor:pointer;
+  transition:background-color .2s var(--ease),border-color .2s var(--ease),color .2s var(--ease),transform .16s var(--ease);
+}
+.chip:hover{background:var(--paper2)}
+.chip:active{transform:scale(.95)}
+.chip.on{background:var(--sage);border-color:var(--sage);color:#fff;font-weight:600}
+.chip.on:hover{background:var(--sage-d);border-color:var(--sage-d)}
+.chip.ghost{border-style:dashed;color:var(--ink3)}
+.chip b{font-size:10px;font-weight:600}
+
+/* ---------- 设置行 / 胶囊池 ---------- */
+.row{display:flex;align-items:center;gap:12px;padding:16px 0;border-top:1px solid var(--line2);cursor:pointer}
+.row:first-child{border-top:none}
+.row-main{flex:1;min-width:0}
+.row-t{font-size:calc(14.5px * var(--ui-scale));line-height:1.6}
+.row-s{font-size:calc(11px * var(--ui-scale));color:var(--ink3);margin-top:5px;line-height:1.8}
+.row-a{font-size:11.5px;color:var(--ink3);flex:0 0 auto}
+.pool{display:flex;flex-wrap:wrap;gap:7px;padding:2px 0 4px}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--line);
+  border-radius:100px;padding:7px 6px 7px 12px;font-family:inherit;font-size:12.5px;color:var(--ink);
+  cursor:pointer;transition:transform .15s;
+}
+.pill:active{transform:scale(.96)}
+.pill .dotc{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;flex:0 0 auto}
+.pill .x{
+  width:18px;height:18px;border-radius:50%;border:none;background:var(--paper2);color:var(--ink3);
+  font-size:11px;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0;
+}
+.pill .x:active{background:#EFDCD2;color:var(--clay)}
+.pill.add{border-style:dashed;color:var(--ink3);padding:7px 12px}
+
+/* ---------- 遮罩 / 弹层 ---------- */
+.mask{
+  position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;
+  justify-content:center;background:rgba(240,235,226,.88);opacity:0;visibility:hidden;transition:opacity .5s var(--ease);
+}
+.mask.on{opacity:1;visibility:visible}
+.mask.mid{align-items:center}
+.sheet{
+  width:100%;max-width:460px;background:var(--bg);border-radius:var(--r3) var(--r3) 0 0;
+  padding:8px 18px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;
+  transform:translateY(24px);transition:transform var(--dur-2) var(--ease);-webkit-overflow-scrolling:touch;
+  background-image:radial-gradient(rgba(170,150,120,.075) .8px,transparent .8px);background-size:20px 20px;
+}
+.mask.on .sheet{transform:translateY(0)}
+@media(min-width:600px){
+  .sheet{border-radius:var(--r3);max-width:440px;margin-bottom:24px}
+  .mask.on .sheet{transform:none}
+}
+@media(min-width:900px){
+  #app{max-width:560px}
+  .nav{max-width:560px}
+}
+.handle{width:36px;height:4px;border-radius:100px;background:#DED5C6;margin:4px auto 14px}
+.shd{margin-bottom:14px}
+.shd-t{font-family:var(--serif);font-size:calc(19px * var(--ui-scale));font-weight:600;letter-spacing:.3px}
+.shd-s{font-size:11.5px;color:var(--ink3);margin-top:5px;line-height:1.6}
+.field{margin-bottom:13px}
+.field-l{font-size:10.5px;letter-spacing:1.2px;color:var(--ink3);margin:0 0 6px 2px}
+.inp,.ta,.sel{
+  width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 12px;
+  font-family:inherit;font-size:16px;color:var(--ink);outline:none;transition:border-color .2s;
+}
+.inp:disabled{background:var(--line2);color:var(--ink3);cursor:default}
+.inp:focus,.ta:focus,.sel:focus{border-color:var(--sage)}
+.ta{resize:none;line-height:1.7}
+.inp::placeholder,.ta::placeholder{color:var(--ink3);font-size:13px}
+.row2{display:flex;gap:9px}
+.row2>*{flex:1;min-width:0}
+.acts{display:flex;gap:9px;margin-top:6px}
+.acts .btn{flex:1;padding:13px 0}
+.acts .btn.fx{flex:0 0 84px}
+.modal{
+  width:calc(100% - 46px);max-width:370px;background:var(--bg);border-radius:22px;padding:20px 18px 16px;
+  transform:scale(.95) translateY(8px);transition:transform .6s var(--ease);box-shadow:var(--sh2);
+  max-height:86vh;overflow-y:auto;
+}
+.mask.on .modal{transform:none}
+.m-t{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:600}
+.m-s{font-size:11.5px;color:var(--ink3);margin:6px 0 14px;line-height:1.65}
+.m-msg{font-size:13px;color:var(--ink2);line-height:1.75;margin-bottom:16px;white-space:pre-line}
+.toast{
+  position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translate(-50%,10px);
+  background:rgba(46,44,40,.94);color:#fff;font-size:12.5px;padding:9px 18px;border-radius:100px;
+  opacity:0;transition:all var(--dur-1) var(--ease);pointer-events:none;z-index:95;white-space:nowrap;
+  box-shadow:0 8px 24px rgba(0,0,0,.18);
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.float{
+  position:fixed;pointer-events:none;font-size:13px;font-weight:700;color:var(--sage-d);z-index:96;
+  animation:fu 1.5s var(--ease) forwards;text-shadow:0 1px 4px rgba(255,255,255,.9);
+}
+@keyframes fu{0%{opacity:1;transform:translate(-50%,0)}65%{opacity:1}100%{opacity:0;transform:translate(-50%,-32px)}}
+
+@media(max-width:360px){
+  .seg button{font-size:12px}
+}
+/* toast 里的撤销按钮 */
+.toast .t-act{
+  border:none;background:transparent;color:#fff;font-family:inherit;font-size:12.5px;
+  font-weight:700;letter-spacing:.5px;text-decoration:underline;text-underline-offset:3px;
+  cursor:pointer;padding:0 0 0 6px;pointer-events:auto;
+}
+
+/* 时长输入：分 + 秒 */
+.dur-row{display:flex;align-items:center;gap:8px;margin-top:10px}
+.dur-row .inp{flex:1;min-width:0;width:0}
+.dur-row span{flex:0 0 auto;font-size:12px;color:var(--ink3)}

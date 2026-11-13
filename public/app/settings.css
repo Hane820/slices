@@ -1,0 +1,90 @@
+/* settings.css — 设置页专属：开关 / 颜色与表情选择 */
+
+/* 开关 */
+.sw{width:31px;height:18px;border-radius:100px;background:#E2DACC;border:none;cursor:pointer;position:relative;flex:0 0 auto;transition:background .22s;padding:0;opacity:.9}
+.sw::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .22s cubic-bezier(.3,1.3,.5,1);box-shadow:0 1px 3px rgba(0,0,0,.16)}
+.sw.on{background:var(--sage);opacity:1}
+.sw.on::after{transform:translateX(13px)}
+
+/* 标记编辑：预览 → 颜色 → 符号（可选）→ 名字，分区标题小号灰字、间距 20px */
+.pv-sec{font-size:11px;color:var(--ink3);margin:20px 0 10px;letter-spacing:.5px}
+.pv-cell{
+  position:relative;width:96px;height:80px;margin:4px auto 0;border-radius:12px;
+  background:var(--paper);border:1px solid var(--line);box-shadow:var(--sh1);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.pv-cell .pv-swipe{position:absolute;left:9%;right:9%;top:34%;height:38%;border-radius:999px;opacity:.5;transform:rotate(-1.8deg)}
+.pv-cell .pv-emo{position:absolute;top:5px;left:0;right:0;text-align:center;font-size:13px;line-height:1;z-index:1}
+.pv-cell .pv-name{position:relative;z-index:1;font-weight:600;font-size:14px;color:var(--ink);text-shadow:0 0 3px rgba(255,253,249,.9)}
+.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.sw-c{aspect-ratio:1;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:transform .15s,box-shadow .2s}
+.emos{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.em{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:17px;border-radius:10px;cursor:pointer;border:none;background:transparent;transition:background .15s}
+.em.sel{background:var(--sage-l)}
+.em.none{border:2px dashed var(--ink3);border-radius:50%;width:24px;height:24px;margin:auto;position:relative}
+.em.none.sel{border-color:var(--sage-d);background:var(--sage-l)}
+
+/* ---------- 主题色色块 ---------- */
+.themes{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:10px}
+.theme-sw{
+  position:relative;height:52px;border-radius:13px;border:1.5px solid var(--line);
+  cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;
+  transition:border-color .2s,transform .15s;padding:0;
+}
+.theme-sw:active{transform:scale(.94)}
+.theme-sw i{width:22px;height:22px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px rgba(46,44,40,.08)}
+.theme-sw b{position:absolute;bottom:3px;left:0;right:0;font-size:9px;font-weight:500;color:var(--ink2);text-align:center;letter-spacing:.5px}
+.theme-sw.on{border:2px solid var(--ink)}
+.theme-sw .ck{position:absolute;top:1px;right:4px;font-size:10px;color:var(--ink);font-weight:700}
+
+/* 编辑弹层底部的弱化删除入口（需进确认框才会真的删） */
+.fx-del{
+  display:block;margin:16px auto 0;border:none;background:transparent;
+  color:#B46254;font-size:calc(12.5px * var(--ui-scale));font-family:inherit;
+  cursor:pointer;padding:6px 12px;letter-spacing:.5px;transition:opacity .15s;
+}
+.fx-del:active{opacity:.5}
+
+/* 输入方式：多选模式的选项编辑 */
+.opt-add{display:flex;gap:7px;margin-top:9px}
+.opt-add .inp{flex:1}
+.opt-add .btn{flex:0 0 auto;padding:0 14px}
+.chip .opt-x{color:var(--ink3);margin-left:4px;font-size:11px}
+
+/* 每天目标：数字 + 单位下拉 + 不设目标，固定一行；切换只淡入淡出，行高不变 */
+.fx-goal-row{display:flex;align-items:center;gap:8px;min-height:36px;margin-top:10px}
+.fx-goal-main{
+  display:flex;align-items:center;gap:8px;min-width:0;
+  transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s;
+}
+.fx-goal-main.off{
+  opacity:0;transform:translateX(-6px);pointer-events:none;visibility:hidden;
+  transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s .18s;
+}
+.fx-num{
+  flex:0 0 72px;width:72px;height:36px;padding:0 9px;text-align:right;
+  border:1px solid transparent;background:var(--paper2);border-radius:10px;
+  font-family:inherit;font-size:16px;line-height:1;color:var(--ink);
+  font-variant-numeric:tabular-nums;outline:none;
+  -moz-appearance:textfield;appearance:textfield;
+  transition:border-color .18s var(--ease),background-color .18s var(--ease),box-shadow .18s var(--ease);
+}
+.fx-num::-webkit-outer-spin-button,.fx-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.fx-num::placeholder{color:var(--ink3);font-size:13px}
+.fx-num:focus{border-color:var(--sage);background:var(--paper);box-shadow:0 0 0 3px rgba(var(--sage-rgb),.14)}
+.fx-num.err{border-color:#CF8A76;background:#FBF1ED}
+.fx-unit{position:relative;display:inline-flex;flex:0 0 auto}
+.fx-unit::after{
+  content:"";position:absolute;right:11px;top:50%;width:5px;height:5px;
+  border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);
+  transform:translateY(-70%) rotate(45deg);pointer-events:none;
+}
+.fx-unit-sel{
+  display:block;appearance:none;-webkit-appearance:none;
+  width:84px;height:36px;padding:0 24px 0 12px;text-align:left;
+  cursor:pointer;color:var(--ink);
+}
+.fx-num-custom{flex:0 0 76px;width:76px;text-align:center;visibility:hidden;opacity:0;transition:opacity .16s var(--ease)}
+.fx-num-custom.on{visibility:visible;opacity:1}
+.fx-no-goal{flex:0 0 auto;margin-left:auto}
+.fx-no-goal.on{border-style:solid}

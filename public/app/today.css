@@ -1,0 +1,173 @@
+/* today.css — 今日页：提醒条 / 待办 / 今日重点 / 灵光一闪 / 日程 / 最近 / 计划 */
+/* ---------- 提醒条 ---------- */
+.remind{
+  margin:0 18px 4px;background:var(--paper2);border-left:3px solid var(--clay);
+  border-radius:0 var(--r1) var(--r1) 0;padding:11px 28px 11px 13px;position:relative;
+}
+.remind-line{font-size:12.5px;line-height:1.65;color:#7A533D;display:flex;gap:8px;align-items:flex-start;padding-right:16px}
+.remind-line+.remind-line{margin-top:6px}
+.remind-line span{flex:1}
+.remind-x{border:none;background:transparent;color:var(--ink3);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit;position:absolute;right:6px;top:5px;opacity:.7;transition:opacity .18s}
+.remind-x:active{opacity:1}
+.remind-act{border:none;background:transparent;color:#8B5A3E;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+
+/* ---------- 待办：一个分类一张卡 ---------- */
+.th{display:flex;align-items:center;gap:9px;padding:11px 0 7px}
+.th-n{font-size:calc(14px * var(--ui-scale));letter-spacing:1px;color:var(--ink);font-weight:700;flex:1}
+.th-c{font-size:calc(12px * var(--ui-scale));color:var(--ink2);font-weight:600;font-variant-numeric:tabular-nums}
+.tagcard{padding:2px 14px;margin-top:13px}
+.allbtn{
+  width:21px;height:21px;border-radius:50%;border:1.4px solid var(--line);background:#fff;
+  cursor:pointer;flex:0 0 auto;transition:all .22s cubic-bezier(.3,1.4,.5,1);padding:0;
+}
+.allbtn:active{transform:scale(.88)}
+.allbtn.on{background:var(--sage);border-color:var(--sage)}
+.task{display:flex;align-items:flex-start;gap:12px;padding:14px 0;cursor:pointer;position:relative}
+.task+.task{border-top:1px solid var(--line2)}
+.check{
+  width:21px;height:21px;border:1.4px solid #DCD3C4;border-radius:50%;flex:0 0 auto;margin-top:2px;
+  display:flex;align-items:center;justify-content:center;transition:all .18s ease;background:#fff;
+}
+.check.on{background:var(--sage);border-color:var(--sage);animation:pop .32s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pop{0%{transform:scale(.5)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.check.on::after{content:"";width:9px;height:4.5px;border-left:1.8px solid #fff;border-bottom:1.8px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.task-main{flex:1;min-width:0}
+.task-t{font-size:calc(14px * var(--ui-scale));line-height:1.75;color:var(--ink);transition:color .2s;word-break:break-word}
+.task.done .task-t{color:var(--ink3);text-decoration:line-through;text-decoration-color:#CFC6B7}
+/* 番茄钟结束自动打钩后的确认脉冲 */
+.task.hit{animation:taskHit 1.2s var(--ease) 1}
+@keyframes taskHit{0%{background:var(--sage-l)}100%{background:transparent}}
+.task-m{font-size:10.5px;color:var(--ink3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+.task-m .due{color:var(--clay)}
+.task-more{
+  border:none;background:transparent;color:var(--ink3);font-size:14px;letter-spacing:1px;cursor:pointer;
+  font-family:inherit;padding:0 2px;flex:0 0 auto;line-height:1.4;opacity:.5;transition:opacity .18s;
+}
+.task-more:active{opacity:.9}
+.addline{display:flex;align-items:center;gap:8px;padding:13px 0 14px;cursor:pointer;font-size:calc(14px * var(--ui-scale));color:var(--ink2);transition:color .18s}
+.addline:active{color:var(--sage-d)}
+.addline b{font-weight:500;font-size:calc(17px * var(--ui-scale));line-height:1}
+.inline-add{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line2)}
+.inline-add input{flex:1;border:none;background:transparent;outline:none;font-family:inherit;font-size:16px;color:var(--ink);min-width:0}
+.inline-add input::placeholder{font-size:13px;color:var(--ink3)}
+.inline-add .ok{border:none;background:transparent;font-family:inherit;font-size:12.5px;color:var(--sage-d);font-weight:600;cursor:pointer;padding:3px 4px}
+.inline-add .no{border:none;background:transparent;color:var(--ink3);font-size:15px;cursor:pointer;font-family:inherit;padding:3px 2px}
+.empty{padding:9px 0 13px;font-size:12px;color:var(--ink3);line-height:1.6}
+
+/* 标签条：待办卡最后一行 */
+.tagfoot{display:flex;align-items:center;gap:10px;padding:10px 0 11px;border-top:1px solid var(--line2);flex-wrap:wrap}
+.tf-l{font-size:11px;letter-spacing:1.6px;color:var(--ink3);flex:0 0 auto;font-weight:600}
+.tf-add{
+  flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:1px dashed var(--line);background:transparent;
+  color:var(--ink3);font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0;
+}
+
+/* ---------- 折叠：今日待办叠成一摞卡片（stylekit card-stack 公式） ----------
+   静息态第 i 层：translate(i*6px, i*10px) scale(1-i*.05) rotate(i*1.5deg)，透明度每层 -10% */
+.deck{position:relative;cursor:pointer;margin-bottom:38px}
+.deck-l{
+  position:absolute;top:0;bottom:0;left:0;right:0;
+  background:#FFFDF9;border:1px solid var(--line);border-radius:var(--r2);
+  box-shadow:var(--sh1);transform-origin:50% 0;
+  transition:transform .45s cubic-bezier(.16,1,.3,1),opacity .45s cubic-bezier(.16,1,.3,1);
+}
+.deck-l.l1{transform:translate(6px,10px) scale(.95) rotate(1.5deg);opacity:.9}
+.deck-l.l2{transform:translate(12px,20px) scale(.9) rotate(3deg);opacity:.8;background:#FAF4E9}
+@media(hover:hover){
+  .deck:hover .deck-l.l1{transform:translate(16px,16px) scale(.95) rotate(3deg)}
+  .deck:hover .deck-l.l2{transform:translate(30px,30px) scale(.9) rotate(6deg)}
+}
+.deck .top{position:relative;z-index:2;box-shadow:var(--sh2)}
+.deck .top:active{transform:scale(.99)}
+.deck .top .th{cursor:default}
+.deck .top .th + .th{border-top:1px solid var(--line2)}
+
+/* 展开时卡片依次落位（不支持 Web Animations 的兜底） */
+.tcard.deal,.tagcard.deal{animation:dealIn .5s var(--ease) both}
+@keyframes dealIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+
+/* ---------- 今日重点 ---------- */
+.goals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.goal{
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);
+  padding:16px 14px 15px;cursor:pointer;transition:transform .16s;box-shadow:var(--sh1);text-align:left;
+  font-family:inherit;display:flex;flex-direction:column;align-items:stretch;
+}
+.goal:active{transform:scale(.97)}
+.goal-l{font-size:calc(11.5px * var(--ui-scale));letter-spacing:.8px;color:var(--ink2);font-weight:600;display:flex;align-items:center;gap:4px;line-height:1.5;min-height:1.5em}
+.goal-v{font-family:var(--serif);font-size:calc(26px * var(--ui-scale));font-weight:600;margin-top:7px;line-height:1.15;letter-spacing:.3px;color:var(--ink)}
+.goal-v em{font-style:normal;font-size:10.5px;font-family:inherit;font-weight:400;color:var(--ink3);margin-left:2px}
+.goal-v.dim{color:var(--ink3)}
+.goal-bar{height:2.5px;border-radius:2px;background:var(--paper2);margin-top:10px;overflow:hidden}
+.goal-bar i{display:block;height:100%;border-radius:2px;background:var(--sage);transition:width .5s var(--ease)}
+.goal-sub{font-size:calc(10.5px * var(--ui-scale));color:var(--ink2);margin-top:auto;padding-top:9px;letter-spacing:.2px;line-height:1.6}
+
+/* ---------- 灵光一闪 ---------- */
+.flash-ta{width:100%;border:none;background:transparent;outline:none;resize:vertical;font-family:inherit;
+  font-size:calc(15px * var(--ui-scale));line-height:1.85;color:var(--ink);min-height:132px}
+.flash-foot{display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line2);padding-top:10px}
+.flash-hint{flex:1;font-size:10.5px;color:var(--ink3);letter-spacing:.2px}
+.flash-list{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.flash-item{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:10px 12px;box-shadow:var(--sh1)}
+.flash-d{font-size:10px;color:var(--ink3);letter-spacing:.6px;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.flash-t{font-size:calc(13px * var(--ui-scale));color:var(--ink2);line-height:2.05;white-space:pre-wrap;word-break:break-word}
+
+/* ---------- 日程 ---------- */
+.sch{display:flex;gap:11px;padding:10px 0;align-items:flex-start;cursor:pointer}
+.sch+.sch{border-top:1px solid var(--line2)}
+.sch-time{font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums;flex:0 0 42px;padding-top:1px;line-height:1.5}
+.sch-main{flex:1;min-width:0}
+.sch-t{font-size:13.5px;line-height:1.4}
+.sch-p{font-size:10.5px;color:var(--ink3);margin-top:2px}
+.sch.next .sch-time{color:var(--sage-d);font-weight:600}
+.sch.next .sch-t{color:var(--sage-d);font-weight:600}
+.now-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--sage);margin-right:5px;vertical-align:1px}
+
+/* ---------- 最近 ---------- */
+.rec{display:flex;gap:10px;padding:10px 0;cursor:pointer}
+.rec+.rec{border-top:1px solid var(--line2)}
+.rec-d{font-size:11.5px;color:var(--ink3);flex:0 0 46px;font-variant-numeric:tabular-nums;padding-top:1px}
+.rec-t{flex:1;font-size:12.5px;color:var(--ink2);line-height:1.55;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* ---------- 接下来 / 计划 / 倒计时 ---------- */
+.up-row{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer}
+.up-row+.up-row{border-top:1px solid var(--line2)}
+.up-d{flex:0 0 62px;font-size:10.5px;color:var(--clay);letter-spacing:.2px}
+.up-t{flex:1;font-size:13px;line-height:1.45;min-width:0}
+.up-a{font-size:11px;color:var(--ink3)}
+.plan-pick{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0 12px}
+.plan-date{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:14px;color:var(--ink);outline:none}
+.pd-group{margin-bottom:18px}
+.pd-group:first-child{margin-top:4px}
+.pd-h{display:flex;align-items:baseline;gap:9px;margin:0 2px 8px}
+.pd-d{font-family:var(--serif);font-size:calc(15.5px * var(--ui-scale));font-weight:600}
+.pd-w{font-size:11px;color:var(--ink3)}
+.pd-c{margin-left:auto;font-size:11px;color:var(--clay);font-weight:600}
+.pd-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:2px 13px;box-shadow:var(--sh1)}
+.pd-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;cursor:pointer}
+.pd-row+.pd-row{border-top:1px solid var(--line2)}
+.pd-check{width:20px;height:20px;border:1.4px solid #DCD3C4;border-radius:50%;flex:0 0 auto;margin-top:1px}
+.pd-row.is-done .pd-check{background:var(--sage);border-color:var(--sage);position:relative}
+.pd-row.is-done .pd-check::after{content:"";position:absolute;width:8px;height:4px;border-left:1.7px solid #fff;border-bottom:1.7px solid #fff;transform:rotate(-45deg);left:5px;top:6px}
+.pd-main{flex:1;min-width:0}
+.pd-t{font-size:13.5px;line-height:1.45}
+.pd-row.is-done .pd-t{color:var(--ink3);text-decoration:line-through}
+.pd-n{font-size:10.5px;color:var(--ink3);margin-top:3px}
+.pd-x{border:none;background:transparent;color:var(--ink3);font-size:14px;cursor:pointer;font-family:inherit;padding:0 2px;opacity:.6}
+
+@media(max-width:360px){
+  .hd-hi{font-size:calc(24px * var(--ui-scale))}
+  .goal-v{font-size:19px}
+}
+
+/* 计数类重点 +1 时数字轻轻一跳 */
+.goal-v.bump{animation:goalBump .34s var(--ease)}
+@keyframes goalBump{
+  0%{transform:translateY(0)}
+  38%{transform:translateY(-3px) scale(1.06)}
+  100%{transform:translateY(0)}
+}
+
+/* 番茄钟飞到条目上打钩时的短脉冲 */
+.task.pomo-hit{animation:pomoHit .24s var(--ease) 1}
+@keyframes pomoHit{0%{background:transparent}45%{background:var(--sage-l)}100%{background:transparent}}
