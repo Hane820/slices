@@ -36,8 +36,8 @@ const structuredData = {
     <TableOfContents variant="rail" headings={tocHeadings}/>
     <div class="prose"><Content /></div>
   </article>
-  {related.length>0 && <section><div class="section-heading"><h2>相关文章</h2></div><div class="list">{related.map((item)=><PostCard entry={item}/>)}</div></section>}
-  <nav class="post-nav" aria-label="文章导航"><div>{previous && <><span>上一篇</span><a href={writingPath(previous)}>{previous.data.title}</a></>}</div><div>{next && <><span>下一篇</span><a href={writingPath(next)}>{next.data.title}</a></>}</div></nav>
+  {related.length>0 && <section class="narrow"><div class="section-heading"><h2>相关文章</h2></div><div class="list">{related.map((item)=><PostCard entry={item}/>)}</div></section>}
+  <nav class="post-nav narrow" aria-label="文章导航"><div>{previous && <><span>上一篇</span><a href={writingPath(previous)}>{previous.data.title}</a></>}</div><div>{next && <><span>下一篇</span><a href={writingPath(next)}>{next.data.title}</a></>}</div></nav>
 </BaseLayout>
 <style>
 .article{padding:5rem 0}
