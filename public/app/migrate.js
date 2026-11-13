@@ -12,6 +12,8 @@
  *   - 干跑不通过（fatal / 主键冲突 / 数量不符 / 无指纹）一律禁止写入
  *   - 事务内第一条 await 必须是 assertMigrationLease()
  *   - meta 只按精确白名单操作，不做前缀匹配
+ *   - 未知顶层字段原样存 meta.legacyExtras（不进业务表，也不丢）
+ *   - 写入权：assertWriteLease / renewWriteLease 只提供能力，不接 save()、不自动启动
  *   - 不调用 save() / normalize() / loadState()，不碰全局 S
  *   - localStorage['earthonline-v4'] 原样保留，只写独立的 earthonline-v4-migrated
  *
@@ -32,10 +34,22 @@
   var TABLE_NAMES = ['meta', 'definitions', 'tasks', 'schedule', 'dayEntries', 'dayMaps'];
   var BUSINESS_TABLES = ['definitions', 'tasks', 'schedule', 'dayEntries', 'dayMaps'];
   var PAYLOAD_KEYS = ['v', 'settings', 'plugins'];
+  var EXTRAS_KEY = 'legacyExtras';
+
+  /* 19 个顶层字段，与 legacy.js 的 TOP_ORDER / core.js 的 defaults() 逐一对应。
+     不在此列 = 未知顶层字段，写入 meta.legacyExtras，绝不丢弃。 */
+  var TOP_KEYS = [
+    'v', 'tasks', 'schedule', 'plans', 'notes', 'marks', 'pens', 'tags', 'tagLogs',
+    'suggestions', 'doneSugg', 'workouts', 'studyLogs', 'decisionLog', 'restDays',
+    'flashes', 'itemLogs', 'plugins', 'settings'
+  ];
+
+  /* 重迁移时先清的业务载荷：三个原始载荷 + legacyExtras（它由源数据派生） */
+  var CLEARED_KEYS = PAYLOAD_KEYS.concat([EXTRAS_KEY]);
 
   /* meta 精确白名单。新增 key 必须显式改这里，不接受前缀/正则通配。 */
   var META_ALLOWED = {
-    v: 'payload', settings: 'payload', plugins: 'payload',
+    v: 'payload', settings: 'payload', plugins: 'payload', legacyExtras: 'payload',
     schemaVersion: 'infra', migration: 'infra', writer: 'infra',
     preNormalize: 'infra', bizDatePolicy: 'infra'
   };
@@ -173,6 +187,19 @@
     if (has(S0, 'v')) rows.meta.push({ key: 'v', value: S0.v });
     if (isPlainObject(S0.settings)) rows.meta.push({ key: 'settings', value: shallow(S0.settings) });
     if (Array.isArray(S0.plugins)) rows.meta.push({ key: 'plugins', value: S0.plugins.slice() });
+
+    /* 未知顶层字段：键与值原样收进 meta.legacyExtras。
+       不删、不改、不进五张业务表，也不计入六表条数（Step 3 预览只算三个载荷）。 */
+    var extraKeys = [];
+    var extraVal = {};
+    var allTop = Object.keys(S0).sort();
+    for (i = 0; i < allTop.length; i++) {
+      if (TOP_KEYS.indexOf(allTop[i]) < 0) {
+        extraKeys.push(allTop[i]);
+        extraVal[allTop[i]] = S0[allTop[i]];
+      }
+    }
+    rows.extras = { present: extraKeys.length > 0, keys: extraKeys, value: extraVal };
 
     for (i = 0; i < DEF_MAP.length; i++) {
       var dm = DEF_MAP[i];
@@ -384,6 +411,12 @@
           if (!h.hex) blocked.push({ code: 'digest-unavailable', message: '当前环境算不出 SHA-256（非安全上下文），无法建立可核对的来源指纹' });
 
           var warnings = (rep.issues || []).concat(built.issues);
+          if (built.rows.extras.present) {
+            warnings.push({
+              level: 'info', code: 'extras.preserved', path: built.rows.extras.keys.join(','),
+              message: '有 ' + built.rows.extras.keys.length + ' 个未知顶层字段，将原样存入 meta.legacyExtras（不进业务表）'
+            });
+          }
           if (badDates.length) {
             var kinds = {};
             for (var b = 0; b < badDates.length; b++) kinds[badDates[b].kind || badDates[b].type] = true;
@@ -404,6 +437,7 @@
             expected: expected,
             diff: diff,
             rows: built.rows,
+            extras: built.rows.extras,
             source: {
               status: rep.status,
               sha256: h.hex,
@@ -539,6 +573,70 @@
     });
   }
 
+  /* ==================== 写入权（Step 4.5） ==================== */
+
+  /* 业务写入权的校验顺序：存在 → 状态 → 归属 → epoch → 有效期。
+     顺序固定，第一个不满足的即为失败原因，便于诊断「到底哪一项不对」。 */
+  function checkWriteLease(db, ownerId, epoch) {
+    return db.meta.get('writer').then(function (w) {
+      if (!w) throw writeLeaseError('writer-missing', '没有写入权记录');
+      if (w.status !== 'active') throw writeLeaseError('writer-inactive', '写入权状态不是 active：' + w.status);
+      if (w.ownerId !== ownerId) throw writeLeaseError('writer-owner-changed', '写入权已被其它标签页接管');
+      if (w.epoch !== epoch) throw writeLeaseError('writer-epoch-changed', '写入权 epoch 不匹配');
+      if (typeof w.leaseExpiresAt !== 'number' || w.leaseExpiresAt < Date.now()) {
+        throw writeLeaseError('writer-lease-expired', '写入权租约已过期');
+      }
+      return w;
+    });
+  }
+
+  function writeLeaseError(code, message) {
+    var err = new Error(message || code);
+    err.name = 'WriteLeaseLost';
+    err.code = code;
+    return err;
+  }
+
+  /* 拿当前已打开的实例；关闭态 instance() 返回 null，不自动 open（写入权不负责建库） */
+  function currentDb() {
+    if (!global.OLDB || typeof global.OLDB.instance !== 'function') return null;
+    try { return global.OLDB.instance(); } catch (e) { return null; }
+  }
+
+  /* 只读校验：不改任何字段。返回 {ok, ownerId, epoch, leaseExpiresAt} */
+  function assertWriteLease(ownerId, epoch) {
+    var db = currentDb();
+    if (!db) return Promise.resolve({ ok: false, reason: 'db-not-open', message: '数据库尚未打开' });
+    return db.transaction('r', db.meta, function () {
+      return checkWriteLease(db, ownerId, epoch);
+    }).then(function (w) {
+      return { ok: true, ownerId: w.ownerId, epoch: w.epoch, status: w.status, leaseExpiresAt: w.leaseExpiresAt };
+    }, function (e) {
+      return { ok: false, reason: (e && e.code) || 'write-lease-lost', message: (e && e.message) || String(e) };
+    });
+  }
+
+  /* 事务内校验后续期。校验不通过就一个字都不写——绝不把别人的写入权改成自己的。
+     返回 {ok:true, writer:{ownerId, epoch, heartbeatAt, leaseExpiresAt, status}} */
+  function renewWriteLease(ownerId, epoch) {
+    var db = currentDb();
+    if (!db) return Promise.resolve({ ok: false, reason: 'db-not-open', message: '数据库尚未打开' });
+    var renewed = null;
+    return db.transaction('rw', db.meta, function () {
+      return checkWriteLease(db, ownerId, epoch).then(function (w) {
+        var now = Date.now();
+        w.heartbeatAt = now;
+        w.leaseExpiresAt = now + WRITE_TTL;
+        renewed = { ownerId: w.ownerId, epoch: w.epoch, status: w.status, heartbeatAt: w.heartbeatAt, leaseExpiresAt: w.leaseExpiresAt };
+        return db.meta.put(w);
+      });
+    }).then(function () {
+      return { ok: true, writer: renewed };
+    }, function (e) {
+      return { ok: false, reason: (e && e.code) || 'write-lease-lost', message: (e && e.message) || String(e) };
+    });
+  }
+
   /* ==================== 租约续期 ==================== */
 
   /* claim 之后启动：每 MIGRATION_HEARTBEAT_MS 用独立的 meta 单表事务续租。
@@ -591,8 +689,8 @@
         }).then(function () {
           return db.dayMaps.clear();
         }).then(function () {
-          /* 精确白名单：只删三个业务载荷 key，基础设施行不动 */
-          return db.meta.bulkDelete(PAYLOAD_KEYS.slice());
+          /* 精确白名单：只删三个业务载荷 key + legacyExtras，基础设施行不动 */
+          return db.meta.bulkDelete(CLEARED_KEYS.slice());
         }).then(function () {
           /* 原始快照先落库：normalize 之前唯一可回退副本 */
           return db.meta.put({
@@ -601,6 +699,17 @@
             sha256: ctx.sourceHash,
             bytes: ctx.bytes,
             characters: ctx.characters,
+            capturedAt: now,
+            schemaVersion: SCHEMA_VERSION
+          });
+        }).then(function () {
+          /* 未知顶层字段的载体：有才写，没有就不留空行 */
+          if (!rows.extras || !rows.extras.present) return null;
+          return db.meta.put({
+            key: EXTRAS_KEY,
+            keys: rows.extras.keys.slice(),
+            value: rows.extras.value,
+            count: rows.extras.keys.length,
             capturedAt: now,
             schemaVersion: SCHEMA_VERSION
           });
@@ -633,12 +742,15 @@
               dayEntries: rows.dayEntries.length,
               dayMaps: rows.dayMaps.length
             };
+            m.legacyExtrasKeys = rows.extras ? rows.extras.keys.length : 0;
             return db.meta.put(m);
           });
         }).then(function () {
-          /* 迁移锁退出、日常写入权装上：同一个事务里完成切换 */
+          /* 迁移锁退出、日常写入权装上：同一个事务里完成切换。
+             status='active' 是 assertWriteLease 的第一道判定，缺它即视为无写入权。 */
           return db.meta.put({
             key: 'writer',
+            status: 'active',
             ownerId: ctx.ownerId,
             epoch: 1,
             heartbeatAt: now,
@@ -663,13 +775,16 @@
       return db.meta.get('migration');
     }).then(function (m) {
       return db.meta.get('writer').then(function (w) {
-        return {
-          counts: got,
-          metaStatus: m ? m.status : null,
-          leaseCleared: !!(m && m.ownerId === null && m.leaseExpiresAt === 0),
-          writerInstalled: !!(w && w.ownerId === ownerId),
-          schemaVersion: null
-        };
+        return db.meta.get(EXTRAS_KEY).then(function (x) {
+          return {
+            counts: got,
+            metaStatus: m ? m.status : null,
+            leaseCleared: !!(m && m.ownerId === null && m.leaseExpiresAt === 0),
+            writerInstalled: !!(w && w.ownerId === ownerId && w.status === 'active'),
+            legacyExtrasKeys: x && Array.isArray(x.keys) ? x.keys.length : 0,
+            schemaVersion: null
+          };
+        });
       });
     }).then(function (r) {
       return db.meta.get('schemaVersion').then(function (s) {
@@ -810,6 +925,7 @@
       diff: plan.diff,
       conflictCount: (plan.conflicts || []).length,
       badDateCount: (plan.badDates || []).length,
+      extrasCount: plan.extras && plan.extras.keys ? plan.extras.keys.length : 0,
       source: plan.source,
       warningCount: (plan.warnings || []).length
     };
@@ -866,6 +982,9 @@
     TABLE_NAMES: TABLE_NAMES.slice(),
     BUSINESS_TABLES: BUSINESS_TABLES.slice(),
     PAYLOAD_KEYS: PAYLOAD_KEYS.slice(),
+    CLEARED_KEYS: CLEARED_KEYS.slice(),
+    EXTRAS_KEY: EXTRAS_KEY,
+    TOP_KEYS: TOP_KEYS.slice(),
     META_ALLOWED: Object.keys(META_ALLOWED),
     isAllowedMetaKey: isAllowedMetaKey,
     buildRows: buildRows,
@@ -877,6 +996,9 @@
     run: run,
     status: status,
     readMarker: readMarker,
+    /* 写入权：Step 5 接线 save() 前先独立实现，本阶段只提供 API 与测试 */
+    assertWriteLease: assertWriteLease,
+    renewWriteLease: renewWriteLease,
     /* 供测试与人工恢复使用，不自动调用 */
     startHeartbeat: function (ownerId, epoch) {
       var db = global.OLDB && global.OLDB.instance();
