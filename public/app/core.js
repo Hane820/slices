@@ -331,14 +331,27 @@ function loadState(){
     save();
   }catch(e){}
 }
+function hasOwn(obj, k){
+  return Object.prototype.hasOwnProperty.call(obj, k);
+}
+/* 显式建自有属性。键名为 __proto__ 时普通赋值会走原型 setter：
+   字段丢失且把值挂成原型。5A 起所有动态合并统一走这里（Step 4.5 审核结论） */
+function defineOwn(obj, k, v){
+  if(k === '__proto__'){
+    Object.defineProperty(obj, k, { value: v, enumerable: true, writable: true, configurable: true });
+  }else{
+    obj[k] = v;
+  }
+}
 function deepMerge(base, src){
   for(var k in src){
-    if(!(k in base)){ base[k] = src[k]; continue; }
+    if(!hasOwn(src, k)) continue;
+    if(!hasOwn(base, k)){ defineOwn(base, k, src[k]); continue; }
     var b = base[k], s = src[k];
     if(b && s && typeof b === 'object' && typeof s === 'object' && !Array.isArray(b) && !Array.isArray(s)){
       deepMerge(b, s);
     }else if(s !== undefined){
-      base[k] = s;
+      defineOwn(base, k, s);
     }
   }
 }
@@ -411,8 +424,29 @@ function migrate(v3){
   if(v3.resetHour != null) S.settings.resetHour = v3.resetHour;
   if(v3.showDone != null) S.settings.showDone = v3.showDone;
 }
+/* ---------- IDB 模式写入闸门（Step 5A 安全修复） ----------
+   启动读取已切到 IndexedDB 后，业务写入仍走旧 save()（localStorage），
+   用户会以为保存成功、刷新后却回到库里的数据。
+   在接入 Step 5B 租约写事务之前，idb 模式下一律阻止业务写入：
+   - save() 拒写（所有 ~50 个业务调用点都经此处收口）
+   - importJSON / 清空数据在入口直接拦截（避免内存里 S 被替换）
+   - 拦截必须有节流的只读提示，不静默、不假装成功
+   legacy 模式（window.OLBoot 不存在或 mode != 'idb'）行为完全不变 */
+function bizWriteBlocked(){
+  var ob = (typeof window !== 'undefined') && window.OLBoot;
+  return !!(ob && ob.mode === 'idb');
+}
+var bizWriteNoticeAt = 0;
+function bizWriteBlockedNotice(){
+  var now = Date.now();
+  if(now - bizWriteNoticeAt < 3000) return;
+  bizWriteNoticeAt = now;
+  toast('只读模式：数据已迁到本地库，写入功能还没接入，这次改动不会保存');
+}
 function save(){
+  if(bizWriteBlocked()){ bizWriteBlockedNotice(); return false; }
   try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+  return true;
 }
 function normalize(){
   var d = defaults();
@@ -796,9 +830,11 @@ function confirmBox(title, msg, cb, opts){
 }
 
 /* ==================== 导入导出 ==================== */
-function exportJSON(){
+/* 生成备份文件：payload 结构与文件名沿用原有约定，改格式会破坏 importJSON 兼容性。
+   只接收待导出的数据，不读全局 S、不写任何存储、不调用 save()。 */
+function writeBackupFile(data){
   var payload = {
-    app: 'earthonline', version: 4, exportedAt: new Date().toISOString(), data: S
+    app: 'earthonline', version: 4, exportedAt: new Date().toISOString(), data: data
   };
   var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
   var url = URL.createObjectURL(blob);
@@ -810,7 +846,47 @@ function exportJSON(){
   toast('已导出备份');
 }
 
+/* idb 模式：备份必须等于 IndexedDB 里已持久化的数据，不能夹带内存中未保存的改动。
+   OLMigrate.rehydrate() 是单只读事务，返回六表反解的 S 形对象（含 legacyExtras）。
+   任何读取失败都明确报错且不生成文件，绝不退回内存 S。 */
+function exportFromIdb(){
+  function fail(msg){ toast('导出失败：' + msg + '，未生成备份'); }
+  var M = window.OLMigrate;
+  if(!M || typeof M.rehydrate !== 'function'){ fail('读取本地库不可用'); return; }
+  var rep;
+  try{ rep = M.rehydrate(); }
+  catch(e){ fail('读取本地库出错'); return; }
+  Promise.resolve(rep).then(function(r){
+    if(!r || r.ok !== true || !r.data || typeof r.data !== 'object'){
+      fail('读取本地库未完成' + (r && (r.reason || r.message) ? '（' + (r.reason || r.message) + '）' : ''));
+      return;
+    }
+    /* 与启动链 mergeRehydrated 同样的合并规则：defaults 打底 → 六表数据覆盖 → extras 原键原值。
+       不调用 normalize()（它只作用于全局 S），不改动 S，不写库。 */
+    var base = defaults();
+    deepMerge(base, r.data);
+    if(r.extras && Array.isArray(r.extras.keys) && r.extras.keys.length){
+      var val = r.extras.value || {};
+      for(var i = 0; i < r.extras.keys.length; i++){
+        var k = r.extras.keys[i];
+        if(!hasOwn(base, k)) defineOwn(base, k, val[k]);
+      }
+    }
+    writeBackupFile(base);
+  }, function(e){
+    fail('读取本地库出错' + (e && e.message ? '（' + e.message + '）' : ''));
+  });
+}
+
+function exportJSON(){
+  /* 与写入闸门共用同一个 idb 模式判定，避免两处判定漂移。
+     legacy 模式保持原有导出行为不变。 */
+  if(bizWriteBlocked()){ exportFromIdb(); return; }
+  writeBackupFile(S);
+}
+
 function importJSON(){
+  if(bizWriteBlocked()){ bizWriteBlockedNotice(); return; }   /* idb 模式：入口拦截，S 不被替换 */
   var inp = document.createElement('input');
   inp.type = 'file';
   inp.accept = 'application/json,.json';

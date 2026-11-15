@@ -465,6 +465,118 @@
     });
   }
 
+  /* ==================== 读取回灌（Step 5A） ==================== */
+
+  /* 自然序比较：'p2' < 'p10'。用于把按主键读回的行恢复成接近创建顺序 */
+  function cmpNat(a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  }
+
+  /* 剥离迁移时注入的路由字段（DEF_MAP 的 kind / ENTRY_MAP 的 type）。
+     旧数据结构里没有任何数组记录自带这两个字段名；若真有，
+     迁移时的 route.overwritten 警告已经记录过原值丢失。 */
+  function stripRoute(row, field) {
+    delete row[field];
+    return row;
+  }
+
+  /* 六表行 → S 形对象（逆向 buildRows）。只读，不改表。 */
+  function buildStateFromRows(metaRows, defRows, taskRows, schedRows, entryRows, mapRows) {
+    var d = {};
+    var out = { ok: true, data: d, extras: null, meta: {}, counts: {} };
+    var i, row, k;
+
+    out.counts.meta = metaRows.length;
+    for (i = 0; i < metaRows.length; i++) {
+      row = metaRows[i];
+      if (row.key === 'v') d.v = row.value;
+      else if (row.key === 'settings') d.settings = row.value;
+      else if (row.key === 'plugins') d.plugins = row.value;
+      else if (row.key === EXTRAS_KEY) out.extras = { keys: (row.keys || []).slice(), value: row.value };
+      else if (row.key === 'schemaVersion') out.meta.schemaVersion = row.value;
+      else if (row.key === 'migration') out.meta.migrationStatus = row.status;
+      else if (row.key === 'preNormalize') out.meta.preNormalize = { sha256: row.sha256, bytes: row.bytes };
+    }
+
+    /* definitions → pens / tags / suggestions */
+    defRows.sort(function (a, b) { return cmpNat(a.id, b.id); });
+    var defBuckets = { pen: [], tag: [], suggestion: [] };
+    for (i = 0; i < defRows.length; i++) {
+      row = defRows[i];
+      if (defBuckets[row.kind]) defBuckets[row.kind].push(stripRoute(row, 'kind'));
+    }
+    d.pens = defBuckets.pen;
+    d.tags = defBuckets.tag;
+    d.suggestions = defBuckets.suggestion;
+
+    /* tasks：创建时间优先，其次 id 自然序（主键序 't10' 会排到 't2' 前面） */
+    taskRows.sort(function (a, b) {
+      var ca = +a.createdAt || 0, cb = +b.createdAt || 0;
+      if (ca !== cb) return ca - cb;
+      return cmpNat(a.id, b.id);
+    });
+    d.tasks = taskRows;
+    out.counts.tasks = taskRows.length;
+
+    schedRows.sort(function (a, b) { return cmpNat(a.id, b.id); });
+    d.schedule = schedRows;
+    out.counts.schedule = schedRows.length;
+
+    /* dayEntries → 七类记录 + restDays */
+    var entryBuckets = {
+      plan: [], tagLog: [], workout: [], studyLog: [],
+      decision: [], flash: [], itemLog: [], restDay: []
+    };
+    for (i = 0; i < entryRows.length; i++) {
+      row = entryRows[i];
+      if (!entryBuckets[row.type]) continue;
+      if (row.type === 'restDay') entryBuckets.restDay.push(String(row.date || ''));
+      else entryBuckets[row.type].push(stripRoute(row, 'type'));
+    }
+    d.plans = entryBuckets.plan;
+    d.tagLogs = entryBuckets.tagLog;
+    d.workouts = entryBuckets.workout;
+    d.studyLogs = entryBuckets.studyLog;
+    d.decisionLog = entryBuckets.decision;
+    d.flashes = entryBuckets.flash;
+    d.itemLogs = entryBuckets.itemLog;
+    d.restDays = entryBuckets.restDay;
+    out.counts.dayEntries = entryRows.length;
+
+    /* dayMaps → notes / marks / doneSugg（键即原始日期键，非法键原样还原） */
+    d.notes = {}; d.marks = {}; d.doneSugg = {};
+    for (i = 0; i < mapRows.length; i++) {
+      row = mapRows[i];
+      if (row.kind === 'note') d.notes[row.date] = row.value;
+      else if (row.kind === 'mark') d.marks[row.date] = row.value;
+      else if (row.kind === 'doneSugg') d.doneSugg[row.date] = row.value;
+    }
+    out.counts.dayMaps = mapRows.length;
+
+    return out;
+  }
+
+  /* 从已打开的数据库读回全部业务数据。单读事务，不写任何东西。 */
+  function rehydrate() {
+    var db = global.OLDB && typeof global.OLDB.instance === 'function' ? global.OLDB.instance() : null;
+    if (!db) return Promise.resolve({ ok: false, reason: 'db-not-open', message: '数据库尚未打开' });
+
+    return db.transaction('r', db.meta, db.definitions, db.tasks, db.schedule, db.dayEntries, db.dayMaps, function () {
+      return db.meta.toArray()
+        .then(function (m) { return db.definitions.toArray().then(function (x) { return [m, x]; }); })
+        .then(function (r) { return db.tasks.toArray().then(function (x) { return [r[0], r[1], x]; }); })
+        .then(function (r) { return db.schedule.toArray().then(function (x) { return [r[0], r[1], r[2], x]; }); })
+        .then(function (r) { return db.dayEntries.toArray().then(function (x) { return [r[0], r[1], r[2], r[3], x]; }); })
+        .then(function (r) { return db.dayMaps.toArray().then(function (x) { return [r[0], r[1], r[2], r[3], r[4], x]; }); });
+    }).then(function (all) {
+      var rep = buildStateFromRows(all[0], all[1], all[2], all[3], all[4], all[5]);
+      rep.meta.tableNames = TABLE_NAMES.slice();
+      return rep;
+    }, function (e) {
+      return { ok: false, reason: 'read-failed', message: (e && e.message) || String(e) };
+    });
+  }
+
   /* ==================== 标记与租约 ==================== */
 
   function readMarker() {
@@ -1017,6 +1129,8 @@
     run: run,
     status: status,
     readMarker: readMarker,
+    /* Step 5A：从已迁移的六表读回业务数据（只读） */
+    rehydrate: rehydrate,
     /* 写入权：Step 5 接线 save() 前先独立实现，本阶段只提供 API 与测试 */
     assertWriteLease: assertWriteLease,
     renewWriteLease: renewWriteLease,

@@ -206,6 +206,7 @@ function renderSettings(){
   dataRow('导出备份', '一个 JSON 文件，包含全部记录', exportJSON);
   dataRow('从备份恢复', '会先给你看摘要，再决定合并还是替换', importJSON);
   dataRow('清空全部数据', '不可恢复，请先导出', function(){
+    if(bizWriteBlocked()){ bizWriteBlockedNotice(); return; }   /* idb 模式：入口拦截，S 不被清空 */
     confirmBox('清空全部数据？', '所有待办、标记、记录、训练都会消失，而且找不回来。', function(){
       S = defaults();
       normalize();
