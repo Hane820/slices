@@ -42,6 +42,8 @@
 
       <div class="sec"><span class="sec-t">不知道做什么</span><span class="sec-line"></span><span class="sec-a" data-action="go-decide">帮你决策 →</span></div>
 
+      <div class="sec" id="eatSec" style="display:none"><span class="sec-t">不知道吃什么</span><span class="sec-line"></span><span class="sec-a" data-action="go-eat">帮我选 →</span></div>
+
       <div class="sec" id="goPlanSec" style="cursor:pointer"><span class="sec-t">接下来</span><span class="sec-line"></span><span class="sec-a">去计划 ↗</span></div>
 
       <div class="sec"><span class="sec-t">最近</span><span class="sec-line"></span><span class="sec-a" id="writeNote">写手账</span><span class="sec-a" id="goRecords">全部记录</span></div>
@@ -63,10 +65,14 @@
     <div class="pad hd">
       <div class="hd-back" data-action="go-home">← 返回今日</div>
       <div class="hd-date">DECIDE</div>
-      <h1 class="hd-hi">现在做什么</h1>
-      <div class="hd-sub">想不清楚的时候，让它替你挑一件。</div>
+      <h1 class="hd-hi" id="decTitle">现在做什么</h1>
+      <div class="hd-sub" id="decSub">想不清楚的时候，让它替你挑一件。</div>
     </div>
-    <div class="pad">
+    <div class="seg" id="decSeg" style="display:none">
+      <button data-tab="do" class="on">做什么</button>
+      <button data-tab="eat">吃什么</button>
+    </div>
+    <div class="pad dec-pane" id="decPaneDo">
       <div class="ask">
         <div class="ask-t">你现在是什么情况</div>
         <div class="scene-grid" id="sceneChips" style="margin-top:12px"></div>
@@ -85,6 +91,28 @@
       <div class="card plain" id="libWrap" style="margin-top:9px;padding:2px 14px"></div>
       <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0">
         每条建议可以绑几个情境，选了才会出现在上面。开关决定它参不参与随机抽取。
+      </div>
+      <div style="height:26px"></div>
+    </div>
+
+    <div class="pad dec-pane" id="decPaneEat" style="display:none">
+      <div class="ask">
+        <div class="ask-t">现在这个饭点，想吃什么</div>
+        <div class="scene-grid" id="eatChips" style="margin-top:12px"></div>
+      </div>
+      <div class="dec-bar">
+        <button class="btn g" id="eatRandBtn" style="flex:1">随便抽一个</button>
+      </div>
+      <div id="eatResult" style="margin-top:14px"></div>
+      <div id="eatToday" style="margin-top:12px"></div>
+
+      <div class="hr"></div>
+
+      <div class="sec"><span class="sec-t">我的菜单</span><span class="sec-line"></span><span class="sec-a" id="eatAdd">+ 新建</span></div>
+      <div class="chips" id="eatFilter" style="margin-bottom:4px"></div>
+      <div class="card plain" id="eatWrap" style="margin-top:9px;padding:2px 14px"></div>
+      <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0">
+        每道菜可以勾几个饭点，抽的时候只从对得上的里出。今天已经记过的先跳过，都吃过了才会重复。
       </div>
       <div style="height:26px"></div>
     </div>
@@ -257,6 +285,8 @@
 <script src="decide.js"></script>
 <script src="records.js"></script>
 <script src="settings.js"></script>
+<script src="write.js"></script>
+<script src="commit-queue.js"></script>
 <script src="boot.js"></script>
 </body>
 </html>

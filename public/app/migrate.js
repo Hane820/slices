@@ -14,6 +14,8 @@
  *   - meta 只按精确白名单操作，不做前缀匹配
  *   - 未知顶层字段原样存 meta.legacyExtras（不进业务表，也不丢）
  *   - 写入权：assertWriteLease / renewWriteLease 只提供能力，不接 save()、不自动启动
+ *   - Step 5B T2：writerEpochFloor 参与代次判定；新增纯校验器与只读状态能力，
+ *     租约最终有效性仍必须在未来的业务 rw 事务内部校验，本阶段不开放业务写入
  *   - 不调用 save() / normalize() / loadState()，不碰全局 S
  *   - localStorage['earthonline-v4'] 原样保留，只写独立的 earthonline-v4-migrated
  *
@@ -30,6 +32,12 @@
   var MIGRATION_HEARTBEAT_MS = 5000;
   var WRITE_TTL = 30000;
   var MAX_ATTEMPTS = 5;
+
+  /* 业务 writer 的代次：epoch 从 1 起，只能严格递增。
+     writerEpochFloor 存 meta.migration，是本轮迁移之后合法 epoch 的下界；
+     旧库没有该字段时按 0 兼容（epoch 1 天然合法），已有 0 也不需要数据迁移。 */
+  var WRITER_EPOCH_MIN = 1;
+  var WRITER_FLOOR_DEFAULT = 0;
 
   var TABLE_NAMES = ['meta', 'definitions', 'tasks', 'schedule', 'dayEntries', 'dayMaps'];
   var BUSINESS_TABLES = ['definitions', 'tasks', 'schedule', 'dayEntries', 'dayMaps'];
@@ -51,7 +59,7 @@
   var META_ALLOWED = {
     v: 'payload', settings: 'payload', plugins: 'payload', legacyExtras: 'payload',
     schemaVersion: 'infra', migration: 'infra', writer: 'infra',
-    preNormalize: 'infra', bizDatePolicy: 'infra'
+    preNormalize: 'infra', bizDatePolicy: 'infra', bizRev: 'infra'
   };
 
   var DEF_MAP = [
@@ -95,6 +103,125 @@
      NaN < now 为 false（会放行），Infinity < now 也为 false（会永久占锁）。 */
   function usableDeadline(v) {
     return typeof v === 'number' && isFinite(v);
+  }
+
+  /* epoch 必须是有限正整数。NaN / Infinity / 小数 / 0 / 负数 / 字符串一律不合法。 */
+  function isWriterEpoch(v) {
+    return typeof v === 'number' && isFinite(v) && Math.floor(v) === v && v >= WRITER_EPOCH_MIN;
+  }
+
+  /* 代次下界的读取与判定。三种情况严格区分，避免「静默归零让旧 epoch 复活」：
+       - migration 行缺失       → 失败关闭（无法证明下界）
+       - 行在、字段缺失         → 兼容旧库，取 0
+       - 字段在但值损坏 / 非法  → 失败关闭，不猜、不修复 */
+  function readWriterEpochFloor(m) {
+    if (!m || !isPlainObject(m)) {
+      return { ok: false, present: false, value: null, code: 'writer-floor-row-missing',
+        message: '迁移记录缺失，无法确认 writer epoch 下界' };
+    }
+    if (!has(m, 'writerEpochFloor')) {
+      return { ok: true, present: false, value: WRITER_FLOOR_DEFAULT,
+        code: 'ok', message: '旧库无下界字段，按 0 兼容' };
+    }
+    var f = m.writerEpochFloor;
+    if (typeof f !== 'number' || !isFinite(f) || Math.floor(f) !== f || f < 0) {
+      return { ok: false, present: true, value: null, code: 'writer-floor-invalid',
+        message: 'writer epoch 下界不是非负有限整数：' + String(f) };
+    }
+    return { ok: true, present: true, value: f, code: 'ok', message: '' };
+  }
+
+  /* 唯一允许提升 epoch 的规则：新代次必须同时 > 当前代次且 >= floor。
+     续期 / 心跳不调用本函数，因此不会提升代次；接管与重迁移必须调用它。 */
+  function nextWriterEpoch(curEpoch, floor) {
+    var base = isWriterEpoch(curEpoch) ? curEpoch : 0;
+    var f = (typeof floor === 'number' && isFinite(floor) && floor >= 0)
+      ? Math.floor(floor) : WRITER_FLOOR_DEFAULT;
+    return Math.max(WRITER_EPOCH_MIN, f, base + 1);
+  }
+
+  /* writer 行体检（纯函数，同步，不含调用方身份判定、不发起任何异步操作）。
+     固定顺序：存在 → 状态 → epoch 合法 → epoch 不低于 floor → 有效期合法 → 未过期。 */
+  function inspectWriterRow(w, floor, now) {
+    var out = {
+      present: !!w,
+      status: w && w.status !== undefined ? w.status : null,
+      ownerId: w && w.ownerId !== undefined ? w.ownerId : null,
+      epoch: w && w.epoch !== undefined ? w.epoch : null,
+      heartbeatAt: w && w.heartbeatAt !== undefined ? w.heartbeatAt : null,
+      leaseExpiresAt: w && w.leaseExpiresAt !== undefined ? w.leaseExpiresAt : null,
+      epochValid: false, leaseValid: false, remainingMs: null, belowFloor: false,
+      floor: typeof floor === 'number' ? floor : null,
+      ok: false, code: 'writer-missing', message: '没有写入权记录'
+    };
+    if (!w) return out;
+    if (w.status !== 'active') {
+      out.code = 'writer-inactive'; out.message = '写入权状态不是 active：' + String(w.status); return out;
+    }
+    if (!isWriterEpoch(w.epoch)) {
+      out.code = 'writer-epoch-invalid'; out.message = '写入权 epoch 非法：' + String(w.epoch); return out;
+    }
+    out.epochValid = true;
+    if (typeof floor === 'number' && isFinite(floor) && w.epoch < floor) {
+      out.belowFloor = true;
+      out.code = 'writer-epoch-below-floor';
+      out.message = '写入权 epoch ' + w.epoch + ' 低于合法下界 ' + floor;
+      return out;
+    }
+    if (!usableDeadline(w.leaseExpiresAt)) {
+      out.code = 'writer-lease-invalid';
+      out.message = '写入权有效期不是有限数值：' + String(w.leaseExpiresAt); return out;
+    }
+    out.leaseValid = true;
+    out.remainingMs = w.leaseExpiresAt - now;
+    if (out.remainingMs <= 0) {
+      out.code = 'writer-lease-expired'; out.message = '写入权租约已过期'; return out;
+    }
+    out.ok = true; out.code = 'ok'; out.message = '';
+    return out;
+  }
+
+  /* 事务级租约判定（纯函数、同步、不抛错）：把身份、行、代次下界、时间算成一份结论。
+     checkWriteLeaseInTx 在业务 rw 事务内调用它并按需抛错；只读状态查询直接取结果。 */
+  function evaluateWriterLease(w, m, ownerId, epoch, now) {
+    var out = {
+      ok: false, code: '', message: '', leaseKind: 'writer', statusOnly: false,
+      ownerId: ownerId === undefined ? null : ownerId,
+      epoch: epoch === undefined ? null : epoch,
+      floor: null, checkedAt: now, writer: null
+    };
+    function fail(code, message) { out.code = code; out.message = message; return out; }
+
+    if (typeof ownerId !== 'string' || !ownerId) {
+      return fail('writer-identity-invalid', '写入身份不是非空字符串');
+    }
+    if (!isWriterEpoch(epoch)) {
+      return fail('writer-epoch-invalid', '调用方 epoch 非法：' + String(epoch));
+    }
+    var f = readWriterEpochFloor(m);
+    if (!f.ok) return fail(f.code, f.message);
+    out.floor = f.value;
+
+    var h = inspectWriterRow(w, f.value, now);
+    out.writer = h;
+    if (!h.ok) return fail(h.code, h.message);
+    if (w.ownerId !== ownerId) {
+      return fail('writer-owner-changed', '写入权已被其它标签页接管');
+    }
+    if (w.epoch !== epoch) {
+      return fail('writer-epoch-changed', '写入权 epoch 不匹配');
+    }
+    out.ok = true; out.code = 'ok';
+    return out;
+  }
+
+  /* 续期只延长租约：身份、状态与 epoch 逐字保留，其余字段也不丢。
+     心跳与同一 writer 的续期都只能构造这种行，因此不会提升代次。 */
+  function buildRenewedWriterRow(w, now) {
+    var out = shallow(w);
+    out.heartbeatAt = now;
+    out.leaseExpiresAt = now + WRITE_TTL;
+    return out;
   }
 
   function shallow(rec) {
@@ -168,10 +295,13 @@
     return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   }
 
+  /* 迁移租约：ownerId/epoch 来自 claimOwner，TTL = MIGRATION_LEASE_TTL，
+     心跳由 startMigrationHeartbeat 驱动，事务结束即停止。 */
   function leaseError(code, message) {
     var err = new Error(message || code);
     err.name = 'MigrationLeaseLost';
     err.code = code;
+    err.leaseKind = 'migration';
     return err;
   }
 
@@ -640,7 +770,17 @@
       function () {
       var attempts = 0;
 
-      function putClaim(cur, now) {
+      /* 代次下界只能升不能降：旧 writer 的 epoch + 1 成为新的合法下界。
+         迁移行里若已有非法 floor，一律失败关闭（不能静默归零让旧 writer 复活）。 */
+      function putClaim(cur, now, oldWriter) {
+        /* 首次认领本就没有迁移行，等价于「旧库无下界字段」→ 0；
+           已有迁移行则严格校验，损坏值一律失败关闭。 */
+        var prev = cur ? readWriterEpochFloor(cur) : {
+          ok: true, present: false, value: WRITER_FLOOR_DEFAULT, code: 'ok', message: ''
+        };
+        if (!prev.ok) throw writeLeaseError(prev.code, prev.message);
+        var oldEpoch = (oldWriter && isWriterEpoch(oldWriter.epoch)) ? oldWriter.epoch : null;
+        var floor = oldEpoch === null ? prev.value : Math.max(prev.value, oldEpoch + 1);
         var epoch = ((cur && cur.epoch) || 0) + 1;
         return db.meta.put({
           key: 'migration',
@@ -657,8 +797,8 @@
           startedAt: (cur && cur.startedAt) || now,
           finishedAt: null,
           errorCode: null,
-          writerEpochFloor: (cur && cur.writerEpochFloor) || 0
-        }).then(function () { return { epoch: epoch, attempts: attempts }; });
+          writerEpochFloor: floor
+        }).then(function () { return { epoch: epoch, attempts: attempts, writerEpochFloor: floor }; });
       }
 
       return db.meta.get('migration').then(function (cur) {
@@ -671,13 +811,16 @@
 
         attempts = ((cur && cur.attempts) || 0) + 1;
 
-        if (!cur) {
-          return countBusinessRows(db).then(function (total) {
-            if (total > 0) return 'unexpected-data';
-            return putClaim(cur, now);
-          });
-        }
-        return putClaim(cur, now);
+        /* 同事务内读旧 writer：下界要盖过它，重迁移后旧代次才不会重新获得写入权。 */
+        return db.meta.get('writer').then(function (oldWriter) {
+          if (!cur) {
+            return countBusinessRows(db).then(function (total) {
+              if (total > 0) return 'unexpected-data';
+              return putClaim(cur, now, oldWriter);
+            });
+          }
+          return putClaim(cur, now, oldWriter);
+        });
       });
     });
   }
@@ -703,30 +846,20 @@
     });
   }
 
-  /* ==================== 写入权（Step 4.5） ==================== */
-
-  /* 业务写入权的校验顺序：存在 → 状态 → 归属 → epoch → 有效期。
-     顺序固定，第一个不满足的即为失败原因，便于诊断「到底哪一项不对」。 */
-  function checkWriteLease(db, ownerId, epoch) {
-    return db.meta.get('writer').then(function (w) {
-      if (!w) throw writeLeaseError('writer-missing', '没有写入权记录');
-      if (w.status !== 'active') throw writeLeaseError('writer-inactive', '写入权状态不是 active：' + w.status);
-      if (w.ownerId !== ownerId) throw writeLeaseError('writer-owner-changed', '写入权已被其它标签页接管');
-      if (w.epoch !== epoch) throw writeLeaseError('writer-epoch-changed', '写入权 epoch 不匹配');
-      if (!usableDeadline(w.leaseExpiresAt)) {
-        throw writeLeaseError('writer-lease-invalid', '写入权有效期不是有限数值：' + String(w.leaseExpiresAt));
-      }
-      if (w.leaseExpiresAt < Date.now()) {
-        throw writeLeaseError('writer-lease-expired', '写入权租约已过期');
-      }
-      return w;
-    });
-  }
+  /* ==================== 业务 writer 租约（Step 4.5 / 5B T2） ====================
+     与「迁移租约」是两套独立身份和生命周期，绝不混用：
+       迁移租约  meta.migration / status in_progress / MIGRATION_LEASE_TTL /
+                 claimOwner 认领 / startMigrationHeartbeat 续期 / 迁移完成即退出
+       writer    meta.writer   / status active       / WRITE_TTL /
+                 迁移末尾装上 / 由后续任务的心跳续期 / 常驻，过期后由新代次接管
+     本任务只提供元数据、纯校验器与只读状态能力；不启动 writer 心跳、不做接管、
+     不开放业务写入。租约最终有效性必须在业务 rw 事务内部判定，事务外结果只作展示。 */
 
   function writeLeaseError(code, message) {
     var err = new Error(message || code);
     err.name = 'WriteLeaseLost';
     err.code = code;
+    err.leaseKind = 'writer';
     return err;
   }
 
@@ -736,47 +869,100 @@
     try { return global.OLDB.instance(); } catch (e) { return null; }
   }
 
-  /* 只读校验：不改任何字段。返回 {ok, ownerId, epoch, leaseExpiresAt} */
+  /* 事务内校验：只能由调用方在自己已经打开的 Dexie 事务里调用。
+     链条里只有 db.meta.get 这类 Dexie 操作，没有非 Dexie 异步，因此不会提前提交事务。
+     失败抛 WriteLeaseLost → Dexie 整事务回滚。
+     这是为未来业务 rw 事务准备的可复用函数，本任务没有任何业务写事务调用它。 */
+  function checkWriteLeaseInTx(db, ownerId, epoch, now) {
+    var at = usableDeadline(now) ? now : Date.now();
+    return db.meta.get('writer').then(function (w) {
+      return db.meta.get('migration').then(function (m) {
+        var r = evaluateWriterLease(w, m, ownerId, epoch, at);
+        if (!r.ok) throw writeLeaseError(r.code, r.message);
+        r.writerRow = w;
+        return r;
+      });
+    });
+  }
+
+  /* 只读状态摘要：一个 r 事务读两行，返回完整体检结论。
+     statusOnly=true 明确表示它只作状态展示，不构成写入授权。 */
+  function inspectWriterLease(ownerId, epoch) {
+    var db = currentDb();
+    if (!db) return Promise.resolve({
+      ok: false, code: 'db-not-open', message: '数据库尚未打开',
+      statusOnly: true, leaseKind: 'writer', writer: null, floor: null
+    });
+    var now = Date.now();
+    return db.transaction('r', db.meta, function () {
+      return db.meta.get('writer').then(function (w) {
+        return db.meta.get('migration').then(function (m) {
+          return { w: w, m: m };
+        });
+      });
+    }).then(function (r) {
+      var out = evaluateWriterLease(r.w, r.m, ownerId, epoch, now);
+      out.statusOnly = true;
+      return out;
+    }, function (e) {
+      return {
+        ok: false, code: 'read-failed', message: (e && e.message) || String(e),
+        statusOnly: true, leaseKind: 'writer', writer: null, floor: null
+      };
+    });
+  }
+
+  /* 只读校验（沿用 Step 4.5 对外契约）：不改任何字段，只作状态展示。 */
   function assertWriteLease(ownerId, epoch) {
     var db = currentDb();
-    if (!db) return Promise.resolve({ ok: false, reason: 'db-not-open', message: '数据库尚未打开' });
+    if (!db) return Promise.resolve({ ok: false, reason: 'db-not-open', message: '数据库尚未打开', statusOnly: true });
     return db.transaction('r', db.meta, function () {
-      return checkWriteLease(db, ownerId, epoch);
-    }).then(function (w) {
-      return { ok: true, ownerId: w.ownerId, epoch: w.epoch, status: w.status, leaseExpiresAt: w.leaseExpiresAt };
+      return checkWriteLeaseInTx(db, ownerId, epoch, Date.now());
+    }).then(function (r) {
+      return {
+        ok: true, ownerId: r.ownerId, epoch: r.epoch, status: r.writer.status,
+        leaseExpiresAt: r.writer.leaseExpiresAt, floor: r.floor, statusOnly: true
+      };
     }, function (e) {
-      return { ok: false, reason: (e && e.code) || 'write-lease-lost', message: (e && e.message) || String(e) };
+      return {
+        ok: false, reason: (e && e.code) || 'write-lease-lost',
+        message: (e && e.message) || String(e), statusOnly: true
+      };
     });
   }
 
   /* 事务内校验后续期。校验不通过就一个字都不写——绝不把别人的写入权改成自己的。
-     返回 {ok:true, writer:{ownerId, epoch, heartbeatAt, leaseExpiresAt, status}} */
+     只延长有效期与心跳时间，epoch / ownerId / status 逐字保留。 */
   function renewWriteLease(ownerId, epoch) {
     var db = currentDb();
     if (!db) return Promise.resolve({ ok: false, reason: 'db-not-open', message: '数据库尚未打开' });
+    var now = Date.now();
     var renewed = null;
     return db.transaction('rw', db.meta, function () {
-      return checkWriteLease(db, ownerId, epoch).then(function (w) {
-        var now = Date.now();
-        w.heartbeatAt = now;
-        w.leaseExpiresAt = now + WRITE_TTL;
-        renewed = { ownerId: w.ownerId, epoch: w.epoch, status: w.status, heartbeatAt: w.heartbeatAt, leaseExpiresAt: w.leaseExpiresAt };
-        return db.meta.put(w);
+      return checkWriteLeaseInTx(db, ownerId, epoch, now).then(function (r) {
+        var row = buildRenewedWriterRow(r.writerRow, now);
+        renewed = {
+          ownerId: row.ownerId, epoch: row.epoch, status: row.status,
+          heartbeatAt: row.heartbeatAt, leaseExpiresAt: row.leaseExpiresAt
+        };
+        return db.meta.put(row);
       });
     }).then(function () {
       return { ok: true, writer: renewed };
     }, function (e) {
-      return { ok: false, reason: (e && e.code) || 'write-lease-lost', message: (e && e.message) || String(e) };
+      return { ok: false, reason: (e && e.code) || 'write-lease-lost',
+        message: (e && e.message) || String(e) };
     });
   }
 
-  /* ==================== 租约续期 ==================== */
+  /* ==================== 迁移租约续期 ==================== */
 
-  /* claim 之后启动：每 MIGRATION_HEARTBEAT_MS 用独立的 meta 单表事务续租。
+  /* 只服务迁移租约（meta.migration），不是 writer 心跳。
+     claim 之后启动：每 MIGRATION_HEARTBEAT_MS 用独立的 meta 单表事务续租。
      续租事务内同样先 assertMigrationLease()，租约一旦丢失立刻停表，不再续。
      写入事务本身会持有 meta 的读写锁，所以心跳在事务进行中会被排队——这是对的：
      事务结束即结束迁移，锁也不再需要。 */
-  function startHeartbeat(db, ownerId, epoch) {
+  function startMigrationHeartbeat(db, ownerId, epoch) {
     var timer = null;
     var stopped = false;
 
@@ -879,15 +1065,25 @@
             return db.meta.put(m);
           });
         }).then(function () {
-          /* 迁移锁退出、日常写入权装上：同一个事务里完成切换。
-             status='active' 是 assertWriteLease 的第一道判定，缺它即视为无写入权。 */
-          return db.meta.put({
-            key: 'writer',
-            status: 'active',
-            ownerId: ctx.ownerId,
-            epoch: 1,
-            heartbeatAt: now,
-            leaseExpiresAt: now + WRITE_TTL
+          /* 迁移锁退出、日常写入权的「占位行」装上：同一个事务里完成切换。
+             epoch 取本轮迁移记录的合法下界（首次迁移为 0 → epoch 1）；
+             重迁移时下界已盖过旧 writer，旧代次因此永远不可能重新生效。
+             leaseExpiresAt 故意写 0：迁移用的 ownerId 与各标签页 write.js 的 TAB_ID
+             不同，满额租约会让迁移页在 TTL（30s）内无法 acquire，首启只能只读。
+             置 0 表示「本迁移不持有日常写入权」——行仍保留 owner/epoch/status，
+             verifyAfterWrite 的 writerInstalled 与 epoch fencing 不受影响；
+             首个 acquireWriter 会按「租约已过期」立即接管并提升 epoch。 */
+          return db.meta.get('migration').then(function (m) {
+            var f = readWriterEpochFloor(m);
+            if (!f.ok) throw writeLeaseError(f.code, f.message);
+            return db.meta.put({
+              key: 'writer',
+              status: 'active',
+              ownerId: ctx.ownerId,
+              epoch: Math.max(WRITER_EPOCH_MIN, f.value),
+              heartbeatAt: now,
+              leaseExpiresAt: 0
+            });
           });
         });
       }
@@ -1005,7 +1201,7 @@
         if (claim === 'too-many-attempts') return { ok: false, reason: 'too-many-attempts', message: '已失败 ' + MAX_ATTEMPTS + ' 次，转人工' };
 
         ctx.epoch = claim.epoch;
-        var stopHeartbeat = startHeartbeat(db, ownerId, ctx.epoch);
+        var stopHeartbeat = startMigrationHeartbeat(db, ownerId, ctx.epoch);
 
         return writeAllInOneTransaction(db, ctx).then(function () {
           stopHeartbeat();
@@ -1066,40 +1262,116 @@
 
   /* ==================== 只读状态 ==================== */
 
+  /* 只读状态：marker + 六表 + 两套租约摘要。
+     readOnly 是五条件合取的结果，缺一即只读：
+       ① mode === 'idb'（迁移完成、六表可用）
+       ② migration.status === 'done'
+       ③ OLWrite.wired === true（业务写入已显式接线，加载 write.js 不算）
+       ④ writerLease.valid === true（writer 体检含代次下界全部通过）
+       ⑤ 当前标签页持有写入权且身份匹配：hasWriterLease() === true、
+         writerLost() === false、currentWriterIdentity() 与库内 writer 行的
+         ownerId / epoch 逐字一致。
+     关键修正（5B-Preflight-R1）：④只证明「库内存在有效 writer 租约」，并不证明
+     该租约属于当前标签页。A 标签页持有时 B 标签页的 ④ 同样为真，若只看四条件，
+     B 会被报可写、但 commit() 必因身份不匹配失败。第 ⑤ 条把「当前标签页」纳入判定，
+     且采用 OLWrite 既有的只读接口 + 最小只读摘要 currentWriterIdentity()，
+     不削弱 commit() 事务内的迁移闸门 / 租约校验 / fencing。 */
   function status() {
     var out = {
       readOnly: true,
       marker: readMarker(),
       markerKeyPresent: false,
-      migration: null,
-      writer: null,
+      migration: null,       /* 迁移租约 / 迁移状态 */
+      writer: null,          /* writer 行摘要 */
+      writerLease: null,     /* 业务 writer 租约体检（含代次下界） */
+      currentWriter: null,   /* 当前标签页持有的只读身份摘要（来自 OLWrite） */
+      writerHeldByCurrentTab: false, /* 当前标签页是否持有且与库内身份匹配 */
       tables: null,
       mode: 'unknown'
     };
     try { out.markerKeyPresent = global.localStorage.getItem(MARKER_KEY) !== null; } catch (e) {}
 
-    if (!global.OLDB) return Promise.resolve(out);
+    function done() {
+      var idbMode = out.mode === 'idb';
+      var migrationDone = !!(out.migration && out.migration.status === 'done');
+      var wired = !!(global.OLWrite && global.OLWrite.wired === true);
+      var leaseValid = !!(out.writerLease && out.writerLease.valid === true);
+
+      /* 当前标签页身份判定：全部只读，不改库、不授权。
+         没有 OLWrite 模块 / 未持有 / 已失权 → currentWriter=null → 必然只读。 */
+      var localHeld = !!(global.OLWrite && typeof global.OLWrite.hasWriterLease === 'function'
+        && global.OLWrite.hasWriterLease() === true);
+      var notLost = !!(global.OLWrite && typeof global.OLWrite.writerLost === 'function'
+        && global.OLWrite.writerLost() === false);
+      var identity = null;
+      if (global.OLWrite && typeof global.OLWrite.currentWriterIdentity === 'function') {
+        var id = global.OLWrite.currentWriterIdentity();
+        if (id && typeof id === 'object' && typeof id.ownerId === 'string' && id.ownerId
+            && typeof id.epoch === 'number' && isFinite(id.epoch)) {
+          identity = { ownerId: id.ownerId, epoch: id.epoch };
+        }
+      }
+      out.currentWriter = identity;
+
+      /* 身份匹配：本地身份与库内 writer 行逐字一致，且库内行有效。 */
+      var dbWriter = out.writer;   /* summarizeInfra('writer')：含 ownerId / epoch / status */
+      var identityMatches = !!(identity && dbWriter && dbWriter.present
+        && dbWriter.ownerId === identity.ownerId && dbWriter.epoch === identity.epoch);
+      out.writerHeldByCurrentTab = !!(localHeld && notLost && identityMatches && leaseValid);
+
+      out.readOnly = !(idbMode && migrationDone && wired && leaseValid
+        && localHeld && notLost && out.writerHeldByCurrentTab);
+      return out;
+    }
+
+    if (!global.OLDB) return Promise.resolve(done());
 
     return global.OLDB.inspect().then(function (rep) {
       out.existence = rep.existence;
       if (rep.existence !== 'exists') {
         out.mode = rep.existence === 'not-exists' ? 'ls' : 'unknown';
-        return out;
+        return done();
       }
       out.tables = rep.tables;
       if (rep.meta) {
         out.migration = rep.meta.infra.migration.present ? rep.meta.infra.migration : null;
         out.writer = rep.meta.infra.writer.present ? rep.meta.infra.writer : null;
       }
+      /* 代次下界从迁移记录读：旧库无字段 → 0；字段损坏 → 失败关闭。 */
+      var mView = null;
+      if (out.migration) {
+        mView = {};
+        if (out.migration.writerEpochFloorPresent) {
+          defineOwn(mView, 'writerEpochFloor', out.migration.writerEpochFloor);
+        }
+      }
+      var f = readWriterEpochFloor(mView);
+      var now = Date.now();
+      var h = inspectWriterRow(out.writer, f.ok ? f.value : null, now);
+      out.writerLease = {
+        leaseKind: 'writer',
+        statusOnly: true,
+        present: h.present,
+        valid: f.ok && h.ok,
+        code: f.ok ? h.code : (h.present ? f.code : h.code),
+        message: f.ok ? h.message : (h.present ? f.message : h.message),
+        floor: f.ok ? f.value : null,
+        floorPresent: f.present,
+        epochBelowFloor: h.belowFloor,
+        epochValid: h.epochValid,
+        leaseValid: h.leaseValid,
+        remainingMs: h.remainingMs,
+        checkedAt: now
+      };
       if (out.migration && out.migration.status === 'done') out.mode = 'idb';
       else if (out.migration && out.migration.status === 'in_progress') out.mode = 'in_progress';
       else if (out.migration && out.migration.status === 'failed') out.mode = 'failed';
       else out.mode = 'unmigrated';
-      return out;
+      return done();
     }, function (e) {
       out.mode = 'unavailable';
       out.error = (e && e.message) || String(e);
-      return out;
+      return done();
     });
   }
 
@@ -1112,6 +1384,8 @@
     MIGRATION_HEARTBEAT_MS: MIGRATION_HEARTBEAT_MS,
     WRITE_TTL: WRITE_TTL,
     MAX_ATTEMPTS: MAX_ATTEMPTS,
+    WRITER_EPOCH_MIN: WRITER_EPOCH_MIN,
+    WRITER_FLOOR_DEFAULT: WRITER_FLOOR_DEFAULT,
     TABLE_NAMES: TABLE_NAMES.slice(),
     BUSINESS_TABLES: BUSINESS_TABLES.slice(),
     PAYLOAD_KEYS: PAYLOAD_KEYS.slice(),
@@ -1131,14 +1405,31 @@
     readMarker: readMarker,
     /* Step 5A：从已迁移的六表读回业务数据（只读） */
     rehydrate: rehydrate,
-    /* 写入权：Step 5 接线 save() 前先独立实现，本阶段只提供 API 与测试 */
+    /* 业务 writer 租约：只读校验 / 续期（Step 4.5 既有能力） */
     assertWriteLease: assertWriteLease,
     renewWriteLease: renewWriteLease,
-    /* 供测试与人工恢复使用，不自动调用 */
+    /* Step 5B T2：代次基础设施（全部为纯函数，不写库、不授权写入） */
+    isWriterEpoch: isWriterEpoch,
+    readWriterEpochFloor: readWriterEpochFloor,
+    nextWriterEpoch: nextWriterEpoch,
+    inspectWriterRow: inspectWriterRow,
+    evaluateWriterLease: evaluateWriterLease,
+    buildRenewedWriterRow: buildRenewedWriterRow,
+    /* 只能在调用方已打开的 Dexie 事务内部调用；事务外调用不构成写入授权 */
+    checkWriteLeaseInTx: checkWriteLeaseInTx,
+    /* 只读状态摘要：只作展示，statusOnly=true */
+    inspectWriterLease: inspectWriterLease,
+    /* 迁移租约心跳（不是 writer 心跳）：供测试与人工恢复使用，不自动调用。
+       保留 startHeartbeat 名字以兼容 Step 4.5 既有调用。 */
+    startMigrationHeartbeat: function (ownerId, epoch) {
+      var db = global.OLDB && global.OLDB.instance();
+      if (!db) return function () {};
+      return startMigrationHeartbeat(db, ownerId, epoch);
+    },
     startHeartbeat: function (ownerId, epoch) {
       var db = global.OLDB && global.OLDB.instance();
       if (!db) return function () {};
-      return startHeartbeat(db, ownerId, epoch);
+      return startMigrationHeartbeat(db, ownerId, epoch);
     },
     markFailed: function (ownerId, epoch, errorCode, summary) {
       var db = global.OLDB && global.OLDB.instance();

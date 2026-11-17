@@ -78,6 +78,7 @@ function renderScenes(){
       box.appendChild(b);
     });
   }
+  renderDecideShell();          /* 决策页外壳：按插件开关与当前标签，决定显示哪一块 */
 }
 
 /* 选情境：列出绑在这个情境上的建议，并直接落到结果顶部 */
@@ -509,12 +510,12 @@ function cancelPomo(){
   var wasFs = !!pomoFsEl();
   if(wasFs) pomoFsExit();
   confirmBox('取消本次专注？', '本次时长不会计入统计。', function(){
+    var notify = function(){ toast('已取消，这次不计入'); };
     if(logId){
       S.decisionLog = S.decisionLog.filter(function(x){ return x.id !== logId; });
-      save();
-    }
+      save(notify);
+    }else notify();
     removePomo();
-    toast('已取消，这次不计入');
   }, { okText:'确认取消', focusCancel:true });
   pomoLock = false;   /* 等她在弹窗里做决定，浮窗按钮先别锁死 */
 }
@@ -781,7 +782,7 @@ function openSuggEdit(sg){
     body.querySelector('#sgDel').addEventListener('click', function(){
       confirmBox('删掉这条建议？', '它不会再出现在情境和随机里。', function(){
         S.suggestions = S.suggestions.filter(function(x){ return x.id !== item.id; });
-        save(); closeSheet(); renderLib(); toast('已删除');
+        save(function(){ toast('已删除'); }); closeSheet(); renderLib();
       });
     });
   }
@@ -797,9 +798,316 @@ function openSuggEdit(sg){
     item.scenes = scenes;
     item.random = body.querySelector('#sgR').classList.contains('on');
     if(isNew){ item.enabled = true; item.priority = 2; item.tags = []; S.suggestions.push(item); }
-    save(); closeSheet(); renderLib();
+    save(function(){ toast('已保存'); }); closeSheet(); renderLib();
     if(decState.scene && decState.mode === 'scene' && currentPage === 'pDecide') renderSceneResult(decState.scene);
-    toast('已保存');
+  });
+}
+
+/* ==================== 吃什么（插件） ====================
+   和「做什么」同一套路：先选饭点，再抽一道，抽到就能直接记下来。
+   菜单和吃过记录都放在 S.settings 里（跟着 settings 载荷整体迁移，
+   不新增顶层字段，也不动迁移白名单）。插件关掉只是不在首页出现，数据不动。 */
+var eatState = { tab:'do', slot:'', cat:'全部', open:false, pick:null };
+
+function foodSlotNow(){
+  var h = new Date().getHours();
+  if(h >= 5 && h < 10) return 'breakfast';
+  if(h >= 10 && h < 14) return 'lunch';
+  if(h >= 14 && h < 17) return 'tea';
+  if(h >= 17 && h < 21) return 'dinner';
+  return 'night';
+}
+function foodSlotDesc(k){
+  var m = { breakfast:'5-10 点', lunch:'10-14 点', tea:'14-17 点', dinner:'17-21 点', night:'21 点以后' };
+  return m[k] || '';
+}
+function foodList(){
+  var list = (S.settings && S.settings.foodItems) || [];
+  return list.filter(function(it){ return it && it.name; });
+}
+function foodLogList(){
+  var list = (S.settings && S.settings.foodLog) || [];
+  return list.filter(function(l){ return l && l.date && l.name; });
+}
+function foodTodayLog(){
+  var d = TODAY();
+  return foodLogList().filter(function(l){ return l.date === d; });
+}
+function foodEatenToday(name){
+  return foodTodayLog().some(function(l){ return l.name === name; });
+}
+/* 候选：开着、且饭点对得上（any 通吃）；默认排除今天已经吃过的 */
+function foodPool(slot, includeEaten){
+  return foodList().filter(function(it){
+    if(it.enabled === false) return false;
+    var slots = (it.slots && it.slots.length) ? it.slots : ['any'];
+    if(slots.indexOf('any') < 0 && slots.indexOf(slot) < 0) return false;
+    if(!includeEaten && foodEatenToday(it.name)) return false;
+    return true;
+  });
+}
+function pickFood(slot){
+  var pool = foodPool(slot, false), relaxed = false;
+  if(!pool.length){ pool = foodPool(slot, true); relaxed = true; }   /* 今天都吃过了，允许重复 */
+  if(!pool.length) return null;
+  return { item: pool[Math.floor(Math.random() * pool.length)], relaxed: relaxed };
+}
+
+/* ---------- 决策页外壳：做什么 / 吃什么 ---------- */
+function renderDecideShell(){
+  var on = pluginOn('food');
+  if(!on && eatState.tab === 'eat') eatState.tab = 'do';
+  var seg = $('decSeg');
+  if(seg){
+    seg.style.display = on ? '' : 'none';
+    var bs = seg.querySelectorAll('button');
+    for(var i = 0; i < bs.length; i++) bs[i].classList.toggle('on', bs[i].dataset.tab === eatState.tab);
+  }
+  var eating = on && eatState.tab === 'eat';
+  var doPane = $('decPaneDo'), eatPane = $('decPaneEat');
+  var title = $('decTitle'), sub = $('decSub');
+  if(title) title.textContent = eating ? '现在吃什么' : '现在做什么';
+  if(sub) sub.textContent = eating ? '到饭点还没主意，让它替你挑一道。' : '想不清楚的时候，让它替你挑一件。';
+  if(doPane) doPane.style.display = eating ? 'none' : '';
+  if(eatPane) eatPane.style.display = eating ? '' : 'none';
+  if(eating) renderEat();
+}
+function switchDecideTab(k){
+  if(k === 'eat' && !pluginOn('food')){ toast('「吃什么」还关着，去设置里打开'); return; }
+  eatState.tab = k === 'eat' ? 'eat' : 'do';
+  renderDecideShell();
+  if(eatState.tab === 'eat') window.scrollTo(0, 0);
+}
+function renderEat(){
+  if(!pluginOn('food')) return;
+  if(!eatState.slot) eatState.slot = foodSlotNow();
+  renderEatSlots();
+  renderEatToday();
+  renderEatResult();
+  renderEatLib();
+}
+
+function renderEatSlots(){
+  var box = $('eatChips');
+  if(!box) return;
+  box.innerHTML = '';
+  var now = foodSlotNow();
+  FOOD_SLOTS.forEach(function(k){
+    var b = el('button','scene-card' + (eatState.slot === k ? ' on' : ''));
+    b.innerHTML = '<div class="n">' + esc(foodSlotName(k)) +
+      (k === now ? '<span class="eat-now">现在</span>' : '') +
+      '</div><div class="d">' + esc(foodSlotDesc(k)) + '</div>';
+    b.addEventListener('click', function(){
+      if(eatState.slot === k) return;
+      eatState.slot = k;
+      eatState.pick = null;
+      renderEat();
+    });
+    box.appendChild(b);
+  });
+}
+
+function renderEatToday(){
+  var box = $('eatToday');
+  if(!box) return;
+  box.innerHTML = '';
+  var list = foodTodayLog();
+  if(!list.length) return;
+  var line = el('div','eat-log');
+  line.appendChild(el('span','eat-log-k','今天吃了'));
+  list.slice(-6).forEach(function(l){
+    line.appendChild(el('span','eat-log-i', (l.slot ? foodSlotName(l.slot) + ' · ' : '') + l.name));
+  });
+  box.appendChild(line);
+}
+
+function renderEatResult(){
+  var box = $('eatResult');
+  if(!box) return;
+  box.innerHTML = '';
+  var c = eatState.pick;
+  if(!c) return;
+  var card = el('div','res');
+  card.appendChild(el('div','res-k', c.relaxed ? '今天都吃过了，再抽一道' : '抽到'));
+  card.appendChild(el('div','res-t', c.item.name));
+  if(c.item.note) card.appendChild(el('div','res-d', c.item.note));
+  var meta = el('div','res-meta');
+  meta.appendChild(el('span','mtag', c.item.cat || '其它'));
+  meta.appendChild(el('span','mtag', foodSlotName(eatState.slot)));
+  card.appendChild(meta);
+  var acts = el('div','res-acts');
+  var ok = el('button','btn p','就吃这个');
+  ok.addEventListener('click', function(){ logEat(c.item, ok); });
+  var again = el('button','btn o','换一个');
+  again.addEventListener('click', function(){
+    card.style.transition = 'opacity .4s var(--ease), transform .4s var(--ease)';
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(-6px)';
+    setTimeout(runEatPick, 180);
+  });
+  acts.appendChild(ok); acts.appendChild(again);
+  card.appendChild(acts);
+  box.appendChild(card);
+}
+
+function runEatPick(){
+  if(!pluginOn('food')){ toast('「吃什么」还关着，去设置里打开'); return; }
+  if(!eatState.slot) eatState.slot = foodSlotNow();
+  if(!foodList().length){ toast('菜单还是空的，先加两道'); return; }
+  var r = pickFood(eatState.slot);
+  if(!r){ toast('这个饭点没有能抽的，去菜单加两道'); return; }
+  eatState.pick = r;
+  renderEatResult();
+  var b = $('eatResult');
+  if(b && b.scrollIntoView) b.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+/* 记一笔：同一天同一道菜只记一次，重复点不叠加 */
+function logEat(item, btnEl){
+  var d = TODAY();
+  var dup = foodEatenToday(item.name);
+  if(!dup){
+    if(!Array.isArray(S.settings.foodLog)) S.settings.foodLog = [];
+    S.settings.foodLog.push({ id:uid('fl'), date:d, ts:Date.now(), name:item.name, slot:eatState.slot });
+    if(S.settings.foodLog.length > 200) S.settings.foodLog = S.settings.foodLog.slice(-200);
+    save(function(){ toast('记下了：' + item.name); });
+  }
+  renderEatToday();
+  if(dup) toast('今天就记过「' + item.name + '」了');
+  if(btnEl){
+    btnEl.textContent = dup ? '已记过' : '已记下';
+    btnEl.disabled = true;
+    setTimeout(function(){
+      if(btnEl.isConnected){ btnEl.textContent = '就吃这个'; btnEl.disabled = false; }
+    }, 1400);
+  }
+}
+
+/* ---------- 我的菜单 ---------- */
+function renderEatLib(){
+  var fbox = $('eatFilter');
+  if(fbox){
+    fbox.innerHTML = '';
+    var cats = ['全部'];
+    foodList().forEach(function(it){
+      var c = it.cat || '其它';
+      if(cats.indexOf(c) < 0) cats.push(c);
+    });
+    if(cats.indexOf(eatState.cat) < 0) eatState.cat = '全部';
+    cats.forEach(function(c){
+      var b = el('button','chip' + (eatState.cat === c ? ' on' : ''), c);
+      b.addEventListener('click', function(){ eatState.cat = c; renderEatLib(); });
+      fbox.appendChild(b);
+    });
+  }
+  var box = $('eatWrap');
+  if(!box) return;
+  box.innerHTML = '';
+  var list = foodList().filter(function(it){
+    return eatState.cat === '全部' || (it.cat || '其它') === eatState.cat;
+  });
+  if(!list.length){
+    box.appendChild(el('div','empty', foodList().length ? '这个分类下还没有菜。' : '菜单还是空的，点「+ 新建」加一道。'));
+    return;
+  }
+  var shown = eatState.open ? list : list.slice(0, 8);
+  shown.forEach(function(it){
+    var item = el('div','lib-item' + (it.enabled === false ? ' off' : ''));
+    var h = el('div','lib-h');
+    h.appendChild(el('div','lib-t', it.name));
+    var sw = el('button','sw' + (it.enabled === false ? '' : ' on'));
+    sw.title = it.enabled === false ? '打开' : '关掉';
+    sw.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      it.enabled = it.enabled === false;
+      save(function(){ toast(it.enabled ? ('「' + it.name + '」参与随机了') : ('「' + it.name + '」不参与随机了')); });
+      renderEatLib();
+      if(eatState.pick && eatState.pick.item.id === it.id) eatState.pick = null;
+      renderEatResult();
+    });
+    h.appendChild(sw);
+    item.appendChild(h);
+    var d = el('div','lib-d');
+    d.appendChild(el('span', null, it.cat || '其它'));
+    d.appendChild(el('span', null, (it.slots || ['any']).map(foodSlotName).join('、')));
+    if(it.note) d.appendChild(el('span', null, it.note));
+    item.appendChild(d);
+    item.addEventListener('click', function(){ openFoodEdit(it); });
+    box.appendChild(item);
+  });
+  if(list.length > 8){
+    var more = el('button','tl-load', eatState.open ? '收起' : ('展开全部 ' + list.length + ' 道'));
+    more.style.margin = '10px 0 4px';
+    more.addEventListener('click', function(){ eatState.open = !eatState.open; renderEatLib(); });
+    box.appendChild(more);
+  }
+}
+
+function openFoodEdit(it){
+  var isNew = !it;
+  var item = it || { id:'', name:'', cat:'家常', note:'', slots:['any'], enabled:true };
+  var cats = FOOD_CATS.concat(foodList().map(function(x){ return x.cat || '其它'; })).filter(function(v, i, a){
+    return a.indexOf(v) === i;
+  });
+  var slotHtml = FOOD_SLOTS.map(function(k){
+    return '<button class="chip' + ((item.slots || []).indexOf(k) >= 0 ? ' on' : '') + '" data-k="' + k + '">' + foodSlotName(k) + '</button>';
+  }).join('') + '<button class="chip' + ((item.slots || []).indexOf('any') >= 0 ? ' on' : '') + '" data-k="any">随时</button>';
+
+  var body = openSheet(
+    '<div class="shd"><div class="shd-t">' + (isNew ? '加一道菜' : '改这道菜') + '</div>' +
+    '<div class="shd-s">勾上适合的饭点，抽的时候只会从对得上的里出。</div></div>' +
+    '<div class="field"><div class="field-l">吃什么</div><input class="inp" id="fdN" maxlength="20" placeholder="比如 牛肉面" value="' + esc(item.name) + '"></div>' +
+    '<div class="field"><div class="field-l">分类</div><input class="inp" id="fdC" maxlength="6" list="fdCatList" value="' + esc(item.cat || '其它') + '">' +
+      '<datalist id="fdCatList">' + cats.map(function(c){ return '<option value="' + esc(c) + '">'; }).join('') + '</datalist></div>' +
+    '<div class="field"><div class="field-l">适合饭点（可多选）</div><div class="chips" id="fdS">' + slotHtml + '</div></div>' +
+    '<div class="field"><div class="field-l">一句话备注</div><input class="inp" id="fdX" maxlength="30" placeholder="哪家、口味、要注意的" value="' + esc(item.note || '') + '"></div>' +
+    '<div class="row" style="border-top:none;padding:4px 0 10px"><div class="row-main"><div class="row-t">参与随机抽取</div><div class="row-s">关掉就只在菜单里看得到</div></div>' +
+      '<div class="row-a"><button class="sw' + (item.enabled === false ? '' : ' on') + '" id="fdR"></button></div></div>' +
+    '<div class="acts">' + (isNew ? '' : '<button class="btn d fx" id="fdDel">删除</button>') +
+      '<button class="btn g" id="fdNo">取消</button><button class="btn p" id="fdOk">保存</button></div>'
+  );
+
+  var slots = (item.slots || ['any']).slice();
+  body.querySelectorAll('#fdS .chip').forEach(function(c){
+    c.addEventListener('click', function(){
+      var k = c.dataset.k;
+      if(k === 'any'){
+        slots = slots.indexOf('any') >= 0 ? [] : ['any'];
+      }else{
+        var i = slots.indexOf(k);
+        if(i >= 0) slots.splice(i, 1); else slots.push(k);
+        slots = slots.filter(function(x){ return x !== 'any'; });
+      }
+      body.querySelectorAll('#fdS .chip').forEach(function(x){
+        x.classList.toggle('on', slots.indexOf(x.dataset.k) >= 0);
+      });
+    });
+  });
+  body.querySelector('#fdNo').addEventListener('click', closeSheet);
+  if(!isNew){
+    body.querySelector('#fdDel').addEventListener('click', function(){
+      confirmBox('删掉「' + item.name + '」？', '它不会再出现在抽取里，吃过的记录还留着。', function(){
+        S.settings.foodItems = foodList().filter(function(x){ return x.id !== item.id; });
+        if(eatState.pick && eatState.pick.item.id === item.id) eatState.pick = null;
+        save(function(){ toast('已删除'); }); closeSheet(); renderEat();
+      });
+    });
+  }
+  body.querySelector('#fdOk').addEventListener('click', function(){
+    var n = body.querySelector('#fdN').value.trim();
+    if(!n){ toast('写一下吃什么'); return; }
+    var data = {
+      id: item.id || uid('fd'),
+      name: n.slice(0, 20),
+      cat: body.querySelector('#fdC').value.trim().slice(0, 6) || '其它',
+      note: body.querySelector('#fdX').value.trim().slice(0, 30),
+      slots: slots.length ? slots : ['any'],
+      enabled: body.querySelector('#fdR').classList.contains('on')
+    };
+    if(isNew) S.settings.foodItems = foodList().concat([data]);
+    else S.settings.foodItems = foodList().map(function(x){ return x.id === item.id ? data : x; });
+    if(eatState.pick && eatState.pick.item.id === data.id) eatState.pick = null;
+    save(function(){ toast('已保存'); }); closeSheet(); renderEat();
   });
 }
 

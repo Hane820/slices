@@ -38,14 +38,14 @@
   var DEF_KINDS   = ['pen', 'tag', 'suggestion'];
   var MAP_KINDS   = ['note', 'mark', 'doneSugg'];
 
-  /* meta 的 key 白名单：固定 8 个，精确匹配（设计文档 §13.5.2.2）。
+  /* meta 的 key 白名单：精确匹配（设计文档 §13.5.2.2）。
      新增 key 必须显式改这里 + 加验收，不接受任何前缀/正则通配。 */
   var META_KEYS = {
     v: 'payload', settings: 'payload', plugins: 'payload',
     schemaVersion: 'infra', migration: 'infra', writer: 'infra',
-    preNormalize: 'infra', bizDatePolicy: 'infra'
+    preNormalize: 'infra', bizDatePolicy: 'infra', bizRev: 'infra'
   };
-  var INFRA_KEYS   = ['schemaVersion', 'migration', 'writer', 'preNormalize', 'bizDatePolicy'];
+  var INFRA_KEYS   = ['schemaVersion', 'migration', 'writer', 'preNormalize', 'bizDatePolicy', 'bizRev'];
   var PAYLOAD_KEYS = ['v', 'settings', 'plugins'];
 
   var state = {
@@ -472,8 +472,16 @@
     if (val === undefined || val === null) return { present: false };
     if (key === 'schemaVersion') return { present: true, value: val };
     if (key === 'bizDatePolicy')  return { present: true, value: val };
+    /* 只读搬运，不校验合法性：判定与失败关闭由 write.js 统一负责 */
+    if (key === 'bizRev') return {
+      present: true,
+      value: (val && typeof val.value === 'number' && isFinite(val.value)) ? val.value : null,
+      at: (val && typeof val.at === 'number' && isFinite(val.at)) ? val.at : null
+    };
     if (key === 'preNormalize')   return { present: true, bytes: (val && typeof val.raw === 'string') ? val.raw.length : null };
     if (key === 'migration') {
+      /* writerEpochFloor 是业务 writer 的代次下界（旧库无此字段时 present=false）。
+         这里只做只读搬运，不校验合法性：判定与失败关闭由 migrate.js 统一负责。 */
       return {
         present: true,
         status: val.status || null,
@@ -482,14 +490,20 @@
         ownerId: val.ownerId || null,
         leaseExpiresAt: (typeof val.leaseExpiresAt === 'number') ? val.leaseExpiresAt : null,
         attempts: (typeof val.attempts === 'number') ? val.attempts : null,
-        errorCode: val.errorCode || null
+        errorCode: val.errorCode || null,
+        writerEpochFloorPresent: !!(val && typeof val === 'object' &&
+          Object.prototype.hasOwnProperty.call(val, 'writerEpochFloor')),
+        writerEpochFloor: (typeof val.writerEpochFloor === 'number' && isFinite(val.writerEpochFloor))
+          ? val.writerEpochFloor : null
       };
     }
     if (key === 'writer') {
       return {
         present: true,
+        status: val.status || null,
         ownerId: val.ownerId || null,
         epoch: (typeof val.epoch === 'number') ? val.epoch : null,
+        heartbeatAt: (typeof val.heartbeatAt === 'number') ? val.heartbeatAt : null,
         leaseExpiresAt: (typeof val.leaseExpiresAt === 'number') ? val.leaseExpiresAt : null
       };
     }
@@ -600,7 +614,8 @@
                         migration:     got.migration || { present: false },
                         writer:        got.writer || { present: false },
                         preNormalize:  got.preNormalize || { present: false },
-                        bizDatePolicy: got.bizDatePolicy || { present: false }
+                        bizDatePolicy: got.bizDatePolicy || { present: false },
+                        bizRev:        got.bizRev || { present: false }
                       },
                       payload: {
                         v:        !!(got.v && got.v.present),

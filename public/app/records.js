@@ -505,18 +505,18 @@ function openDayDetail(key){
     if(sel.length) S.marks[key] = { items: sel.slice(), updatedAt: Date.now() };
     else delete S.marks[key];
     if(note) S.notes[key] = note; else delete S.notes[key];
-    save(); closeSheet();
+    save(function(){ toast('已保存'); }); closeSheet();
     if(currentPage === 'pRecords') renderRecords();
-    renderToday(); toast('已保存');
+    renderToday();
   });
   if(sel.length){
     body.querySelector('#ddClear').addEventListener('click', function(){
       delete S.marks[key];
       var note = body.querySelector('#ddNote').value.trim();
       if(note) S.notes[key] = note; else delete S.notes[key];
-      save(); closeSheet();
+      save(function(){ toast('标记擦掉了'); }); closeSheet();
       if(currentPage === 'pRecords') renderRecords();
-      renderToday(); toast('标记擦掉了');
+      renderToday();
     });
   }
 }
@@ -694,17 +694,16 @@ function openWorkout(w, itemId){
     onDelete: isNew ? null : function(){
       confirmBox('删掉这次训练？', '这条记录会消失，统计也会跟着变。', function(){
         S.workouts = S.workouts.filter(function(x){ return x.id !== item.id; });
-        save(); closeSheet(); renderProject(); renderGoals(); renderRemind(); toast('已删除');
+        save(function(){ toast('已删除'); }); closeSheet(); renderProject(); renderGoals(); renderRemind();
       });
     },
     onSave: function(d){
       item.date = d.date; item.start = d.time; item.minutes = d.minutes;
       item.parts = d.tags; item.kcal = d.extra; item.note = d.note;
       if(isNew) S.workouts.push(item);
-      save(); closeSheet();
+      save(function(){ toast('记下了 ' + d.minutes + ' 分钟'); }); closeSheet();
       if(currentPage === 'pRecords') renderProject();
       renderGoals(); renderRemind(); renderToday();
-      toast('记下了 ' + d.minutes + ' 分钟');
     }
   });
 }

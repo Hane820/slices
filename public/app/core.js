@@ -49,6 +49,15 @@ CAT_LABEL[CAT_MUST] = '必须处理';
 CAT_LABEL[CAT_WANT] = '今天想完成';
 CAT_LABEL[CAT_ROUTINE] = '每天重复';
 
+/* 饭点：「吃什么」按这几个档位分池，任一道菜可以勾多个档或勾「随时」 */
+var FOOD_SLOTS = ['breakfast', 'lunch', 'tea', 'dinner', 'night'];
+var FOOD_SLOT_LABEL = { breakfast:'早餐', lunch:'午餐', tea:'下午茶', dinner:'晚餐', night:'夜宵' };
+var FOOD_CATS = ['家常', '面食', '米饭', '快餐', '清淡', '外卖', '聚餐', '其它'];
+function foodSlotName(k){
+  if(k === 'any') return '随时';
+  return FOOD_SLOT_LABEL[k] || k;
+}
+
 /* ==================== 工具 ==================== */
 function pad(n){ return n < 10 ? '0' + n : '' + n; }
 function fmt(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
@@ -188,18 +197,28 @@ function weekdayCN(d){ return ['周日','周一','周二','周三','周四','周
 
 function toast(msg, act, cb){
   var t = $('toast');
-  t.innerHTML = esc(msg) + (act ? ' <button class="t-act" id="tAct">' + esc(act) + '</button>' : '');
-  t.style.pointerEvents = act ? 'auto' : 'none';
-  if(act){
-    $('tAct').addEventListener('click', function(ev){
-      ev.stopPropagation();
-      t.classList.remove('on');
-      if(cb) cb();
+  /* 原有 toast(msg, '按钮', cb) 保持不变；数组形式用于保存失败的「重试 / 放弃」。 */
+  var actions = Array.isArray(act) ? act : (act ? [{ label:act, cb:cb }] : []);
+  t.innerHTML = esc(msg) + (actions.length
+    ? ' ' + actions.map(function(a, i){
+        return '<button class="t-act" id="tAct' + i + '">' + esc((a && a.label) || '') + '</button>';
+      }).join('')
+    : '');
+  t.style.pointerEvents = actions.length ? 'auto' : 'none';
+  if(actions.length){
+    actions.forEach(function(a, i){
+      var btn = $('tAct' + i);
+      if(!btn) return;
+      btn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        t.classList.remove('on');
+        if(a && typeof a.cb === 'function') a.cb();
+      });
     });
   }
   t.classList.add('on');
   clearTimeout(window.__tt);
-  window.__tt = setTimeout(function(){ t.classList.remove('on'); }, act ? 3200 : 1700);
+  window.__tt = setTimeout(function(){ t.classList.remove('on'); }, actions.length ? 5000 : 1700);
 }
 function floatText(txt, x, y){
   var f = el('div','float',txt);
@@ -251,7 +270,25 @@ function defaultTasks(){
 }
 function defaultPlugins(){
   return [
-    { id:'tags', name:'标签打卡', desc:'点一下记一次，用来数频率', enabled:false }
+    { id:'tags', name:'标签打卡', desc:'点一下记一次，用来数频率', enabled:false },
+    { id:'food', name:'吃什么', desc:'到饭点替你抽一个，菜单自己攒', enabled:true }
+  ];
+}
+/* 菜单种子：只为「第一次就能抽」；用户可改可删，删光也不会再塞回来 */
+function defaultFoodItems(){
+  return [
+    { id:'fd-congee',  name:'粥和小菜',   cat:'清淡', note:'胃不舒服的时候',   slots:['breakfast','night'], enabled:true },
+    { id:'fd-baozi',   name:'小笼包豆浆', cat:'家常', note:'楼下那家',         slots:['breakfast'], enabled:true },
+    { id:'fd-jianbing',name:'煎饼果子',   cat:'快餐', note:'路上带着吃',       slots:['breakfast'], enabled:true },
+    { id:'fd-noodle',  name:'牛肉面',     cat:'面食', note:'多加香菜',         slots:['lunch','dinner'], enabled:true },
+    { id:'fd-rice',    name:'番茄炒蛋盖饭', cat:'米饭', note:'',               slots:['lunch','dinner'], enabled:true },
+    { id:'fd-malatang',name:'麻辣烫',     cat:'快餐', note:'少辣',             slots:['lunch','dinner','night'], enabled:true },
+    { id:'fd-salad',   name:'鸡胸沙拉',   cat:'清淡', note:'想轻一点的时候',   slots:['lunch','tea'], enabled:true },
+    { id:'fd-dumpling',name:'饺子',       cat:'家常', note:'',                 slots:['lunch','dinner'], enabled:true },
+    { id:'fd-hotpot',  name:'火锅',       cat:'聚餐', note:'叫上人一起',       slots:['dinner','night'], enabled:true },
+    { id:'fd-bbq',     name:'烧烤',       cat:'聚餐', note:'',                 slots:['night'], enabled:true },
+    { id:'fd-sandwich',name:'三明治',     cat:'快餐', note:'赶时间',           slots:['breakfast','tea'], enabled:true },
+    { id:'fd-cake',    name:'一个小蛋糕', cat:'其它', note:'下午垫一口',       slots:['tea'], enabled:true }
   ];
 }
 function defaults(){
@@ -286,6 +323,8 @@ function defaults(){
       uiScale: 1.2,
       tasksFold: false,   // 今日待办是否折叠成卡片堆
       focusSeedV: 0,   // 预设补回标记，写过 2 之后用户删掉的预设不再塞回来
+      foodItems: defaultFoodItems(),   // 吃什么：菜单库 {id,name,cat,note,slots,enabled}
+      foodLog: [],                     // 吃什么：吃过的记录 {id,date,ts,name,slot}，只增不覆写
       focusItems: [
         { id:'fi-train', text:'健身', goal:{ value:30, unit:'分钟' }, mode:'multi', options: PARTS.slice() },
         { id:'fi-study', text:'学习', goal:{ value:40, unit:'分钟' }, mode:'text', label:'学了什么', ph:'高数 / 单词…（可留空）' }
@@ -424,14 +463,11 @@ function migrate(v3){
   if(v3.resetHour != null) S.settings.resetHour = v3.resetHour;
   if(v3.showDone != null) S.settings.showDone = v3.showDone;
 }
-/* ---------- IDB 模式写入闸门（Step 5A 安全修复） ----------
-   启动读取已切到 IndexedDB 后，业务写入仍走旧 save()（localStorage），
-   用户会以为保存成功、刷新后却回到库里的数据。
-   在接入 Step 5B 租约写事务之前，idb 模式下一律阻止业务写入：
-   - save() 拒写（所有 ~50 个业务调用点都经此处收口）
-   - importJSON / 清空数据在入口直接拦截（避免内存里 S 被替换）
-   - 拦截必须有节流的只读提示，不静默、不假装成功
-   legacy 模式（window.OLBoot 不存在或 mode != 'idb'）行为完全不变 */
+/* ---------- 业务写入：5A 闸门 / 5B-3 串行队列接线 ----------
+   legacy 模式：localStorage 仍是唯一真相，行为完全不变。
+   idb 模式：save() 只把当前 S 的同步快照交给 OLCommitQueue；返回值仅表示
+   「成功入队」，绝不表示已持久化。成功提示由 onSuccess 在事务确认成功后
+   触发；失败统一给可重试 / 放弃的提示，内存 S 始终保留。 */
 function bizWriteBlocked(){
   var ob = (typeof window !== 'undefined') && window.OLBoot;
   return !!(ob && ob.mode === 'idb');
@@ -441,12 +477,116 @@ function bizWriteBlockedNotice(){
   var now = Date.now();
   if(now - bizWriteNoticeAt < 3000) return;
   bizWriteNoticeAt = now;
-  toast('只读模式：数据已迁到本地库，写入功能还没接入，这次改动不会保存');
+  toast('保存不可用：写入还没准备好，这次改动不会保存');
 }
-function save(){
-  if(bizWriteBlocked()){ bizWriteBlockedNotice(); return false; }
-  try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
-  return true;
+var bizSaveFailAt = 0;
+var bizSaveFailSig = '';
+var bizFailForceOnce = false;   /* 用户点过重试 / 恢复后，下一次失败必须提示 */
+/* 把队列 / 恢复原语的错误码翻成用户能看懂的原因；未知码原样显示。 */
+function saveFailText(code){
+  var map = {
+    'snapshot-changed':'内容已变化，请重新操作一次',
+    'retry-not-allowed':'当前状态不能重试',
+    'no-pending':'没有待重试的保存',
+    'abort-not-allowed':'当前状态不能放弃',
+    'writer-not-ready':'写入权还没恢复',
+    'writer-changed-requires-recapture':'写入权已变化，需要重新操作',
+    'state-changed-requires-recapture':'内容或版本已变化，需要重新操作',
+    'no-recovering-job':'没有待恢复的保存',
+    'resolve-failed':'恢复失败'
+  };
+  if(!code) return '';
+  return map[code] ? (code + '：' + map[code]) : String(code);
+}
+function bizSaveFailed(code, actions, jobId, force){
+  var now = Date.now();
+  var sig = String(jobId || '') + '|' + String(code || '');
+  /* 同一 job 的同一错误在极短时间内只提示一次（多个 save 合并到同一 job 时防重复）；
+     用户点过重试 / 恢复后 force=true，保证再次失败一定重新提示。 */
+  if(!force && sig === bizSaveFailSig && now - bizSaveFailAt < 1200) return;
+  bizSaveFailSig = sig; bizSaveFailAt = now;
+  toast('没保存成功' + (code ? '（' + saveFailText(code) + '）' : '') + '，改动还在内存里', actions || []);
+}
+function saveResultFailed(r, fallback){
+  bizSaveFailed((r && r.code) || fallback, [], null, true);
+}
+/* 失败出口按当前队列状态生成：普通失败用 retry/abort；fatal 走 resolve 显式出口。
+   所有结果都检查返回值与 reject，失败原因必须让用户看到。 */
+function saveRecoveryActions(Q){
+  var st = (Q && typeof Q.status === 'function') ? Q.status() : null;
+  if(st && st.state === 'recovering'){
+    return [
+      { label:'重试', cb:function(){
+          bizFailForceOnce = true;
+          var p = Q.resolve({ action:'retry' });
+          if(p && p.then) p.then(function(r){ if(!r || !r.ok) saveResultFailed(r, 'resolve-failed'); },
+                                   function(e){ saveResultFailed(e, 'resolve-failed'); });
+        } },
+      { label:'放弃', cb:function(){
+          var p = Q.resolve({ action:'discard' });
+          if(p && p.then) p.then(function(r){ if(!r || !r.ok) saveResultFailed(r, 'resolve-failed'); },
+                                   function(e){ saveResultFailed(e, 'resolve-failed'); });
+        } }
+    ];
+  }
+  return [
+    { label:'重试', cb:function(){
+        bizFailForceOnce = true;
+        var r = Q.retry();
+        if(r && r.ok === false) saveResultFailed(r, 'retry-failed');
+      } },
+    { label:'放弃', cb:function(){
+        var r = Q.abort();
+        if(r && r.ok === false) saveResultFailed(r, 'abort-failed');
+      } }
+  ];
+}
+/* save(onSuccess, opts) 保持同步。opts.highFrequency 只给确有连续输入的点。 */
+function save(onSuccess, opts){
+  opts = opts || {};
+  if(!bizWriteBlocked()){
+    try{ localStorage.setItem(KEY, JSON.stringify(S)); }
+    catch(e){ bizSaveFailed('local-storage'); return false; }
+    if(typeof onSuccess === 'function') onSuccess();
+    return true;
+  }
+  var Q = window.OLCommitQueue, W = window.OLWrite;
+  var ident = (W && typeof W.currentWriterIdentity === 'function') ? W.currentWriterIdentity() : null;
+  var st = (Q && typeof Q.status === 'function') ? Q.status() : null;
+  if(!Q || typeof Q.enqueue !== 'function' || !W || !W.wired || !ident ||
+     (st && (st.state === 'recovering' || st.state === 'stopped'))){
+    bizWriteBlockedNotice();
+    return false;
+  }
+  /* R2 契约：operation 的 callback 只在终局结算（普通失败不调用），
+     所以成功提示走 callback，失败提示必须另走队列的全局结果事件。 */
+  var r, off = null;
+  function jobStillActive(id){
+    var s = (Q && typeof Q.status === 'function') ? Q.status() : null;
+    if(!s) return false;
+    return !!((s.inFlight && s.inFlight.id === id) ||
+              (s.pending && s.pending.id === id) ||
+              (s.recoveringJob && s.recoveringJob.id === id));
+  }
+  var onEvent = function(ev){
+    if(!r || !ev || ev.jobId !== r.jobId) return;
+    var force = bizFailForceOnce; bizFailForceOnce = false;
+    if(ev.type === 'failure' || ev.type === 'fatal'){
+      bizSaveFailed(ev.code || ev.stopReason, saveRecoveryActions(Q), r.jobId, force);
+    }
+    /* failure/fatal 时 job 仍在 PENDING / RECOVERING_JOB，监听器必须保留：
+       重试后再次失败仍要提示。只有 job 真正离开队列才注销。 */
+    if(off && !jobStillActive(r.jobId)){ off(); off = null; }
+  };
+  try{
+    off = Q.onResult(onEvent);
+    r = Q.enqueue({
+      source: 'business',
+      onResult: function(result){ if(result && result.ok && typeof onSuccess === 'function') onSuccess(); }
+    }, opts);
+  }catch(e){ if(off) off(); bizSaveFailed((e && e.code) || 'save-threw'); return false; }
+  if(!r || !r.ok){ if(off) off(); bizSaveFailed(r && r.code); return false; }
+  return true;   /* 只表示入队成功，不代表事务已提交 */
 }
 function normalize(){
   var d = defaults();
@@ -463,6 +603,36 @@ function normalize(){
   if(THEME_KEYS.indexOf(S.settings.theme) < 0) S.settings.theme = 'default';
   if(!S.settings.libFilter) S.settings.libFilter = '全部';
   if(!S.settings.randFilter) S.settings.randFilter = '全部';
+  /* 吃什么：菜单与记录都放在 settings 里，随 settings 载荷整体迁移，不新增顶层字段。
+     非法项就地丢弃，缺字段补默认值；用户删光菜单不会被种子塞回来。 */
+  if(!Array.isArray(S.settings.foodItems)) S.settings.foodItems = d.settings.foodItems;
+  S.settings.foodItems = S.settings.foodItems.map(function(it){
+    if(!it || typeof it !== 'object') return null;
+    var name = typeof it.name === 'string' ? it.name.trim().slice(0, 20) : '';
+    if(!name) return null;
+    var slots = Array.isArray(it.slots) ? it.slots.filter(function(k){ return k === 'any' || FOOD_SLOTS.indexOf(k) >= 0; }) : [];
+    if(!slots.length) slots = ['any'];
+    return {
+      id: typeof it.id === 'string' && it.id ? it.id : uid('fd'),
+      name: name,
+      cat: typeof it.cat === 'string' && it.cat.trim() ? it.cat.trim().slice(0, 6) : '其它',
+      note: typeof it.note === 'string' ? it.note.slice(0, 30) : '',
+      slots: slots,
+      enabled: it.enabled !== false
+    };
+  }).filter(function(it){ return !!it; });
+  if(!Array.isArray(S.settings.foodLog)) S.settings.foodLog = [];
+  S.settings.foodLog = S.settings.foodLog.filter(function(l){
+    return l && typeof l.date === 'string' && typeof l.name === 'string' && l.name;
+  }).map(function(l){
+    return {
+      id: typeof l.id === 'string' && l.id ? l.id : uid('fl'),
+      date: l.date,
+      ts: typeof l.ts === 'number' ? l.ts : 0,
+      name: l.name,
+      slot: FOOD_SLOTS.indexOf(l.slot) >= 0 ? l.slot : ''
+    };
+  }).slice(-200);
   if(!Array.isArray(S.settings.focusItems)) S.settings.focusItems = [];
   S.settings.focusItems = S.settings.focusItems.filter(function(it){ return it && it.text; }).map(function(it){
     it.id = it.id || uid('fi');
@@ -846,19 +1016,18 @@ function writeBackupFile(data){
   toast('已导出备份');
 }
 
-/* idb 模式：备份必须等于 IndexedDB 里已持久化的数据，不能夹带内存中未保存的改动。
+/* idb 模式：导出必须等于 IndexedDB 里已持久化的数据，不能夹带内存中未保存的改动。
    OLMigrate.rehydrate() 是单只读事务，返回六表反解的 S 形对象（含 legacyExtras）。
-   任何读取失败都明确报错且不生成文件，绝不退回内存 S。 */
-function exportFromIdb(){
-  function fail(msg){ toast('导出失败：' + msg + '，未生成备份'); }
+   任何读取失败都交给 onFail，绝不退回内存 S；成功的数据交给 onOk 生成文件。 */
+function readExportSource(onOk, onFail){
   var M = window.OLMigrate;
-  if(!M || typeof M.rehydrate !== 'function'){ fail('读取本地库不可用'); return; }
+  if(!M || typeof M.rehydrate !== 'function'){ onFail('读取本地库不可用'); return; }
   var rep;
   try{ rep = M.rehydrate(); }
-  catch(e){ fail('读取本地库出错'); return; }
+  catch(e){ onFail('读取本地库出错'); return; }
   Promise.resolve(rep).then(function(r){
     if(!r || r.ok !== true || !r.data || typeof r.data !== 'object'){
-      fail('读取本地库未完成' + (r && (r.reason || r.message) ? '（' + (r.reason || r.message) + '）' : ''));
+      onFail('读取本地库未完成' + (r && (r.reason || r.message) ? '（' + (r.reason || r.message) + '）' : ''));
       return;
     }
     /* 与启动链 mergeRehydrated 同样的合并规则：defaults 打底 → 六表数据覆盖 → extras 原键原值。
@@ -872,10 +1041,14 @@ function exportFromIdb(){
         if(!hasOwn(base, k)) defineOwn(base, k, val[k]);
       }
     }
-    writeBackupFile(base);
+    onOk(base);
   }, function(e){
-    fail('读取本地库出错' + (e && e.message ? '（' + e.message + '）' : ''));
+    onFail('读取本地库出错' + (e && e.message ? '（' + e.message + '）' : ''));
   });
+}
+
+function exportFromIdb(){
+  readExportSource(writeBackupFile, function(msg){ toast('导出失败：' + msg + '，未生成备份'); });
 }
 
 function exportJSON(){
@@ -883,6 +1056,140 @@ function exportJSON(){
      legacy 模式保持原有导出行为不变。 */
   if(bizWriteBlocked()){ exportFromIdb(); return; }
   writeBackupFile(S);
+}
+
+/* ==================== 导出表格 ==================== */
+/* 把各类记录摊平成「日期 / 类别 / 内容 / 补充」四列的一张 CSV。
+   只读取传入的数据：不改全局 S、不写任何存储、不调用 save()。
+   Excel / WPS 打开中文需要 UTF-8 BOM；单元格一律加引号并转义内部双引号。 */
+function tableText(v){
+  if(v === null || v === undefined || typeof v === 'object') return '';
+  return String(v);
+}
+function tableField(o, keys){
+  for(var i = 0; i < keys.length; i++){
+    var v = tableText(o[keys[i]]);
+    if(v !== '') return v;
+  }
+  return '';
+}
+function tableJoin(parts){
+  return parts.filter(function(x){ return x !== '' && x !== null && x !== undefined; }).join('；');
+}
+function tableCsvCell(v){
+  return '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+}
+
+function buildTableRows(D){
+  var rows = [];
+  function add(date, kind, content, extra){
+    rows.push([date || '', kind, content || '', extra || '']);
+  }
+  var penName = {};
+  (Array.isArray(D.pens) ? D.pens : []).forEach(function(p){
+    if(p && p.id) penName[p.id] = tableText(p.name || p.emoji || p.id);
+  });
+  var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+
+  (Array.isArray(D.plans) ? D.plans : []).forEach(function(p){
+    if(!p) return;
+    add(p.date, '计划', tableField(p, ['title', 'text']),
+      tableJoin([tableText(p.note), p.done ? '已完成' : '']));
+  });
+  var notes = (D.notes && typeof D.notes === 'object') ? D.notes : {};
+  Object.keys(notes).forEach(function(k){
+    var v = tableText(notes[k]);
+    if(v.trim()) add(k, '每日笔记', v, '');
+  });
+  var marks = (D.marks && typeof D.marks === 'object') ? D.marks : {};
+  Object.keys(marks).forEach(function(k){
+    var m = marks[k];
+    var items = (m && Array.isArray(m.items)) ? m.items : [];
+    var names = items.map(function(it){
+      return penName[it && it.penId] || tableText(it && it.penId);
+    }).filter(function(x){ return x; });
+    if(names.length) add(k, '标记', names.join('、'), '');
+  });
+  (Array.isArray(D.workouts) ? D.workouts : []).forEach(function(w){
+    if(!w) return;
+    var parts = Array.isArray(w.parts) ? w.parts.map(tableText).filter(function(x){ return x; }) : [];
+    add(w.date, '训练', parts.join('、'),
+      tableJoin([w.minutes ? w.minutes + ' 分钟' : '', w.kcal ? w.kcal + ' 千卡' : '', tableText(w.note)]));
+  });
+  (Array.isArray(D.studyLogs) ? D.studyLogs : []).forEach(function(s){
+    if(!s) return;
+    add(s.date, '学习', tableText(s.what),
+      tableJoin([s.minutes ? s.minutes + ' 分钟' : '', tableText(s.note)]));
+  });
+  (Array.isArray(D.decisionLog) ? D.decisionLog : []).forEach(function(d){
+    if(!d) return;
+    add(d.date, '决定', tableText(d.title),
+      tableJoin([d.duration ? '计划 ' + Math.round(d.duration / 60) + ' 分钟' : '',
+        d.actual ? '实际 ' + Math.round(d.actual / 60) + ' 分钟' : '']));
+  });
+  (Array.isArray(D.restDays) ? D.restDays : []).forEach(function(day){
+    add(day, '休息日', '休息', '');
+  });
+  (Array.isArray(D.flashes) ? D.flashes : []).forEach(function(f){
+    if(!f) return;
+    add(f.date, '灵光一闪', tableField(f, ['text', 'title']), tableText(f.time));
+  });
+  (Array.isArray(D.itemLogs) ? D.itemLogs : []).forEach(function(r){
+    if(!r) return;
+    add(r.date, '重点记录', tableField(r, ['what', 'text', 'title']),
+      tableJoin([r.minutes ? r.minutes + ' 分钟' : '', r.count ? r.count + ' 次' : '', tableText(r.feel)]));
+  });
+  (Array.isArray(D.tasks) ? D.tasks : []).forEach(function(t){
+    if(!t) return;
+    add(t.due || t.date || '', '待办', tableText(t.title),
+      tableJoin([tableText(t.cat), tableText(t.note)]));
+  });
+  (Array.isArray(D.schedule) ? D.schedule : []).forEach(function(s){
+    if(!s) return;
+    var wd = (s.weekday !== null && s.weekday !== undefined && s.weekday !== '') ?
+      '每周' + WEEK[+s.weekday] : '';
+    var span = (tableText(s.start) && tableText(s.end)) ? s.start + '–' + s.end : '';
+    add(s.date || '', '日程', tableText(s.title),
+      tableJoin([wd, span, tableText(s.place)]));
+  });
+
+  var order = ['计划', '每日笔记', '标记', '训练', '学习', '决定', '休息日',
+    '灵光一闪', '重点记录', '待办', '日程'];
+  rows.sort(function(a, b){
+    if(a[0] && !b[0]) return -1;
+    if(!a[0] && b[0]) return 1;
+    if(a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
+    return order.indexOf(a[1]) - order.indexOf(b[1]);
+  });
+  return rows;
+}
+
+function writeTableFile(D){
+  var rows;
+  try{ rows = buildTableRows(D); }
+  catch(e){ toast('导出失败：整理记录时出错，未生成表格'); return; }
+  var lines = [['日期', '类别', '内容', '补充']].concat(rows).map(function(r){
+    return r.map(tableCsvCell).join(',');
+  });
+  var text = '\ufeff' + lines.join('\r\n') + '\r\n';
+  var blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'earthonline-表格-' + todayReal() + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  toast('已导出表格');
+}
+
+function exportTable(){
+  /* 与 JSON 备份共用同一个 idb 判据和同一条只读取数路径：
+     本地库里已保存的数据才进表格，读失败就报错且不生成文件。 */
+  if(bizWriteBlocked()){
+    readExportSource(writeTableFile, function(msg){ toast('导出失败：' + msg + '，未生成表格'); });
+    return;
+  }
+  writeTableFile(S);
 }
 
 function importJSON(){

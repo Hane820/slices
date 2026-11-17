@@ -25,7 +25,7 @@ function renderSettings(){
     var t0 = TODAY();
     if(isRest) S.restDays = S.restDays.filter(function(d){ return d !== t0; });
     else S.restDays.push(t0);
-    save(); renderSettings(); renderRemind(); toast(isRest ? '恢复提醒' : '今天好好休息');
+    save(function(){ toast(isRest ? '恢复提醒' : '今天好好休息'); }); renderSettings(); renderRemind();
   });
   r2.appendChild(r2s);
   rb.appendChild(r2);
@@ -47,7 +47,7 @@ function renderSettings(){
       confirmBox('删掉「' + (p.name||'未命名') + '」？', '用过这个标记的日期会变回空白。', function(){
         S.pens = S.pens.filter(function(y){ return y.id !== p.id; });
         for(var k in S.marks){ S.marks[k].items = (S.marks[k].items || []).filter(function(it){ return it.penId !== p.id; }); if(!S.marks[k].items.length) delete S.marks[k]; }
-        save(); renderSettings(); toast('已删除');
+        save(function(){ toast('已删除'); }); renderSettings();
       });
     });
     pill.appendChild(x);
@@ -70,14 +70,14 @@ function renderSettings(){
       confirmBox('删除标签「' + t.name + '」？', '之前的打卡记录会一起消失。', function(){
         S.tags = S.tags.filter(function(y){ return y.id !== t.id; });
         S.tagLogs = S.tagLogs.filter(function(l){ return l.tagId !== t.id; });
-        save(); renderSettings(); toast('已删除');
+        save(function(){ toast('已删除'); }); renderSettings();
       });
     });
     pill.appendChild(x);
     pill.addEventListener('click', function(){
       openModal({
         title:'改标签名', sub:'', input:true, value:t.name, placeholder:'标签名', okText:'保存',
-        onOk:function(v){ t.name = v; save(); renderSettings(); toast('改好了'); }
+        onOk:function(v){ t.name = v; save(function(){ toast('改好了'); }); renderSettings(); }
       });
     });
     tp.appendChild(pill);
@@ -88,7 +88,7 @@ function renderSettings(){
       title:'新建标签', sub:'点一下记一次，用来数频率', input:true, placeholder:'比如「晒了太阳」', okText:'加上',
       onOk:function(v){
         S.tags.push({ id: uid('tag'), name:v });
-        save(); renderSettings(); renderTagsRow(); toast('标签已加上');
+        save(function(){ toast('标签已加上'); }); renderSettings(); renderTagsRow();
       }
     });
   });
@@ -108,10 +108,10 @@ function renderSettings(){
     r.appendChild(sw);
     r.addEventListener('click', function(){
       p.enabled = !p.enabled;
-      save();
+      save(function(){ toast(p.enabled ? '「' + p.name + '」打开了' : '「' + p.name + '」关掉了'); });
       renderSettings();
       renderToday();
-      toast(p.enabled ? '「' + p.name + '」打开了' : '「' + p.name + '」关掉了');
+      if(typeof renderDecideShell === 'function') renderDecideShell();
     });
     gl.appendChild(r);
   });
@@ -127,7 +127,7 @@ function renderSettings(){
   rr.appendChild(el('div','row-a', '凌晨 ' + S.settings.resetHour + ':00'));
   rr.addEventListener('click', function(){
     askNumber('几点算新的一天（0-6 点）', S.settings.resetHour, 0, 6, function(v){
-      S.settings.resetHour = v; save(); renderSettings(); renderToday(); toast('改好了');
+      S.settings.resetHour = v; save(function(){ toast('改好了'); }); renderSettings(); renderToday();
     });
   });
   ob.appendChild(rr);
@@ -158,8 +158,7 @@ function renderSettings(){
     sw.addEventListener('click', function(){
       if(S.settings.theme === t[0]) return;
       S.settings.theme = t[0];
-      save(); applyTheme(); renderSettings();
-      toast('换成「' + t[1] + '」了');
+      save(function(){ toast('换成「' + t[1] + '」了'); }); applyTheme(); renderSettings();
     });
     tgrid.appendChild(sw);
   });
@@ -184,7 +183,7 @@ function renderSettings(){
     applyUiScale();
     lval.textContent = Math.round(v * 100) + '%';
   });
-  slider.addEventListener('change', function(){ save(); toast('字号记下了'); });
+  slider.addEventListener('change', function(){ save(function(){ toast('字号记下了'); }, { highFrequency:true }); });
   lb.appendChild(slider);
 
   renderFocusSet();
@@ -204,6 +203,7 @@ function renderSettings(){
   }
   dataRow('导出 PDF 记录', '月历 + 时间轴 + 小结，打印或存成 PDF', openPdfPanel);
   dataRow('导出备份', '一个 JSON 文件，包含全部记录', exportJSON);
+  dataRow('导出表格', '把记录按日期排成一张表，Excel / WPS 能打开', exportTable);
   dataRow('从备份恢复', '会先给你看摘要，再决定合并还是替换', importJSON);
   dataRow('清空全部数据', '不可恢复，请先导出', function(){
     if(bizWriteBlocked()){ bizWriteBlockedNotice(); return; }   /* idb 模式：入口拦截，S 不被清空 */
@@ -287,7 +287,7 @@ function openPenEdit(existing){
       confirmBox('删掉这个标记？', '用过它的日期会变回空白。', function(){
         S.pens = S.pens.filter(function(y){ return y.id !== existing.id; });
         for(var k in S.marks){ S.marks[k].items = (S.marks[k].items || []).filter(function(it){ return it.penId !== existing.id; }); if(!S.marks[k].items.length) delete S.marks[k]; }
-        save(); closeSheet(); renderSettings(); toast('已删除');
+        save(function(){ toast('已删除'); }); closeSheet(); renderSettings();
       });
     });
   }
@@ -299,7 +299,7 @@ function openPenEdit(existing){
     }else{
       S.pens.push({ id: uid('p'), color: draft.color, emoji: draft.emoji, name: n });
     }
-    save(); closeSheet(); renderSettings(); toast('已保存');
+    save(function(){ toast('已保存'); }); closeSheet(); renderSettings();
   });
 }
 
@@ -514,9 +514,8 @@ function openFocusEdit(it, isNew){
       it.text = name; it.goal = goal; it.unit = gu || '分钟';
       it.mode = fields.mode; it.options = fields.options; it.label = fields.label; it.ph = fields.ph;
     }
-    save(); closeSheet(); renderFocusSet(); renderGoals(); renderRemind();
+    save(function(){ toast(isNew ? '加好了' : '改好了'); }); closeSheet(); renderFocusSet(); renderGoals(); renderRemind();
     if(currentPage === 'pRecords') renderProject();
-    toast(isNew ? '加好了' : '改好了');
   });
   if(!isNew){
     body.querySelector('#fxDel').addEventListener('click', function(){
@@ -538,14 +537,14 @@ function openFocusEdit(it, isNew){
         }
         setTimeout(function(){
           S.settings.focusItems = S.settings.focusItems.filter(function(x){ return x !== it; });
-          save(); renderFocusSet(); renderGoals();
+          save(function(){
+            toast('已删除「' + it.text + '」', '撤销', function(){
+              S.settings.focusItems.splice(Math.min(pos, S.settings.focusItems.length), 0, it);
+              save(function(){ toast('已恢复'); }); renderFocusSet(); renderGoals();
+              if(currentPage === 'pRecords') renderProject();
+            });
+          }); renderFocusSet(); renderGoals();
           if(currentPage === 'pRecords') renderProject();
-          toast('已删除「' + it.text + '」', '撤销', function(){
-            S.settings.focusItems.splice(Math.min(pos, S.settings.focusItems.length), 0, it);
-            save(); renderFocusSet(); renderGoals();
-            if(currentPage === 'pRecords') renderProject();
-            toast('已恢复');
-          });
         }, deckCanAnimate() ? 210 : 0);
       }, { okText: '确认删除' });
     });
