@@ -1,0 +1,9 @@
+{
+  "name": "earthonline-backup-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/harness.cjs",
+    "dev": "wrangler dev"
+  }
+}

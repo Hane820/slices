@@ -711,16 +711,22 @@ function openWorkout(w, itemId){
 /* ==================== 记录：学习 ==================== */
 function renderRecords(){
   var v = recordView;
+  /* 饮食记录（插件）：开关只控制入口显隐，数据不动；关掉时若正停在饮食视图则回落 */
+  var dietBtn = document.getElementById('dietSegBtn');
+  if(dietBtn) dietBtn.style.display = pluginOn('diet') ? '' : 'none';
+  if(v === 'diet' && !pluginOn('diet')) v = recordView = 'timeline';
   $('vPlan').style.display = v === 'plan' ? 'block' : 'none';
   $('vTimeline').style.display = v === 'timeline' ? 'block' : 'none';
   $('vMonth').style.display = v === 'month' ? 'block' : 'none';
   $('vItem').style.display = v === 'item' ? 'block' : 'none';
+  $('vDiet').style.display = v === 'diet' ? 'block' : 'none';
   var bs = $('recSeg').querySelectorAll('button');
   for(var i=0;i<bs.length;i++) bs[i].classList.toggle('on', bs[i].dataset.v === v);
   if(v === 'plan') renderPlan();
   if(v === 'timeline') renderTimeline();
   if(v === 'month') renderMonth(true);
   if(v === 'item') renderProject();
+  if(v === 'diet') renderDiet();
 }
 var recordView = 'timeline';
 

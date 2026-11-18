@@ -3,14 +3,14 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const siteUrl = `${siteOrigin}${basePath}`;
 
 export const site = {
-  name: 'A Quiet Publication',
-  title: 'A Quiet Publication · 静态个人出版物模板',
-  description: '写作、专栏、项目、研究与影像放在同一套静态档案里。这是 Fourfold 的示例站点。',
+  name: 'Slices0fMe',
+  title: '关于一切· 我的切片',
+  description: '这是人类切片。',
   url: siteUrl,
   author: {
-    name: 'Site Author',
-    bio: '示例作者。关心个人网站如何被长期维护：写作如何归档，项目如何留下状态，研究如何标出版本。',
-    email: '',
+    name: 'HANE',
+    bio: '我到底要如何把自己切得足够薄？',
+    email: 'hanehane@foxmail.com',
   },
   locale: 'zh-cn',
   locales: ['zh-cn', 'en'] as const,
@@ -21,7 +21,7 @@ export const site = {
     url: 'https://creativecommons.org/licenses/by-nc-sa/4.0/',
   },
   social: [
-    { label: 'GitHub', href: 'https://github.com/Liyuk/astro-fourfold' },
+    { label: 'GitHub', href: 'https://github.com/Hane820/slices' },
   ] as Array<{ label: string; href: string }>,
   features: {
     search: true,

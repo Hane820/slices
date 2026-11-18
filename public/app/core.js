@@ -20,8 +20,22 @@ var SCENES = [
   {k:'beforebed',  n:'睡前',         d:'该收尾了'},
   {k:'lost',       n:'不知道做什么', d:'你替我定'}
 ];
+/* 运行时情境清单以 S.scenes 为准（可自定义、稳定 id）；SCENES 只作种子与系统保护基线 */
+function defaultScenes(){
+  return SCENES.map(function(sc, i){
+    return { id:sc.k, name:sc.n, desc:sc.d, sys:true, enabled:true, order:i };
+  });
+}
+function allScenes(){
+  return Array.isArray(S.scenes) && S.scenes.length ? S.scenes : defaultScenes();
+}
+function activeScenes(){
+  return allScenes().filter(function(sc){ return sc && sc.enabled !== false; });
+}
 function sceneName(k){
-  for(var i=0;i<SCENES.length;i++) if(SCENES[i].k === k) return SCENES[i].n;
+  var list = allScenes();
+  for(var i=0;i<list.length;i++) if(list[i] && list[i].id === k) return list[i].name;
+  for(i=0;i<SCENES.length;i++) if(SCENES[i].k === k) return SCENES[i].n;
   return k;
 }
 var DEFAULT_SCENES = {
@@ -271,7 +285,8 @@ function defaultTasks(){
 function defaultPlugins(){
   return [
     { id:'tags', name:'标签打卡', desc:'点一下记一次，用来数频率', enabled:false },
-    { id:'food', name:'吃什么', desc:'到饭点替你抽一个，菜单自己攒', enabled:true }
+    { id:'food', name:'吃什么', desc:'到饭点替你抽一个，菜单自己攒', enabled:true },
+    { id:'diet', name:'饮食记录', desc:'记吃了什么、什么时候吃，看进食窗口', enabled:false }
   ];
 }
 /* 菜单种子：只为「第一次就能抽」；用户可改可删，删光也不会再塞回来 */
@@ -310,6 +325,8 @@ function defaults(){
     restDays: [],       // ['YYYY-MM-DD']
     flashes: [],
     itemLogs: [],   // 自己填的重点记录 {id,itemId,date,time,minutes,what,feel}
+    scenes: defaultScenes(),   // 决策情境（自定义）：{id,name,desc,sys,enabled,order}，id 稳定，顺序即显示顺序
+    meals: [],      // 饮食记录（插件）{id,date,ts,slot,foods:[{name,portion}],note}，date 为业务日期，ts 为实际进食时间戳
     plugins: defaultPlugins(),   // 首页功能插件 {id,name,desc,enabled}，关掉只隐藏入口，数据不动
     settings: {
       resetHour: 4,
@@ -325,6 +342,7 @@ function defaults(){
       focusSeedV: 0,   // 预设补回标记，写过 2 之后用户删掉的预设不再塞回来
       foodItems: defaultFoodItems(),   // 吃什么：菜单库 {id,name,cat,note,slots,enabled}
       foodLog: [],                     // 吃什么：吃过的记录 {id,date,ts,name,slot}，只增不覆写
+      mealSlots: ['早餐', '午餐', '晚餐', '加餐'],   // 饮食记录：餐次清单，可自定义；不入配置文件导出
       focusItems: [
         { id:'fi-train', text:'健身', goal:{ value:30, unit:'分钟' }, mode:'multi', options: PARTS.slice() },
         { id:'fi-study', text:'学习', goal:{ value:40, unit:'分钟' }, mode:'text', label:'学了什么', ph:'高数 / 单词…（可留空）' }
@@ -590,7 +608,7 @@ function save(onSuccess, opts){
 }
 function normalize(){
   var d = defaults();
-  ['tasks','schedule','plans','pens','tags','tagLogs','suggestions','workouts','studyLogs','decisionLog','restDays','flashes','itemLogs'].forEach(function(k){
+  ['tasks','schedule','plans','pens','tags','tagLogs','suggestions','workouts','studyLogs','decisionLog','restDays','flashes','itemLogs','meals'].forEach(function(k){
     if(!Array.isArray(S[k])) S[k] = d[k];
   });
   ['notes','marks','doneSugg'].forEach(function(k){
@@ -633,6 +651,36 @@ function normalize(){
       slot: FOOD_SLOTS.indexOf(l.slot) >= 0 ? l.slot : ''
     };
   }).slice(-200);
+  /* 饮食记录（插件）：业务数据，存顶层 meals（dayEntries type=meal）。
+     结构非法项就地丢弃；时间戳非法的记录保留但置 0——界面与统计按「无效」
+     明确标识，不静默纳入统计。每条记录的 id/date/ts 原样保留，不重生成。 */
+  if(!Array.isArray(S.meals)) S.meals = [];
+  S.meals = S.meals.filter(function(m){
+    return m && typeof m === 'object' && !Array.isArray(m) &&
+      typeof m.id === 'string' && m.id &&
+      typeof m.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m.date);
+  }).map(function(m){
+    var foods = (Array.isArray(m.foods) ? m.foods : []).map(function(f){
+      if(!f || typeof f !== 'object' || Array.isArray(f)) return null;
+      var name = typeof f.name === 'string' ? f.name.trim().slice(0, 40) : '';
+      if(!name) return null;
+      return { name: name, portion: typeof f.portion === 'string' ? f.portion.trim().slice(0, 20) : '' };
+    }).filter(function(f){ return !!f; });
+    return {
+      id: m.id,
+      date: m.date,
+      ts: (typeof m.ts === 'number' && isFinite(m.ts) && m.ts > 0) ? m.ts : 0,
+      slot: typeof m.slot === 'string' && m.slot.trim() ? m.slot.trim().slice(0, 8) : '',
+      foods: foods,
+      note: typeof m.note === 'string' ? m.note.slice(0, 60) : ''
+    };
+  });
+  /* 餐次清单：用户可自定义；去重去空，空清单回退默认。不入配置文件导出白名单。 */
+  if(!Array.isArray(S.settings.mealSlots)) S.settings.mealSlots = d.settings.mealSlots.slice();
+  S.settings.mealSlots = S.settings.mealSlots.map(function(s){
+    return typeof s === 'string' ? s.trim().slice(0, 8) : '';
+  }).filter(function(s, i, arr){ return s && arr.indexOf(s) === i; }).slice(0, 8);
+  if(!S.settings.mealSlots.length) S.settings.mealSlots = d.settings.mealSlots.slice();
   if(!Array.isArray(S.settings.focusItems)) S.settings.focusItems = [];
   S.settings.focusItems = S.settings.focusItems.filter(function(it){ return it && it.text; }).map(function(it){
     it.id = it.id || uid('fi');
@@ -723,6 +771,29 @@ function normalize(){
     if(typeof sg.enabled !== 'boolean') sg.enabled = true;
     if(typeof sg.random !== 'boolean') sg.random = true;
   });
+  /* 决策情境：顶层 scenes（definitions kind='scene'）。id 稳定不重生成；
+     内置情境是系统项——不可删除、缺失自动补回，改名/停用结果保留；
+     顺序即决策页显示顺序，order 随数组下标刷新，重排不改历史记录含义。 */
+  if(!Array.isArray(S.scenes)) S.scenes = defaultScenes();
+  var sceneOut = [];
+  (Array.isArray(S.scenes) ? S.scenes : []).forEach(function(sc){
+    if(!sc || typeof sc !== 'object' || Array.isArray(sc)) return;
+    if(typeof sc.id !== 'string' || !sc.id || byId(sceneOut, sc.id)) return;
+    sceneOut.push({
+      id: sc.id,
+      name: (typeof sc.name === 'string' && sc.name.trim()) ? sc.name.trim().slice(0, 12) : '未命名情况',
+      desc: (typeof sc.desc === 'string') ? sc.desc.trim().slice(0, 30) : '',
+      sys: sc.sys === true,
+      enabled: sc.enabled !== false,
+      order: sceneOut.length
+    });
+  });
+  defaultScenes().forEach(function(ds){
+    if(!byId(sceneOut, ds.id)){
+      sceneOut.push({ id:ds.id, name:ds.name, desc:ds.desc, sys:true, enabled:true, order:sceneOut.length });
+    }
+  });
+  S.scenes = sceneOut.slice(0, 24);
   S.workouts.forEach(function(w){
     if(!Array.isArray(w.parts)) w.parts = [];
     w.minutes = +w.minutes || 0;
@@ -1057,6 +1128,344 @@ function exportJSON(){
   if(bizWriteBlocked()){ exportFromIdb(); return; }
   writeBackupFile(S);
 }
+
+/* 配置文件导出（Task C1）在 config-io.js：抽取规则、信封、下载与 idb/legacy
+   分流都在那里，共用本文件的只读通道 readExportSource()。设置页调用全局
+   exportConfig()（由 config-io.js 暴露）。 */
+
+/* ==================== 配置文件导入（Task C2） ====================
+   解析 / 校验 / 合并预览 / 冲突裁决全部在 config-io.js（纯函数）。
+   本文件负责：读取基线（readConfigSource）、把合并结果套进 S（applyConfigImport）、
+   预览确认弹层（importConfig 系列）。提交就是普通的一次 save()：
+   队列在入队时克隆整个 S，单事务 bizRev CAS 提交，天然满足原子性；
+   失权 / 版本冲突 / 失败重试沿用 5B 系列的恢复生命周期，导入不做特殊分支。 */
+var CI_STATE = {
+  file: null,          /* parseConfigFile 的成功结果（含 config） */
+  preview: null,       /* previewConfigImport 结果 */
+  choices: {},         /* 冲突裁决：key -> 'local' | 'incoming' */
+  mode: null,          /* 'idb' | 'legacy' */
+  baselineRev: null,   /* idb：预览基线 bizRev */
+  fileLabel: '',       /* 弹层副标题 */
+  reading: false,      /* 读基线 / 读版本进行中，挡重复点击 */
+  submitting: false    /* 已进提交路径，挡重复确认 */
+};
+
+/* idb 导入基线：与 readExportSource 同一套只读通道，但额外带回 meta.bizRev，
+   供「预览 → 确认」之间的版本变化检测。不读内存 S、不写库。 */
+function readConfigSource(onOk, onFail){
+  var M = window.OLMigrate;
+  if(!M || typeof M.rehydrate !== 'function'){ onFail('读取本地库不可用'); return; }
+  var rep;
+  try{ rep = M.rehydrate(); }
+  catch(e){ onFail('读取本地库出错'); return; }
+  Promise.resolve(rep).then(function(r){
+    if(!r || r.ok !== true || !r.data || typeof r.data !== 'object'){
+      onFail('读取本地库未完成' + (r && (r.reason || r.message) ? '（' + (r.reason || r.message) + '）' : ''));
+      return;
+    }
+    var base = defaults();
+    deepMerge(base, r.data);
+    if(r.extras && Array.isArray(r.extras.keys) && r.extras.keys.length){
+      var val = r.extras.value || {};
+      for(var i = 0; i < r.extras.keys.length; i++){
+        var k = r.extras.keys[i];
+        if(!hasOwn(base, k)) defineOwn(base, k, val[k]);
+      }
+    }
+    onOk(base, {
+      bizRev: (r.meta && typeof r.meta.bizRev === 'number') ? r.meta.bizRev : null
+    });
+  }, function(e){
+    onFail('读取本地库出错' + (e && e.message ? '（' + e.message + '）' : ''));
+  });
+}
+
+/* 把合并结果套进 S。patch 只含白名单字段；settings 只写文件提供的键，
+   其余设置不动。写完统一 normalize()（补默认字段、重排 scenes order、
+   清洗 mealSlots / theme 等，与正常编辑同一条路径）。 */
+function applyConfigImport(patch){
+  if(!patch || typeof patch !== 'object') return false;
+  ['pens', 'tags', 'suggestions', 'scenes', 'plugins'].forEach(function(k){
+    if(Array.isArray(patch[k])) S[k] = patch[k];
+  });
+  if(patch.settings && typeof patch.settings === 'object'){
+    Object.keys(patch.settings).forEach(function(k){
+      S.settings[k] = patch.settings[k];
+    });
+  }
+  normalize();
+  return true;
+}
+
+function importConfig(){
+  if(CI_STATE.reading || CI_STATE.submitting) return;   /* 重复点击 / 提交中不重开 */
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.json,application/json';
+  inp.style.display = 'none';
+  document.body.appendChild(inp);
+  var cleanup = function(){ if(inp.parentNode) inp.parentNode.removeChild(inp); };
+  inp.addEventListener('change', function(){
+    var f = inp.files && inp.files[0];
+    cleanup();
+    if(!f){ return; }                       /* 未选择文件：不执行任何操作 */
+    importConfigStart(f);
+  });
+  inp.addEventListener('cancel', function(){ cleanup(); });   /* 用户取消 */
+  inp.click();
+}
+
+function importConfigStart(fileObj){
+  var CIO = window.OLConfigIO;
+  if(!CIO || typeof CIO.parseConfigFile !== 'function'){ toast('导入失败：配置模块未加载'); return; }
+  var MAXB = CIO.MAX_IMPORT_CHARS || (2 * 1024 * 1024);
+  if(typeof fileObj.size === 'number' && fileObj.size > MAXB){
+    toast('导入失败：文件太大（上限约 2MB），已拒绝'); return;
+  }
+  CI_STATE.reading = true;
+  var fr = new FileReader();
+  fr.onload = function(){
+    CI_STATE.reading = false;
+    importConfigPreview(String(fr.result), fileObj.name || '');
+  };
+  fr.onerror = function(){
+    CI_STATE.reading = false;
+    toast('导入失败：文件读不出来');
+  };
+  try{ fr.readAsText(fileObj); }
+  catch(e){ CI_STATE.reading = false; toast('导入失败：文件读不出来'); }
+}
+
+function importConfigPreview(text, fileName){
+  var CIO = window.OLConfigIO;
+  var parsed = CIO.parseConfigFile(text, {
+    pluginIds: defaultPlugins().map(function(p){ return p.id; })
+  });
+  if(!parsed.ok){
+    toast('导入失败：' + parsed.message + '，本机没有任何改动');
+    return;
+  }
+  CI_STATE.file = parsed.file;
+  CI_STATE.fileLabel = '来自 ' + (fileName || '配置文件') +
+    (parsed.file.exportedAt ? ' · 导出于 ' + parsed.file.exportedAt.slice(0, 10) : '');
+  if(bizWriteBlocked()){
+    /* idb：基线必须来自已持久化数据，不能拿可能含未保存改动的内存 S */
+    if(window.OLBoot && typeof OLBoot.hasUnsavedSnapshot === 'function' && OLBoot.hasUnsavedSnapshot()){
+      toast('导入失败：有一份未处理的恢复副本，先在顶部横幅里处理它'); return;
+    }
+    readConfigSource(function(data, meta){
+      var local = CIO.buildConfigPayload(data);
+      ciEnterPreview('idb', local, meta && typeof meta.bizRev === 'number' ? meta.bizRev : null);
+    }, function(msg){
+      toast('导入失败：' + msg + '，本机没有任何改动');
+    });
+  } else {
+    ciEnterPreview('legacy', CIO.buildConfigPayload(S), null);
+  }
+}
+
+/* 插件注册表名称：预览逐项展示用（文件里只有 {id, enabled}，名字以应用注册定义为准） */
+function ciPluginNames(){
+  var names = {};
+  try { defaultPlugins().forEach(function(pl){ names[pl.id] = pl.name; }); } catch(e){}
+  return names;
+}
+
+function ciEnterPreview(mode, local, baselineRev){
+  var CIO = window.OLConfigIO;
+  var preview = CIO.previewConfigImport(local, CI_STATE.file.config, { pluginNames: ciPluginNames() });
+  if(!preview || preview.ok !== true){ toast('导入失败：预览计算失败，本机没有任何改动'); return; }
+  CI_STATE.mode = mode;
+  CI_STATE.preview = preview;
+  CI_STATE.baselineRev = baselineRev;
+  CI_STATE.choices = {};
+  preview.conflicts.forEach(function(cf){ CI_STATE.choices[cf.key] = 'local'; });  /* 默认保留本机，可逐条改 */
+  openImportSheet();
+}
+
+function ciStatsLines(preview){
+  var s = preview.stats;
+  var lines = [];
+  lines.push({ t: '新增 ' + s.add + ' 条', sub: '导入文件里有、本机没有的定义与重点/菜单项，追加到末尾' });
+  lines.push({ t: '冲突 ' + s.conflict + ' 条', sub: '两边都有但内容不同，逐条选择：用导入版还是保留本机' });
+  lines.push({ t: '相同跳过 ' + s.same + ' 条', sub: '两边完全一样，不用动' });
+  lines.push({ t: '保留本机 ' + s.keepLocal + ' 条', sub: '本机有、导入文件里没有，不会被删' });
+  var extra = [];
+  if(s.settingsChanged && s.settingsChanged.length) extra.push('设置变更：' + s.settingsChanged.join('、'));
+  if(s.pluginUpdates) extra.push('插件开关更新 ' + s.pluginUpdates + ' 个');
+  if(s.pluginAdds) extra.push('补上缺失插件 ' + s.pluginAdds + ' 个');
+  if(s.settingsChanged && s.settingsChanged.indexOf('mealSlots') >= 0) extra.push('餐次清单按导入文件整体替换');
+  lines.push({ t: extra.length ? extra.join('；') : '设置与插件：无变更', sub: '文件没提供的设置保持本机原样' });
+  /* 插件变化逐项展示：已有插件（开关翻转）与新增插件分别列，各显示名称与状态变化 */
+  function onoff(v){ return v ? '开' : '关'; }
+  if(s.pluginDetails && s.pluginDetails.updates.length){
+    s.pluginDetails.updates.forEach(function(u){
+      lines.push({ t: '插件开关更新：' + (u.name || u.id),
+        sub: '本机：' + onoff(u.from) + ' → 导入后：' + onoff(u.to) });
+    });
+  }
+  if(s.pluginDetails && s.pluginDetails.adds.length){
+    s.pluginDetails.adds.forEach(function(a){
+      lines.push({ t: '补上缺失插件：' + (a.name || a.id),
+        sub: '本机没有这个插件 → 导入后状态：' + onoff(a.enabled) });
+    });
+  }
+  return lines;
+}
+
+function openImportSheet(){
+  var body = openSheet(
+    '<div class="shd"><div class="shd-t">导入配置文件</div><div class="shd-s">' + esc(CI_STATE.fileLabel) + '</div></div>' +
+    '<div id="ciBody"></div>' +
+    '<div class="acts">' +
+      '<button class="btn g" id="ciCancel">取消</button>' +
+      '<button class="btn p" id="ciOk">确认导入</button>' +
+    '</div>'
+  );
+  body.querySelector('#ciCancel').addEventListener('click', function(){
+    CI_STATE.file = null; CI_STATE.preview = null; CI_STATE.choices = {};
+    closeSheet();
+  });
+  body.querySelector('#ciOk').addEventListener('click', confirmConfigImport);
+  renderImportSheetBody();
+}
+
+/* 预览过期重算后整体重渲染；旧的冲突选择保留仍然有效的 key，其余重置为保留本机 */
+function renderImportSheetBody(){
+  var body = $('sheetBody');
+  var box = body.querySelector('#ciBody');
+  if(!box || !CI_STATE.preview) return;
+  var p = CI_STATE.preview;
+  var keep = CI_STATE.choices;
+  CI_STATE.choices = {};
+  p.conflicts.forEach(function(cf){
+    CI_STATE.choices[cf.key] = (keep[cf.key] === 'incoming') ? 'incoming' : 'local';
+  });
+  var html = '<div class="card plain" id="ciStats">';
+  ciStatsLines(p).forEach(function(l){
+    html += '<div class="row"><div class="row-main"><div class="row-t">' + esc(l.t) +
+      '</div><div class="row-s">' + esc(l.sub) + '</div></div></div>';
+  });
+  html += '</div>';
+  /* 全部冲突保留本机且没有其他实际变化 → 提示本次确认不会改任何数据 */
+  var noEffNow = !window.OLConfigIO.previewHasEffectiveChange(p, CI_STATE.choices);
+  if(p.conflicts.length && noEffNow){
+    html += '<div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6">所有冲突都保留本机，且没有其他变化——确认不会改任何数据。</div>';
+  }
+  if(p.conflicts.length){
+    html += '<div class="sec"><span class="sec-t">冲突（逐条选择）</span><span class="sec-line"></span></div>';
+    p.conflicts.forEach(function(cf, i){
+      html += '<div class="row" data-ci="' + esc(cf.key) + '">' +
+        '<div class="row-main"><div class="row-t">' + esc(cf.label) + ' <span style="color:var(--ink3)">(' + esc(cf.id) + ')</span></div>' +
+        '<div class="row-s">本机：' + esc(window.OLConfigIO.configItemSummary(cf.kind, cf.local)) + '<br>导入：' + esc(window.OLConfigIO.configItemSummary(cf.kind, cf.incoming)) + '</div></div>' +
+        '<div class="row-a">' +
+          '<button class="btn g sm" id="ciL' + i + '">保留本机</button> ' +
+          '<button class="btn p sm" id="ciR' + i + '">用导入版</button>' +
+        '</div></div>';
+    });
+    html += '<div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6">每一条冲突都必须选过才提交；默认保留本机。</div>';
+  } else if(p.stats.nothingToDo){
+    html += '<div style="font-size:11px;color:var(--ink3);margin:10px 4px;line-height:1.7">导入文件和本机配置一致，没有什么要导入的。直接关闭就行。</div>';
+  }
+  box.innerHTML = html;
+  var okBtn = body.querySelector('#ciOk');
+  function refreshOkBtn(){
+    if(!okBtn) return;
+    /* 确认可用性跟裁决联动：纯相同 → 禁用；全部冲突保留本机且无其他变化 → 禁用；
+       任一真实变化（新增/设置/插件/任一冲突选导入版）→ 可确认 */
+    var eff = window.OLConfigIO.previewHasEffectiveChange(CI_STATE.preview, CI_STATE.choices);
+    var none = !!CI_STATE.preview.stats.nothingToDo || !eff;
+    okBtn.disabled = none;
+    okBtn.textContent = CI_STATE.preview.stats.nothingToDo ? '没有要导入的变更'
+      : (none ? '没有要导入的变更（冲突均保留本机）' : '确认导入');
+    okBtn.className = 'btn ' + (none ? 'g' : 'p');
+  }
+  refreshOkBtn();
+  p.conflicts.forEach(function(cf, i){
+    var l = box.querySelector('#ciL' + i), r = box.querySelector('#ciR' + i);
+    function paint(){
+      var v = CI_STATE.choices[cf.key];
+      if(l){ l.className = 'btn sm ' + (v === 'local' ? 'p' : 'g'); }
+      if(r){ r.className = 'btn sm ' + (v === 'incoming' ? 'p' : 'g'); }
+      refreshOkBtn();  /* 每次裁决变化都重算确认按钮可用性 */
+    }
+    if(l) l.addEventListener('click', function(){ CI_STATE.choices[cf.key] = 'local'; paint(); });
+    if(r) r.addEventListener('click', function(){ CI_STATE.choices[cf.key] = 'incoming'; paint(); });
+    paint();
+  });
+}
+
+function confirmConfigImport(){
+  var st = CI_STATE;
+  if(!st.preview || st.submitting) return;
+  if(st.submitting) return;
+  /* 冲突逐条都必须有明确选择（UI 默认保留本机，可改）；缺选直接拦截 */
+  for(var i = 0; i < st.preview.conflicts.length; i++){
+    var key = st.preview.conflicts[i].key;
+    if(st.choices[key] !== 'local' && st.choices[key] !== 'incoming'){
+      toast('还有冲突没选好，每一条都要选'); return;
+    }
+  }
+  /* 无实际变化（全部冲突保留本机且无新增/设置/插件变化）：不提交、不动 bizRev */
+  if(!window.OLConfigIO.previewHasEffectiveChange(st.preview, st.choices)){
+    toast('没有要导入的变更，本机没有任何改动');
+    closeSheet();
+    st.file = null; st.preview = null; st.choices = {};
+    return;
+  }
+  if(st.mode === 'legacy'){
+    var res = OLConfigIO.applyResolutions(st.preview, st.choices);
+    if(!res){ toast('导入失败：合并结果异常'); return; }
+    applyConfigImport(res.merged);
+    closeSheet();
+    st.file = null; st.preview = null; st.choices = {};
+    var okL = save(function(){ toast('配置已导入'); });
+    if(!okL) toast('导入没存上，再试一次');
+    return;
+  }
+  /* idb：确认时复核 队列空闲 / writer 仍有效 / bizRev 未变 */
+  var Q = window.OLCommitQueue, W = window.OLWrite;
+  var qs = (Q && typeof Q.status === 'function') ? Q.status() : null;
+  if(!Q || !W || typeof W.readBizRev !== 'function' || !W.wired ||
+     !qs || qs.state !== 'idle' || qs.inFlight || qs.pending || qs.recoveringJob){
+    toast('当前保存还没就绪（队列忙或写入未接线），稍后再确认'); return;
+  }
+  if(st.reading) return;
+  st.reading = true;
+  W.readBizRev().then(function(rr){
+    st.reading = false;
+    if(!rr || rr.ok !== true){ toast('导入失败：读不到当前版本号，请重试'); return; }
+    if(st.baselineRev !== null && rr.rev !== st.baselineRev){
+      /* 预览已过期：重读库、重算预览、要求再次确认；绝不用旧预览覆盖新状态 */
+      readConfigSource(function(data, meta){
+        var local = OLConfigIO.buildConfigPayload(data);
+        var p2 = OLConfigIO.previewConfigImport(local, st.file.config, { pluginNames: ciPluginNames() });
+        if(!p2 || p2.ok !== true){ toast('导入失败：重算预览失败'); return; }
+        CI_STATE.preview = p2;
+        CI_STATE.baselineRev = (meta && typeof meta.bizRev === 'number') ? meta.bizRev : null;
+        renderImportSheetBody();
+        toast('本机数据在这期间有变化，预览已重算，请再确认一次');
+      }, function(msg){
+        toast('重算预览失败：' + msg);
+      });
+      return;
+    }
+    var res2 = OLConfigIO.applyResolutions(st.preview, st.choices);
+    if(!res2){ toast('导入失败：合并结果异常'); return; }
+    st.submitting = true;
+    /* 同一个 JS 回合内完成：改 S → 入队（快照克隆）→ CAS 提交，中间无等待点 */
+    applyConfigImport(res2.merged);
+    closeSheet();
+    st.file = null; st.preview = null; st.choices = {}; st.submitting = false;
+    var ok = save(function(){ toast('配置已导入并保存'); });
+    if(!ok) toast('导入没存上（队列拒绝了这次提交）');
+  }, function(){
+    st.reading = false;
+    toast('导入失败：读不到当前版本号，请重试');
+  });
+}
+
+
 
 /* ==================== 导出表格 ==================== */
 /* 把各类记录摊平成「日期 / 类别 / 内容 / 补充」四列的一张 CSV。

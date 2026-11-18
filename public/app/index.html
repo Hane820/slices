@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="today.css">
 <link rel="stylesheet" href="decide.css">
 <link rel="stylesheet" href="records.css">
+<link rel="stylesheet" href="diet.css">
 <link rel="stylesheet" href="settings.css">
 <link rel="stylesheet" href="pdf.css">
 </head>
@@ -131,6 +132,7 @@
       <button data-v="timeline" class="on">时间轴</button>
       <button data-v="month">月历</button>
       <button data-v="item">项目</button>
+      <button data-v="diet" id="dietSegBtn" style="display:none">饮食</button>
     </div>
     <div class="pad">
       <div id="vPlan" style="display:none">
@@ -179,6 +181,7 @@
         <div id="itemList"></div>
         <div id="itemHint" style="font-size:10.5px;color:var(--ink3);margin:12px 4px 0;line-height:1.7"></div>
       </div>
+      <div id="vDiet" style="display:none"></div>
       <div style="height:26px"></div>
     </div>
   </section>
@@ -210,6 +213,10 @@
       <div class="sec"><span class="sec-t">插件</span><span class="sec-line"></span></div>
       <div class="card plain" id="pluginSet"></div>
       <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6">关掉只是不在首页出现，记过的都还在。</div>
+
+      <div class="sec"><span class="sec-t">决策情况</span><span class="sec-line"></span><span class="sec-a" id="addScene">+ 新建</span></div>
+      <div class="card plain" id="sceneSet"></div>
+      <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6">系统自带的情境不能删（可以改名或停用），自己加的可以删；顺序就是决策页里的显示顺序。</div>
 
       <div class="sec"><span class="sec-t">其它</span><span class="sec-line"></span></div>
       <div class="card plain" id="otherSet"></div>
@@ -281,9 +288,11 @@
 <script src="legacy.js"></script>
 <script src="migrate.js"></script>
 <script src="core.js"></script>
+<script src="config-io.js"></script>
 <script src="today.js"></script>
 <script src="decide.js"></script>
 <script src="records.js"></script>
+<script src="diet.js"></script>
 <script src="settings.js"></script>
 <script src="write.js"></script>
 <script src="commit-queue.js"></script>

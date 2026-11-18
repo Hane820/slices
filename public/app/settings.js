@@ -116,6 +116,9 @@ function renderSettings(){
     gl.appendChild(r);
   });
 
+  // 决策情况（自定义）
+  renderSceneSet();
+
   // 其它
   var ob = $('otherSet');
   ob.innerHTML = '';
@@ -204,6 +207,8 @@ function renderSettings(){
   dataRow('导出 PDF 记录', '月历 + 时间轴 + 小结，打印或存成 PDF', openPdfPanel);
   dataRow('导出备份', '一个 JSON 文件，包含全部记录', exportJSON);
   dataRow('导出表格', '把记录按日期排成一张表，Excel / WPS 能打开', exportTable);
+  dataRow('导出配置文件', '笔 / 标签 / 决策库 / 偏好设置，不含日常记录，换设备导入用', exportConfig);
+  dataRow('导入配置文件', '先给你看预览和冲突，确认后才会写进来', importConfig);
   dataRow('从备份恢复', '会先给你看摘要，再决定合并还是替换', importJSON);
   dataRow('清空全部数据', '不可恢复，请先导出', function(){
     if(bizWriteBlocked()){ bizWriteBlockedNotice(); return; }   /* idb 模式：入口拦截，S 不被清空 */
@@ -549,4 +554,110 @@ function openFocusEdit(it, isNew){
       }, { okText: '确认删除' });
     });
   }
+}
+
+/* ==================== 决策情况（自定义） ====================
+   S.scenes：稳定 id，顺序即决策页显示顺序（order 随数组下标刷新）。
+   内置情境是系统项——不可删除、缺失自动补回，可改名/停用；
+   删除自定义情况不级联删除历史决策记录（记录存的是 id，展示也不查这里）。
+   全部改动走 save() 串行队列，不碰其他业务数据。 */
+function renderSceneSet(){
+  var box = $('sceneSet');
+  if(!box) return;
+  box.innerHTML = '';
+  var list = allScenes();
+  if(!list.length){
+    var empty = el('div', 'row');
+    var em = el('div', 'row-main');
+    em.appendChild(el('div', 'row-t', '还没有情况'));
+    em.appendChild(el('div', 'row-s', '点右上角「+ 新建」加一个'));
+    empty.appendChild(em);
+    box.appendChild(empty);
+    return;
+  }
+  list.forEach(function(sc, i){
+    var r = el('div', 'row');
+    var m = el('div', 'row-main');
+    m.appendChild(el('div', 'row-t', sc.name + (sc.sys ? '（系统）' : '') + (sc.enabled ? '' : '（停用）')));
+    m.appendChild(el('div', 'row-s', sc.desc || ''));
+    r.appendChild(m);
+    var acts = el('div', 'row-a');
+    if(i > 0){
+      var up = el('span', 'sc-move', '↑');
+      up.addEventListener('click', function(e){ e.stopPropagation(); sceneMove(sc.id, -1); });
+      acts.appendChild(up);
+    }
+    if(i < list.length - 1){
+      var dn = el('span', 'sc-move', '↓');
+      dn.addEventListener('click', function(e){ e.stopPropagation(); sceneMove(sc.id, 1); });
+      acts.appendChild(dn);
+    }
+    r.appendChild(acts);
+    r.addEventListener('click', function(){ openSceneEdit(sc.id); });
+    box.appendChild(r);
+  });
+}
+function sceneMove(id, dir){
+  if(!Array.isArray(S.scenes)) return;
+  var i = -1;
+  S.scenes.forEach(function(sc, j){ if(sc && sc.id === id) i = j; });
+  var j = i + dir;
+  if(i < 0 || j < 0 || j >= S.scenes.length) return;
+  var t = S.scenes[i]; S.scenes[i] = S.scenes[j]; S.scenes[j] = t;
+  normalize();
+  save(function(){ toast('顺序调好了'); });
+  renderSettings();
+  if(typeof renderScenes === 'function') renderScenes();
+}
+function openSceneEdit(id){
+  var isNew = !id;
+  var sc = isNew ? null : byId(S.scenes, id);
+  if(!isNew && !sc) return;
+  var body = openSheet(
+    '<div class="shd"><div class="shd-t">' + (isNew ? '新建一个情况' : '编辑情况') + '</div>' +
+    '<div class="shd-s">' + (isNew ? '会出现在决策页「你现在是什么情况」里，建议库里也能绑到它。' : (sc.sys ? '系统自带：不能删，可以改名或停用。' : '自己加的情况，可以改、删、调顺序。')) + '</div></div>' +
+    '<div class="field"><div class="field-l">名称</div><input class="inp" id="scN" maxlength="12" value="' + esc(sc ? sc.name : '') + '" placeholder="比如：等项目"></div>' +
+    '<div class="field"><div class="field-l">一句话说明（可空）</div><input class="inp" id="scD" maxlength="30" value="' + esc(sc ? sc.desc : '') + '" placeholder="卡片下方的小字"></div>' +
+    (!isNew ? '<div class="row" style="border-top:none"><div class="row-main"><div class="row-t">在决策页显示</div><div class="row-s">停用只是不出现，绑定的建议和记录都在</div></div><div class="row-a"><button class="sw' + (sc.enabled ? ' on' : '') + '" id="scE"></button></div></div>' : '') +
+    '<div class="acts">' + (!isNew && !sc.sys ? '<button class="btn d fx" id="scDel">删除</button>' : '') +
+      '<button class="btn g" id="scNo">取消</button><button class="btn p" id="scOk">保存</button></div>'
+  );
+  var enabled = sc ? sc.enabled !== false : true;
+  var sw = body.querySelector('#scE');
+  if(sw) sw.addEventListener('click', function(){ enabled = !enabled; sw.classList.toggle('on', enabled); });
+  body.querySelector('#scNo').addEventListener('click', closeSheet);
+  body.querySelector('#scOk').addEventListener('click', function(){
+    var name = body.querySelector('#scN').value.trim();
+    var desc = body.querySelector('#scD').value.trim();
+    if(!name){ toast('写个名字'); return; }
+    if(isNew){
+      S.scenes.push({ id: uid('sc'), name: name, desc: desc, sys: false, enabled: true });
+      normalize();
+      save(function(){ toast('加好了，决策页马上能用'); });
+    } else {
+      sc.name = name; sc.desc = desc; sc.enabled = enabled;
+      normalize();
+      save(function(){ toast('改好了'); });
+    }
+    closeSheet();
+    renderSettings();
+    if(typeof renderScenes === 'function') renderScenes();
+  });
+  var delBtn = body.querySelector('#scDel');
+  if(delBtn) delBtn.addEventListener('click', function(){
+    confirmBox('删除「' + sc.name + '」？', '只删这个情况本身：过去的决策记录和绑定的建议都不受影响。', function(){
+      /* 只清建议里对这个情况的引用（建议本身保留）；历史决策记录存的是 id，原样保留 */
+      S.suggestions.forEach(function(sg){
+        if(Array.isArray(sg.scenes) && sg.scenes.indexOf(sc.id) >= 0){
+          sg.scenes = sg.scenes.filter(function(k){ return k !== sc.id; });
+        }
+      });
+      S.scenes = S.scenes.filter(function(x){ return x.id !== sc.id; });
+      normalize();
+      save(function(){ toast('删掉了'); });
+      closeSheet();
+      renderSettings();
+      if(typeof renderScenes === 'function') renderScenes();
+    });
+  });
 }

@@ -1,0 +1,19 @@
+# 地球online — wrangler 本地验收专用配置（补充验收用，不用于部署）
+# 与 wrangler.toml 的区别：ACCESS_TEAM/AUD_TAG 用本地测试值，JWKS_URL 指向本地
+# JWKS 服务（由测试脚本启动），R2 用 wrangler dev 内置的本地模拟桶。
+# 线上部署永远以 wrangler.toml 为准。
+
+name = "earthonline-backup-devtest"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+
+[vars]
+APP_ORIGIN = "https://liyuk.github.io"
+ACCESS_TEAM = "test-team.cloudflareaccess.com"
+AUD_TAG = "test-aud-tag"
+JWKS_URL = "http://127.0.0.1:61620/cdn-cgi/access/certs"
+MAX_BACKUP_BYTES = "20971520"
+
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "earthonline-backups"

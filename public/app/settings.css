@@ -88,3 +88,10 @@
 .fx-num-custom.on{visibility:visible;opacity:1}
 .fx-no-goal{flex:0 0 auto;margin-left:auto}
 .fx-no-goal.on{border-style:solid}
+
+/* 决策情况：行内排序按钮 */
+.sc-move{
+  font-size:12px; color:var(--ink3); cursor:pointer; padding:2px 4px;
+  font-variant-numeric:tabular-nums;
+}
+.sc-move:active{ color:var(--ink); }

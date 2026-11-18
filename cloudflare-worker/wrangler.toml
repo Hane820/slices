@@ -1,0 +1,29 @@
+# 地球online — 云端备份 Worker 配置
+# 部署前必须把下面的 REPLACE-ME 换成你自己的 Cloudflare 资源信息（见 README「控制台配置清单」）。
+# 本文件只用于 `wrangler dev` 本地模拟与 `wrangler deploy`；测试不依赖它。
+
+name = "earthonline-backup"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+# 只保留 workers.dev 一个入口，关掉预览 URL（预览域名可能不在 Access 保护范围内）
+workers_dev = true
+preview_urls = false
+
+[vars]
+# 地球online站点来源：CORS 唯一白名单（协议 + 域名，不带路径斜杠）
+# 站点是 https://slices0flife.me/app/，但 Origin 只含协议+域名+端口（不含 /app/）
+APP_ORIGIN = "https://slices0flife.me"
+# Cloudflare Access 团队域（Zero Trust 控制台首页可以看到）
+ACCESS_TEAM = "still-silence-4b58.cloudflareaccess.com"
+# Access 应用（Self-hosted）的 Application AUD 值
+AUD_TAG = "7aff656c944431a8c78434defd7875f695e4bad64eb44a1e2602992a70e80e88"
+# 备份大小上限（字节），不填默认 20MB
+# MAX_BACKUP_BYTES = "20971520"
+# 本地测试用 JWKS 覆盖（线上必须删掉这一行，走团队域官方证书地址）
+# JWKS_URL = "http://127.0.0.1:8787/cdn-cgi/access/certs"
+
+# 私有 R2 桶：只在 Cloudflare 控制台创建，不绑公开域名、不开公开访问。
+# wrangler dev 本地模式会自动模拟这个桶，不需要真的先建好。
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "earthonline-backups"

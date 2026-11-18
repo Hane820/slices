@@ -49,11 +49,13 @@
     { key: 'tags',        type: 'tag',        table: 'definitions' },
     { key: 'tagLogs',     type: 'tagLog',     table: 'dayEntries' },
     { key: 'suggestions', type: 'suggestion', table: 'definitions' },
+    { key: 'scenes',      type: 'scene',      table: 'definitions' },
     { key: 'workouts',    type: 'workout',    table: 'dayEntries' },
     { key: 'studyLogs',   type: 'studyLog',   table: 'dayEntries' },
     { key: 'decisionLog', type: 'decision',   table: 'dayEntries' },
     { key: 'flashes',     type: 'flash',      table: 'dayEntries' },
     { key: 'itemLogs',    type: 'itemLog',    table: 'dayEntries' },
+    { key: 'meals',       type: 'meal',       table: 'dayEntries' },
     { key: 'plugins',     type: 'plugin',     table: 'meta' }
   ];
 
@@ -685,18 +687,18 @@
       /* 六张表的预计写入条数：只统计能映射的记录 */
       append: {
         meta: metaRows,
-        definitions: m('pens') + m('tags') + m('suggestions'),
+        definitions: m('pens') + m('tags') + m('suggestions') + m('scenes'),
         tasks: m('tasks'),
         schedule: m('schedule'),
-        dayEntries: m('plans') + m('tagLogs') + m('workouts') + m('studyLogs') + m('decisionLog') + m('flashes') + m('itemLogs') + restMappable,
+        dayEntries: m('plans') + m('tagLogs') + m('workouts') + m('studyLogs') + m('decisionLog') + m('flashes') + m('itemLogs') + m('meals') + restMappable,
         dayMaps: (mapCounts.notes || 0) + (mapCounts.marks || 0) + (mapCounts.doneSugg || 0)
       },
       /* 原始条数，用于和 append 对照，差值是「无法映射」的数量 */
       sourceCounts: {
-        definitions: c('pens') + c('tags') + c('suggestions'),
+        definitions: c('pens') + c('tags') + c('suggestions') + c('scenes'),
         tasks: c('tasks'),
         schedule: c('schedule'),
-        dayEntries: c('plans') + c('tagLogs') + c('workouts') + c('studyLogs') + c('decisionLog') + c('flashes') + c('itemLogs') + (ctx.rest ? ctx.rest.count : 0),
+        dayEntries: c('plans') + c('tagLogs') + c('workouts') + c('studyLogs') + c('decisionLog') + c('flashes') + c('itemLogs') + c('meals') + (ctx.rest ? ctx.rest.count : 0),
         dayMaps: (mapCounts.notes || 0) + (mapCounts.marks || 0) + (mapCounts.doneSugg || 0)
       },
       meta: {

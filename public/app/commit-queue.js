@@ -35,6 +35,11 @@
   var RECOVERING_JOB = null;    /* fatal 现场：原 job（快照 + operations），不得静默丢弃 */
   var STOP_REASON = null;       /* 进入 recovering/stopped 的原因码 */
   var WRITER_KEY = null;        /* 当前基线对应的 writer 身份：ownerId|epoch */
+  /* 5B-5-R：恢复凭据（闭包私有，绝不通过可赋值的标志暴露）。
+     只有 resolve() 的 writerChanged 分支在内部签发；completeRehydrate 按引用核对，
+     一次成功即消费。外部伪造的普通对象永远无法通过 === 校验。 */
+  var REHYDRATE_ROUND = 0;      /* 每次签发凭据递增；旧轮次凭据随之失效 */
+  var REHYDRATE_CRED = null;    /* { round, writerKey, revAtIssue, issuedAt, used } */
   var BASELINE_INFLIGHT = false;/* 只读基线读取在途，防重入 */
   var SEQ = 0;                  /* 诊断用递增计数；jobId 唯一性不再依赖它 */
   var OP_SEQ = 0;               /* operation 序号（与 job 独立） */
@@ -125,6 +130,10 @@
       stopReason: STOP_REASON,
       hfBuffered: HF_OPS.length,
       hfPendingRecovery: HF_PENDING_RECOVERY,
+      /* 5B-5-R：恢复诊断。只暴露轮次计数与“是否有待消费凭据”的布尔值，
+         凭据对象本身永不放入 status/snapshot。 */
+      rehydrateRound: REHYDRATE_ROUND,
+      rehydrateCredentialPending: !!(REHYDRATE_CRED && !REHYDRATE_CRED.used),
       wired: !!(global.OLWrite && global.OLWrite.wired)
     };
   }
@@ -519,7 +528,13 @@
         WRITER_KEY = key;
         STATE = 'stopped';
         STOP_REASON = 'rehydrate-required';
-        return { ok:true, action:action, started:false, rehydrateRequired:true, rev:res.rev };
+        /* 内部签发一次性恢复凭据：绑定本轮 round 与签发时的 writer 身份。
+           只随本次返回值交给调用方；没有走真实 discard/recapture 流程的调用者拿不到。 */
+        REHYDRATE_ROUND += 1;
+        REHYDRATE_CRED = { round: REHYDRATE_ROUND, writerKey: key,
+                           revAtIssue: res.rev, issuedAt: Date.now(), used: false };
+        return { ok:true, action:action, started:false, rehydrateRequired:true,
+                 rev:res.rev, rehydrateCredential:REHYDRATE_CRED };
       }
 
       /* discard / recapture：明确结算保留的 job 一次，operations 不悬挂 */
@@ -539,21 +554,52 @@
     });
   }
 
-  /* completeRehydrate()：writer 变化后的唯一安全恢复入口。
-     调用前提：调用方已把内存 S 从当前库重新读回（rehydrate），并重新取得 writer。
-     本函数只读最新 bizRev 作为基线，清空旧 pending / recovering job，然后恢复 idle；
-     绝不用旧快照提交，也不继承旧 committedBizRev。 */
-  function completeRehydrate() {
+  /* completeRehydrate(credential, mergedRev)：writer 变化后的唯一安全恢复入口。
+     credential 必须是 resolve() writerChanged 分支内部签发的同一个对象（按引用核对，
+     伪造对象 / 旧轮次 / 已消费 / 重复使用一律拒绝）；mergedRev 必须是调用方
+     真实 rehydrate 读回并合并时同事务读到的 bizRev（本函数会重新只读对齐核对）。
+     成功：凭据一次性消费，队列以最新 rev 为基线恢复 idle。
+     失败（writer 或 bizRev 在恢复期间又变化）：凭据作废并在结果中签发新一轮，
+     队列保持 stopped/rehydrate-required，绝不带旧内存状态恢复写入。 */
+  function completeRehydrate(credential, mergedRev) {
     if (STATE !== 'stopped' || STOP_REASON !== 'rehydrate-required') {
       return Promise.resolve({ ok:false, code:'not-awaiting-rehydrate', state:STATE, stopReason:STOP_REASON });
     }
+    if (!credential || credential !== REHYDRATE_CRED || credential.used) {
+      return Promise.resolve({ ok:false, code:'rehydrate-credential-invalid',
+        detail:{ provided:!!credential, isCurrent:credential === REHYDRATE_CRED, used:!!(credential && credential.used) } });
+    }
+    if (typeof mergedRev !== 'number' || !isFiniteNumber(mergedRev) || mergedRev < 0) {
+      return Promise.resolve({ ok:false, code:'rehydrate-rev-missing',
+        message:'必须传入真实 rehydrate 同事务读到的 bizRev' });
+    }
     var ident = currentIdentity();
     if (!ident) return Promise.resolve({ ok:false, code:'writer-not-ready' });
+    credential.used = true;               /* 防并发双花：进入即标记 */
     return readBaseline(ident).then(function (res) {
       if (STATE !== 'stopped' || STOP_REASON !== 'rehydrate-required') {
         return { ok:false, code:'state-changed' };
       }
-      if (!res.ok) return { ok:false, code:res.code, phase:'baseline' };
+      if (!res.ok) { credential.used = false; return { ok:false, code:res.code, phase:'baseline' }; }
+      if (res.writerKey !== credential.writerKey) {
+        /* writer 在恢复期间再次变化：本轮凭据作废，签发新一轮（旧引用自动失效） */
+        REHYDRATE_ROUND += 1;
+        REHYDRATE_CRED = { round: REHYDRATE_ROUND, writerKey: res.writerKey,
+                           revAtIssue: res.rev, issuedAt: Date.now(), used: false };
+        return { ok:false, code:'rehydrate-stale-writer-changed', credential:REHYDRATE_CRED,
+                 detail:{ credRound:credential.round, nowRound:REHYDRATE_ROUND } };
+      }
+      if (res.rev !== mergedRev) {
+        /* 库在重建之后又有提交：内存可能已经落后，作废并签发新一轮 */
+        REHYDRATE_ROUND += 1;
+        REHYDRATE_CRED = { round: REHYDRATE_ROUND, writerKey: res.writerKey,
+                           revAtIssue: res.rev, issuedAt: Date.now(), used: false };
+        return { ok:false, code:'rehydrate-stale-rev-changed', credential:REHYDRATE_CRED,
+                 detail:{ mergedRev:mergedRev, currentRev:res.rev } };
+      }
+      /* 一次性消费：内部引用清空，凭据对象即刻作废 */
+      REHYDRATE_CRED = null;
+      credential.used = true;
       Q.committedBizRev = res.rev;
       WRITER_KEY = res.writerKey;
       Q.committedSnapshot = null;
@@ -563,8 +609,9 @@
       STATE = 'idle';
       STOP_REASON = null;
       flushHighFrequencyIfRecovered();
-      return { ok:true, rev:res.rev, writerKey:res.writerKey };
+      return { ok:true, rev:res.rev, writerKey:res.writerKey, round:credential.round };
     }, function (e) {
+      credential.used = false;            /* 失败不吞凭据，调用方可重试 */
       return { ok:false, code:(e && e.code) || 'rehydrate-failed' };
     });
   }

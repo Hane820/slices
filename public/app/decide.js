@@ -70,11 +70,11 @@ function renderScenes(){
   var box = $('sceneChips');
   if(box){
     box.innerHTML = '';
-    SCENES.forEach(function(sc){
-      var b = el('button','scene-card' + (decState.scene === sc.k ? ' on' : ''));
-      b.innerHTML = '<div class="n">' + esc(sc.n) + '</div><div class="d">' + esc(sc.d) + '</div>';
+    activeScenes().forEach(function(sc){
+      var b = el('button','scene-card' + (decState.scene === sc.id ? ' on' : ''));
+      b.innerHTML = '<div class="n">' + esc(sc.name) + '</div><div class="d">' + esc(sc.desc) + '</div>';
       b.dataset.action = 'scene-full';
-      b.dataset.k = sc.k;
+      b.dataset.k = sc.id;
       box.appendChild(b);
     });
   }
@@ -700,8 +700,8 @@ function openSuggEdit(sg){
   var isNew = !sg;
   var item = sg || { id: uid('s'), name:'', cat:'生活', duration:900, tags:[], scenes:[], times:['any'], priority:2, random:true, enabled:true, note:'' };
   var cats = ['身体','健身','学习','生活','心情','其它'].concat(libCats()).filter(function(v,i,a){ return a.indexOf(v) === i; });
-  var sceneHtml = SCENES.map(function(sc){
-    return '<button class="chip' + ((item.scenes||[]).indexOf(sc.k) >= 0 ? ' on' : '') + '" data-k="' + sc.k + '">' + sc.n + '</button>';
+  var sceneHtml = allScenes().map(function(sc){
+    return '<button class="chip' + ((item.scenes||[]).indexOf(sc.id) >= 0 ? ' on' : '') + '" data-k="' + esc(sc.id) + '">' + esc(sc.name) + '</button>';
   }).join('');
   var body = openSheet(
     '<div class="shd"><div class="shd-t">' + (isNew ? '新建一条建议' : '改这条建议') + '</div>' +

@@ -49,7 +49,7 @@
   var TOP_KEYS = [
     'v', 'tasks', 'schedule', 'plans', 'notes', 'marks', 'pens', 'tags', 'tagLogs',
     'suggestions', 'doneSugg', 'workouts', 'studyLogs', 'decisionLog', 'restDays',
-    'flashes', 'itemLogs', 'plugins', 'settings'
+    'flashes', 'itemLogs', 'meals', 'scenes', 'plugins', 'settings'
   ];
 
   /* 重迁移时先清的业务载荷：三个原始载荷 + legacyExtras（它由源数据派生） */
@@ -65,7 +65,8 @@
   var DEF_MAP = [
     { src: 'pens', kind: 'pen' },
     { src: 'tags', kind: 'tag' },
-    { src: 'suggestions', kind: 'suggestion' }
+    { src: 'suggestions', kind: 'suggestion' },
+    { src: 'scenes', kind: 'scene' }
   ];
   var ENTRY_MAP = [
     { src: 'plans', type: 'plan' },
@@ -74,7 +75,8 @@
     { src: 'studyLogs', type: 'studyLog' },
     { src: 'decisionLog', type: 'decision' },
     { src: 'flashes', type: 'flash' },
-    { src: 'itemLogs', type: 'itemLog' }
+    { src: 'itemLogs', type: 'itemLog' },
+    { src: 'meals', type: 'meal' }
   ];
   var MAP_KINDS = [
     { src: 'notes', kind: 'note' },
@@ -626,11 +628,13 @@
       else if (row.key === 'schemaVersion') out.meta.schemaVersion = row.value;
       else if (row.key === 'migration') out.meta.migrationStatus = row.status;
       else if (row.key === 'preNormalize') out.meta.preNormalize = { sha256: row.sha256, bytes: row.bytes };
+      /* 5B-5-R：同事务读取 bizRev，供恢复凭据与重建基线绑定 */
+      else if (row.key === 'bizRev') out.meta.bizRev = typeof row.value === 'number' ? row.value : null;
     }
 
     /* definitions → pens / tags / suggestions */
     defRows.sort(function (a, b) { return cmpNat(a.id, b.id); });
-    var defBuckets = { pen: [], tag: [], suggestion: [] };
+    var defBuckets = { pen: [], tag: [], suggestion: [], scene: [] };
     for (i = 0; i < defRows.length; i++) {
       row = defRows[i];
       if (defBuckets[row.kind]) defBuckets[row.kind].push(stripRoute(row, 'kind'));
@@ -638,6 +642,10 @@
     d.pens = defBuckets.pen;
     d.tags = defBuckets.tag;
     d.suggestions = defBuckets.suggestion;
+    /* 情境：用户可自定义显示顺序（order 字段），按 order 还原，不按 id 字典序 */
+    d.scenes = defBuckets.scene.slice().sort(function (a, b) {
+      return (+a.order || 0) - (+b.order || 0) || cmpNat(a.id, b.id);
+    });
 
     /* tasks：创建时间优先，其次 id 自然序（主键序 't10' 会排到 't2' 前面） */
     taskRows.sort(function (a, b) {
@@ -655,7 +663,7 @@
     /* dayEntries → 七类记录 + restDays */
     var entryBuckets = {
       plan: [], tagLog: [], workout: [], studyLog: [],
-      decision: [], flash: [], itemLog: [], restDay: []
+      decision: [], flash: [], itemLog: [], meal: [], restDay: []
     };
     for (i = 0; i < entryRows.length; i++) {
       row = entryRows[i];
@@ -670,6 +678,7 @@
     d.decisionLog = entryBuckets.decision;
     d.flashes = entryBuckets.flash;
     d.itemLogs = entryBuckets.itemLog;
+    d.meals = entryBuckets.meal;
     d.restDays = entryBuckets.restDay;
     out.counts.dayEntries = entryRows.length;
 
