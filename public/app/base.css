@@ -243,3 +243,76 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
 .dur-row{display:flex;align-items:center;gap:8px;margin-top:10px}
 .dur-row .inp{flex:1;min-width:0;width:0}
 .dur-row span{flex:0 0 auto;font-size:12px;color:var(--ink3)}
+
+/* ---------- 时间选择：滚轮弹层（替代各浏览器长相不一的原生 time 选择器） ---------- */
+.tp-field{position:relative}
+.tp-field .inp{
+  padding-right:40px;cursor:pointer;font-variant-numeric:tabular-nums;
+  -webkit-user-select:none;user-select:none;caret-color:transparent;
+}
+.tp-ico{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  display:flex;color:var(--ink3);pointer-events:none;
+}
+.tp-ico svg{width:16px;height:16px;display:block}
+.tp-head{display:flex;gap:12px;justify-content:center}
+.tp-head span{
+  flex:1;max-width:110px;text-align:center;
+  font-size:10.5px;letter-spacing:1.2px;color:var(--ink3);
+}
+.tp-wheel{position:relative;display:flex;gap:12px;justify-content:center;margin:2px 0 4px}
+.tp-wheel::before{
+  content:'';position:absolute;left:0;right:0;top:50%;height:36px;margin-top:-18px;
+  border-radius:10px;background:var(--paper2);pointer-events:none;
+}
+.tp-col{
+  position:relative;z-index:1;flex:1;max-width:110px;height:180px;
+  overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior:contain;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 20%,#000 80%,transparent);
+  mask-image:linear-gradient(to bottom,transparent,#000 20%,#000 80%,transparent);
+}
+.tp-col::-webkit-scrollbar{display:none;width:0;height:0}
+.tp-item{
+  height:36px;line-height:36px;text-align:center;cursor:pointer;
+  font-size:16px;color:var(--ink3);font-variant-numeric:tabular-nums;
+  scroll-snap-align:center;transition:color .2s,font-weight .2s;
+}
+.tp-item.on{color:var(--ink);font-weight:600}
+.tp-pad{height:72px}
+.tp-clear{
+  display:block;width:100%;text-align:center;font-size:11.5px;color:var(--ink3);
+  padding:6px 0 0;border:none;background:transparent;font-family:inherit;cursor:pointer;
+}
+.tp-clear:active{color:var(--clay)}
+
+/* ---------- 日期选择：月历弹层 ---------- */
+.dp-head{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.dp-nav{
+  flex:none;width:30px;height:30px;border-radius:9px;border:none;
+  background:var(--paper2);color:var(--ink);font-size:15px;line-height:1;
+  font-family:inherit;cursor:pointer;transition:transform .15s;
+}
+.dp-nav:active{transform:scale(.94)}
+.dp-title{
+  flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.dp-wd{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}
+.dp-wd span{text-align:center;font-size:10.5px;color:var(--ink3);letter-spacing:.5px}
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-cell{
+  height:38px;display:flex;align-items:center;justify-content:center;
+  border:none;background:transparent;border-radius:10px;
+  font-family:inherit;font-size:13.5px;color:var(--ink);
+  font-variant-numeric:tabular-nums;cursor:pointer;transition:background .15s,color .15s;
+}
+.dp-cell.mute{pointer-events:none}
+.dp-cell.today{box-shadow:inset 0 0 0 1px var(--line);color:var(--sage-d)}
+.dp-cell:active{background:var(--paper2)}
+.dp-cell.on{background:var(--sage);color:#fff;font-weight:600;box-shadow:none}
+.dp-quick{display:flex;gap:16px;justify-content:center;padding:8px 0 0}
+.dp-quick .tp-clear{width:auto;padding:0;display:inline-block}
+
+/* 选择器浮层：盖在正在编辑的表单之上，关掉后原表单还在 */
+.mask.pk{z-index:70;background:rgba(240,235,226,.72)}

@@ -268,7 +268,7 @@ function renderDiet(){
     if(t.dataset.del){
       confirmBox('删除这条进食记录？', '记录会从存档里删掉，不影响其他数据。', function(){
         dietRemove(t.dataset.del, function(ok){
-          if(ok) toast('删掉了');
+          if(ok) toast(OLT('删掉了'));
           renderDiet();
         });
       });
@@ -286,8 +286,9 @@ function renderDiet(){
     '<div class="diet-frow"><div class="field-l">吃了什么（份量可空）</div><div id="dietFoodRows"></div>' +
       '<div class="diet-addfood" id="dietAddFoodRow">+ 再吃一样</div></div>' +
     '<div class="diet-frow"><div class="field-l">备注（可选）</div><input class="inp" id="dietNote" maxlength="60" placeholder="比如：和朋友一起吃的"></div>' +
-    '<div class="diet-btns"><button class="ok" id="dietSave">记下这一餐</button></div>';
+    '<div class="diet-btns"><button class="btn p" id="dietSave">记下这一餐</button></div>';
   wrap.appendChild(form);
+  if(window.OLTimePicker) OLTimePicker.attach(form.querySelector('#dietTime'));
 
   function renderSlotChips(){
     var chips = form.querySelector('#dietSlotChips');
@@ -329,11 +330,11 @@ function renderDiet(){
   });
   addC.querySelector('#dietCopyBtn').addEventListener('click', function(){
     var foods = dietCopyLastFoods();
-    if(!foods){ toast('还没有可复制的一餐'); return; }
+    if(!foods){ toast(OLT('还没有可复制的一餐')); return; }
     dietForm.foods = foods.map(function(f){ return { name:f.name, portion:f.portion || '' }; });
     if(dietForm.foods.length < 8) dietForm.foods.push({ name:'', portion:'' });
     renderFoodRows();
-    toast('上一餐的食物填好了');
+    toast(OLT('上一餐的食物填好了'));
   });
   secT.querySelector('#dietSlotsBtn').addEventListener('click', dietOpenSlots);
   form.querySelector('#dietSave').addEventListener('click', function(){
@@ -342,9 +343,9 @@ function renderDiet(){
     var foods = dietForm.foods.map(function(f){
       return { name: (f.name || '').trim(), portion: (f.portion || '').trim() };
     }).filter(function(f){ return f.name; });
-    if(!foods.length && !note){ toast('吃的东西写一样就行，份量可以空着'); return; }
+    if(!foods.length && !note){ toast(OLT('吃的东西写一样就行，份量可以空着')); return; }
     dietPush({ time: time, slot: dietForm.slot, foods: foods, note: note }, function(rec, ok){
-      if(ok) toast('记下了');
+      if(ok) toast(OLT('记下了'));
       else bizSaveFailed('save-enqueue-failed', saveRecoveryActions(window.OLCommitQueue));
       dietForm.foods = [{ name:'', portion:'' }, { name:'', portion:'' }];
       dietForm.note = '';
@@ -377,7 +378,7 @@ function renderDiet(){
       hist.appendChild(row);
     });
   } else if(dietState.histDate === today && hs.all.length){
-    hist.appendChild(el('div', 'diet-hist-more', '今天的记录见上面「今日饮食」，同样可以编辑删除。'));
+    hist.appendChild(el('div', 'diet-hist-more', OLT('今天的记录见上面「今日饮食」，同样可以编辑删除。')));
   }
   wrap.appendChild(hist);
   hist.addEventListener('click', function(e){
@@ -386,7 +387,7 @@ function renderDiet(){
     if(t && t.dataset.del){
       confirmBox('删除这条进食记录？', '记录会从存档里删掉，不影响其他数据。', function(){
         dietRemove(t.dataset.del, function(ok){
-          if(ok) toast('删掉了');
+          if(ok) toast(OLT('删掉了'));
           renderDiet();
         });
       });
@@ -397,7 +398,7 @@ function renderDiet(){
     renderDiet();
   });
   hist.querySelector('#dietNext').addEventListener('click', function(){
-    if(dietState.histDate >= today){ toast('已经是最新的那天了'); return; }
+    if(dietState.histDate >= today){ toast(OLT('已经是最新的那天了')); return; }
     dietState.histDate = dietShiftDate(dietState.histDate, 1);
     renderDiet();
   });
@@ -441,13 +442,14 @@ function dietOpenEdit(id){
   var body = openSheet(
     '<div class="shd"><div class="shd-t">编辑这条进食</div>' +
     '<div class="shd-s">' + esc(rec.date) + '</div></div>' +
-    '<div class="field-l">时间</div><input class="inp" id="deTime" type="time" value="' + (dietValidTs(rec) ? dietHm(rec.ts) : nowHHMM()) + '">' +
-    '<div class="field-l">餐次</div><div class="chips" id="deSlots">' + chips + '</div>' +
-    '<div class="field-l">吃了什么</div><div id="deFoods">' + rows + '</div>' +
-    '<div class="diet-addfood" id="deAddFood">+ 再吃一样</div>' +
-    '<div class="field-l">备注</div><input class="inp" id="deNote" value="' + esc(rec.note) + '" maxlength="60">' +
-    '<div class="shBtn"><button class="btn" id="deNo">取消</button><button class="btn g" id="deOk">保存</button></div>'
+    '<div class="field"><div class="field-l">时间</div><input class="inp" id="deTime" type="time" value="' + (dietValidTs(rec) ? dietHm(rec.ts) : nowHHMM()) + '"></div>' +
+    '<div class="field"><div class="field-l">餐次</div><div class="chips" id="deSlots">' + chips + '</div></div>' +
+    '<div class="field"><div class="field-l">吃了什么</div><div id="deFoods">' + rows + '</div>' +
+      '<div class="diet-addfood" id="deAddFood">+ 再吃一样</div></div>' +
+    '<div class="field"><div class="field-l">备注</div><input class="inp" id="deNote" value="' + esc(rec.note) + '" maxlength="60" placeholder="可留空"></div>' +
+    '<div class="acts"><button class="btn g" id="deNo">取消</button><button class="btn p" id="deOk">保存</button></div>'
   );
+  if(window.OLTimePicker) OLTimePicker.attach(body.querySelector('#deTime'));
   var curSlot = rec.slot;
   body.querySelector('#deSlots').addEventListener('click', function(e){
     var b = e.target.closest ? e.target.closest('.diet-eslot') : null;
@@ -473,7 +475,7 @@ function dietOpenEdit(id){
   body.querySelector('#deNo').addEventListener('click', closeSheet);
   body.querySelector('#deOk').addEventListener('click', function(){
     var fs = collectFoods();
-    if(!fs.length && !body.querySelector('#deNote').value.trim()){ toast('吃的东西写一样就行'); return; }
+    if(!fs.length && !body.querySelector('#deNote').value.trim()){ toast(OLT('吃的东西写一样就行')); return; }
     dietUpdate(id, {
       time: body.querySelector('#deTime').value,
       slot: curSlot,
@@ -481,7 +483,7 @@ function dietOpenEdit(id){
       note: body.querySelector('#deNote').value.trim()
     }, function(ok){
       closeSheet();
-      if(ok) toast('改好了');
+      if(ok) toast(OLT('改好了'));
       else bizSaveFailed('save-enqueue-failed', saveRecoveryActions(window.OLCommitQueue));
       renderDiet();
     });
@@ -501,7 +503,7 @@ function dietOpenSlots(){
       '<div id="dsList">' + rows + '</div>' +
       '<div class="inline-add"><input class="inp" id="dsNew" maxlength="8" placeholder="新餐次，比如：下午茶">' +
       '<button class="ok" id="dsAdd">加上</button></div>' +
-      '<div class="shBtn"><button class="btn g" id="dsDone">好了</button></div>'
+      '<div class="acts"><button class="btn g" id="dsDone">好了</button></div>'
     );
     body.querySelector('#dsList').addEventListener('click', function(e){
       var t = e.target.closest ? e.target.closest('.diet-act') : null;
@@ -512,9 +514,9 @@ function dietOpenSlots(){
     });
     body.querySelector('#dsAdd').addEventListener('click', function(){
       var v = body.querySelector('#dsNew').value.trim();
-      if(!v){ toast('写个名字'); return; }
-      if(dietSlots().indexOf(v) >= 0){ toast('已经有这个餐次了'); return; }
-      if(dietSlots().length >= 8){ toast('餐次最多 8 个'); return; }
+      if(!v){ toast(OLT('写个名字')); return; }
+      if(dietSlots().indexOf(v) >= 0){ toast(OLT('已经有这个餐次了')); return; }
+      if(dietSlots().length >= 8){ toast(OLT('餐次最多 8 个')); return; }
       S.settings.mealSlots.push(v);
       save(function(){}, { highFrequency:true });
       draw();

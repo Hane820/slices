@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#FAF7F1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>地球online</title>
+<title data-i18n="地球online">地球online</title>
 <link rel="stylesheet" href="base.css">
 <link rel="stylesheet" href="today.css">
 <link rel="stylesheet" href="decide.css">
@@ -22,38 +22,38 @@
   <section class="page on" id="pToday">
     <div class="pad hd">
       <div class="hd-date" id="hdDate"></div>
-      <h1 class="hd-hi" id="hdHi">早上好</h1>
+      <h1 class="hd-hi" id="hdHi" data-i18n="早上好">早上好</h1>
     </div>
     <div id="remindWrap"></div>
     <div class="pad">
       <div class="sec">
-        <span class="sec-t">今日待办</span><span class="sec-line"></span>
-        <span class="sec-a" id="toggleDone" data-action="toggle-done">隐藏已完成</span>
-        <span class="sec-a" id="foldTasks" data-action="fold-tasks">收起 ▴</span>
+        <span class="sec-t" data-i18n="今日待办">今日待办</span><span class="sec-line"></span>
+        <span class="sec-a" id="toggleDone" data-action="toggle-done" data-i18n="隐藏已完成">隐藏已完成</span>
+        <span class="sec-a" id="foldTasks" data-action="fold-tasks" data-i18n="收起 ▴">收起 ▴</span>
       </div>
     </div>
     <div class="pad" id="taskWrap"></div>
 
     <div class="pad">
-      <div class="sec"><span class="sec-t">今日重点</span><span class="sec-line"></span></div>
+      <div class="sec"><span class="sec-t" data-i18n="今日重点">今日重点</span><span class="sec-line"></span></div>
       <div class="goals" id="goalWrap"></div>
 
-      <div class="sec"><span class="sec-t">今天的安排</span><span class="sec-line"></span><span class="sec-a" id="addSch">+ 加一条</span></div>
+      <div class="sec"><span class="sec-t" data-i18n="今天的安排">今天的安排</span><span class="sec-line"></span><span class="sec-a" id="addSch" data-i18n="+ 加一条">+ 加一条</span></div>
       <div class="card" id="schWrap"></div>
 
-      <div class="sec"><span class="sec-t">不知道做什么</span><span class="sec-line"></span><span class="sec-a" data-action="go-decide">帮你决策 →</span></div>
+      <div class="sec"><span class="sec-t" data-i18n="不知道做什么">不知道做什么</span><span class="sec-line"></span><span class="sec-a" data-action="go-decide" data-i18n="帮你决策 →">帮你决策 →</span></div>
 
-      <div class="sec" id="eatSec" style="display:none"><span class="sec-t">不知道吃什么</span><span class="sec-line"></span><span class="sec-a" data-action="go-eat">帮我选 →</span></div>
+      <div class="sec" id="eatSec" style="display:none"><span class="sec-t" data-i18n="不知道吃什么">不知道吃什么</span><span class="sec-line"></span><span class="sec-a" data-action="go-eat" data-i18n="帮我选 →">帮我选 →</span></div>
 
-      <div class="sec" id="goPlanSec" style="cursor:pointer"><span class="sec-t">接下来</span><span class="sec-line"></span><span class="sec-a">去计划 ↗</span></div>
+      <div class="sec" id="goPlanSec" style="cursor:pointer"><span class="sec-t" data-i18n="接下来">接下来</span><span class="sec-line"></span><span class="sec-a" data-i18n="去计划 ↗">去计划 ↗</span></div>
 
-      <div class="sec"><span class="sec-t">最近</span><span class="sec-line"></span><span class="sec-a" id="writeNote">写手账</span><span class="sec-a" id="goRecords">全部记录</span></div>
+      <div class="sec"><span class="sec-t" data-i18n="最近">最近</span><span class="sec-line"></span><span class="sec-a" id="writeNote" data-i18n="写手账">写手账</span><span class="sec-a" id="goRecords" data-i18n="全部记录">全部记录</span></div>
       <div class="card" id="recentWrap"></div>
 
-      <div class="sec"><span class="sec-t">灵光一闪</span><span class="sec-line"></span></div>
+      <div class="sec"><span class="sec-t" data-i18n="灵光一闪">灵光一闪</span><span class="sec-line"></span></div>
       <div class="card plain" id="flashBox">
         <textarea class="flash-ta" id="flashTa"></textarea>
-        <div class="flash-foot"><span class="flash-hint">随手写，松手自动存</span><button class="btn p sm" id="flashSave">记下来</button></div>
+        <div class="flash-foot"><span class="flash-hint" data-i18n="随手写，松手自动存">随手写，松手自动存</span><button class="btn p sm" id="flashSave" data-i18n="记下来">记下来</button></div>
       </div>
       <div class="flash-list" id="flashList"></div>
 
@@ -64,33 +64,33 @@
   <!-- ================= 决策 ================= -->
   <section class="page" id="pDecide">
     <div class="pad hd">
-      <div class="hd-back" data-action="go-home">← 返回今日</div>
+      <div class="hd-back" data-action="go-home" data-i18n="← 返回今日">← 返回今日</div>
       <div class="hd-date">DECIDE</div>
-      <h1 class="hd-hi" id="decTitle">现在做什么</h1>
-      <div class="hd-sub" id="decSub">想不清楚的时候，让它替你挑一件。</div>
+      <h1 class="hd-hi" id="decTitle" data-i18n="现在做什么">现在做什么</h1>
+      <div class="hd-sub" id="decSub" data-i18n="想不清楚的时候，让它替你挑一件。">想不清楚的时候，让它替你挑一件。</div>
     </div>
     <div class="seg" id="decSeg" style="display:none">
-      <button data-tab="do" class="on">做什么</button>
-      <button data-tab="eat">吃什么</button>
+      <button data-tab="do" class="on" data-i18n="做什么">做什么</button>
+      <button data-tab="eat" data-i18n="吃什么">吃什么</button>
     </div>
     <div class="pad dec-pane" id="decPaneDo">
       <div class="ask">
-        <div class="ask-t">你现在是什么情况</div>
+        <div class="ask-t" data-i18n="你现在是什么情况">你现在是什么情况</div>
         <div class="scene-grid" id="sceneChips" style="margin-top:12px"></div>
       </div>
       <div class="dec-bar">
-        <button class="btn g" id="randBtn" style="flex:1">随便抽一件</button>
-        <button class="btn o" id="randFilterBtn" style="flex:0 0 auto;padding:10px 12px;font-size:12px;font-weight:500">全部类型</button>
+        <button class="btn g" id="randBtn" style="flex:1" data-i18n="随便抽一件">随便抽一件</button>
+        <button class="btn o" id="randFilterBtn" style="flex:0 0 auto;padding:10px 12px;font-size:12px;font-weight:500" data-i18n="全部类型">全部类型</button>
       </div>
       <div id="decResult" style="margin-top:14px"></div>
 
       <div class="hr"></div>
 
-      <div class="sec"><span class="sec-t">建议库</span><span class="sec-line"></span><span class="sec-a" id="addLib">+ 新建</span></div>
+      <div class="sec"><span class="sec-t" data-i18n="建议库">建议库</span><span class="sec-line"></span><span class="sec-a" id="addLib" data-i18n="+ 新建">+ 新建</span></div>
       <input class="lib-search" id="libSearch" placeholder="找一下，比如 下课" maxlength="20">
       <div class="chips" id="libFilter" style="margin-bottom:4px"></div>
       <div class="card plain" id="libWrap" style="margin-top:9px;padding:2px 14px"></div>
-      <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0">
+      <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0" data-i18n="每条建议可以绑几个情境，选了才会出现在上面。开关决定它参不参与随机抽取。">
         每条建议可以绑几个情境，选了才会出现在上面。开关决定它参不参与随机抽取。
       </div>
       <div style="height:26px"></div>
@@ -98,21 +98,21 @@
 
     <div class="pad dec-pane" id="decPaneEat" style="display:none">
       <div class="ask">
-        <div class="ask-t">现在这个饭点，想吃什么</div>
+        <div class="ask-t" data-i18n="现在这个饭点，想吃什么">现在这个饭点，想吃什么</div>
         <div class="scene-grid" id="eatChips" style="margin-top:12px"></div>
       </div>
       <div class="dec-bar">
-        <button class="btn g" id="eatRandBtn" style="flex:1">随便抽一个</button>
+        <button class="btn g" id="eatRandBtn" style="flex:1" data-i18n="随便抽一个">随便抽一个</button>
       </div>
       <div id="eatResult" style="margin-top:14px"></div>
       <div id="eatToday" style="margin-top:12px"></div>
 
       <div class="hr"></div>
 
-      <div class="sec"><span class="sec-t">我的菜单</span><span class="sec-line"></span><span class="sec-a" id="eatAdd">+ 新建</span></div>
+      <div class="sec"><span class="sec-t" data-i18n="我的菜单">我的菜单</span><span class="sec-line"></span><span class="sec-a" id="eatAdd" data-i18n="+ 新建">+ 新建</span></div>
       <div class="chips" id="eatFilter" style="margin-bottom:4px"></div>
       <div class="card plain" id="eatWrap" style="margin-top:9px;padding:2px 14px"></div>
-      <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0">
+      <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0" data-i18n="每道菜可以勾几个饭点，抽的时候只从对得上的里出。今天已经记过的先跳过，都吃过了才会重复。">
         每道菜可以勾几个饭点，抽的时候只从对得上的里出。今天已经记过的先跳过，都吃过了才会重复。
       </div>
       <div style="height:26px"></div>
@@ -123,61 +123,61 @@
   <section class="page" id="pRecords">
     <div class="pad hd">
       <div class="hd-date">RECORDS</div>
-      <h1 class="hd-hi">生活记录</h1>
-      <div class="hd-sub">往前是计划，往后是记录。</div>
-      <div class="hd-pdf" id="pdfBtn">导出 PDF ↗</div>
+      <h1 class="hd-hi" data-i18n="生活记录">生活记录</h1>
+      <div class="hd-sub" data-i18n="往前是计划，往后是记录。">往前是计划，往后是记录。</div>
+      <div class="hd-pdf" id="pdfBtn" data-i18n="导出 PDF ↗">导出 PDF ↗</div>
     </div>
     <div class="seg" id="recSeg">
-      <button data-v="plan">计划</button>
-      <button data-v="timeline" class="on">时间轴</button>
-      <button data-v="month">月历</button>
-      <button data-v="item">项目</button>
-      <button data-v="diet" id="dietSegBtn" style="display:none">饮食</button>
+      <button data-v="plan" data-i18n="计划">计划</button>
+      <button data-v="timeline" class="on" data-i18n="时间轴">时间轴</button>
+      <button data-v="month" data-i18n="月历">月历</button>
+      <button data-v="item" data-i18n="项目">项目</button>
+      <button data-v="diet" id="dietSegBtn" style="display:none" data-i18n="饮食">饮食</button>
     </div>
     <div class="pad">
       <div id="vPlan" style="display:none">
         <div class="card plain">
-          <div class="field-l">给哪一天</div>
+          <div class="field-l" data-i18n="给哪一天">给哪一天</div>
           <div class="plan-pick" id="planQuick"></div>
           <input class="plan-date" id="planDate" type="date">
           <div class="inline-add" style="margin-top:6px">
             <input id="planInput" placeholder="那天要做什么" maxlength="30">
-            <button class="ok" id="planAddBtn">加上</button>
+            <button class="ok" id="planAddBtn" data-i18n="加上">加上</button>
           </div>
         </div>
-        <div class="sec"><span class="sec-t">定好的事</span><span class="sec-line"></span><span class="sec-a" id="planToggleDone">显示已完成</span></div>
+        <div class="sec"><span class="sec-t" data-i18n="定好的事">定好的事</span><span class="sec-line"></span><span class="sec-a" id="planToggleDone" data-i18n="显示已完成">显示已完成</span></div>
         <div id="planList"></div>
       </div>
 
       <div id="vTimeline">
         <div class="chips" id="tlFilter" style="margin-bottom:12px"></div>
         <div id="tlWrap" class="tl"></div>
-        <button class="tl-load" id="tlMore" style="display:none">加载更早的记录</button>
+        <button class="tl-load" id="tlMore" style="display:none" data-i18n="加载更早的记录">加载更早的记录</button>
       </div>
 
       <div id="vMonth" style="display:none">
         <div class="card plain">
           <div class="mhead">
             <div><div class="mtitle" id="calTitle"></div><div class="mmeta" id="calMeta"></div></div>
-            <div class="mnav"><button id="prevM">‹</button><button id="thisM">今</button><button id="nextM">›</button></div>
+            <div class="mnav"><button id="prevM">‹</button><button id="thisM" data-i18n="今">今</button><button id="nextM">›</button></div>
           </div>
-          <div class="wrow"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+          <div class="wrow"><span data-i18n="日">日</span><span data-i18n="一">一</span><span data-i18n="二">二</span><span data-i18n="三">三</span><span data-i18n="四">四</span><span data-i18n="五">五</span><span data-i18n="六">六</span></div>
           <div class="chips" id="mFil" style="margin:10px 0 0"></div>
-          <div class="mf-hint">颜色越深，那天记的东西越多。点上面的类型可以只看某几类。</div>
+          <div class="mf-hint" data-i18n="颜色越深，那天记的东西越多。点上面的类型可以只看某几类。">颜色越深，那天记的东西越多。点上面的类型可以只看某几类。</div>
           <div class="grid" id="grid"></div>
         </div>
         <div class="gym-stats" id="monthStats" style="margin-top:12px"></div>
-        <div class="sec"><span class="sec-t">热力图</span><span class="sec-line"></span></div>
+        <div class="sec"><span class="sec-t" data-i18n="热力图">热力图</span><span class="sec-line"></span></div>
         <div class="card plain" id="heatWrap"></div>
-        <div style="font-size:10.5px;color:var(--ink3);margin:10px 4px 0;line-height:1.6">点日期可以标记这一天，也能看到那天做了什么。</div>
+        <div style="font-size:10.5px;color:var(--ink3);margin:10px 4px 0;line-height:1.6" data-i18n="点日期可以标记这一天，也能看到那天做了什么。">点日期可以标记这一天，也能看到那天做了什么。</div>
       </div>
 
       <div id="vItem" style="display:none">
         <button class="item-cur" id="itemCur"></button>
         <div class="gym-stats" id="itemStats"></div>
-        <div class="sec"><span class="sec-t">近两周</span><span class="sec-line"></span><span class="sec-a" id="itemAdd">+ 记一条</span></div>
+        <div class="sec"><span class="sec-t" data-i18n="近两周">近两周</span><span class="sec-line"></span><span class="sec-a" id="itemAdd" data-i18n="+ 记一条">+ 记一条</span></div>
         <div class="card plain" id="itemChartCard"></div>
-        <div class="sec"><span class="sec-t" id="itemListT">最近</span><span class="sec-line"></span></div>
+        <div class="sec"><span class="sec-t" id="itemListT" data-i18n="最近">最近</span><span class="sec-line"></span></div>
         <div id="itemList"></div>
         <div id="itemHint" style="font-size:10.5px;color:var(--ink3);margin:12px 4px 0;line-height:1.7"></div>
       </div>
@@ -190,40 +190,40 @@
   <section class="page" id="pSettings">
     <div class="pad hd">
       <div class="hd-date">SETTINGS</div>
-      <h1 class="hd-hi">设置</h1>
-      <div class="hd-sub">东西都只在这台设备上。</div>
+      <h1 class="hd-hi" data-i18n="设置">设置</h1>
+      <div class="hd-sub" data-i18n="东西都只在这台设备上。">东西都只在这台设备上。</div>
     </div>
     <div class="pad">
-      <div class="sec"><span class="sec-t">今日重点</span><span class="sec-line"></span></div>
+      <div class="sec"><span class="sec-t" data-i18n="今日重点">今日重点</span><span class="sec-line"></span></div>
       <div class="card plain" id="focusSet"></div>
 
-      <div class="sec"><span class="sec-t">提醒</span><span class="sec-line"></span></div>
+      <div class="sec"><span class="sec-t" data-i18n="提醒">提醒</span><span class="sec-line"></span></div>
       <div class="card plain" id="remindSet"></div>
 
-      <div class="sec"><span class="sec-t">我的标记</span><span class="sec-line"></span><span class="sec-a" id="addPen">+ 新建</span></div>
+      <div class="sec"><span class="sec-t" data-i18n="我的标记">我的标记</span><span class="sec-line"></span><span class="sec-a" id="addPen" data-i18n="+ 新建">+ 新建</span></div>
       <div class="pool" id="penPool"></div>
-      <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6">点标记改名字和颜色，点 × 删掉。</div>
+      <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6" data-i18n="点标记改名字和颜色，点 × 删掉。">点标记改名字和颜色，点 × 删掉。</div>
 
-      <div class="sec"><span class="sec-t">标签</span><span class="sec-line"></span><span class="sec-a" id="addTag">+ 新建</span></div>
+      <div class="sec"><span class="sec-t" data-i18n="标签">标签</span><span class="sec-line"></span><span class="sec-a" id="addTag" data-i18n="+ 新建">+ 新建</span></div>
       <div class="pool" id="tagPool"></div>
 
-      <div class="sec"><span class="sec-t">外观</span><span class="sec-line"></span></div>
+      <div class="sec"><span class="sec-t" data-i18n="外观">外观</span><span class="sec-line"></span></div>
       <div class="card plain" id="lookSet"></div>
 
-      <div class="sec"><span class="sec-t">插件</span><span class="sec-line"></span></div>
+      <div class="sec"><span class="sec-t" data-i18n="插件">插件</span><span class="sec-line"></span></div>
       <div class="card plain" id="pluginSet"></div>
-      <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6">关掉只是不在首页出现，记过的都还在。</div>
+      <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6" data-i18n="关掉只是不在首页出现，记过的都还在。">关掉只是不在首页出现，记过的都还在。</div>
 
-      <div class="sec"><span class="sec-t">决策情况</span><span class="sec-line"></span><span class="sec-a" id="addScene">+ 新建</span></div>
+      <div class="sec"><span class="sec-t" data-i18n="决策情况">决策情况</span><span class="sec-line"></span><span class="sec-a" id="addScene" data-i18n="+ 新建">+ 新建</span></div>
       <div class="card plain" id="sceneSet"></div>
-      <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6">系统自带的情境不能删（可以改名或停用），自己加的可以删；顺序就是决策页里的显示顺序。</div>
+      <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6" data-i18n="系统自带的情境不能删（可以改名或停用），自己加的可以删；顺序就是决策页里的显示顺序。">系统自带的情境不能删（可以改名或停用），自己加的可以删；顺序就是决策页里的显示顺序。</div>
 
-      <div class="sec"><span class="sec-t">其它</span><span class="sec-line"></span></div>
+      <div class="sec"><span class="sec-t" data-i18n="其它">其它</span><span class="sec-line"></span></div>
       <div class="card plain" id="otherSet"></div>
 
-      <div class="sec"><span class="sec-t">数据</span><span class="sec-line"></span></div>
+      <div class="sec"><span class="sec-t" data-i18n="数据">数据</span><span class="sec-line"></span></div>
       <div class="card plain" id="dataSet"></div>
-      <div style="font-size:10.5px;color:var(--ink3);margin:10px 4px 0;line-height:1.65">
+      <div style="font-size:10.5px;color:var(--ink3);margin:10px 4px 0;line-height:1.65" data-i18n="数据只存在这个浏览器里。清缓存、换设备或误删都可能丢掉，建议偶尔导出一次备份。">
         数据只存在这个浏览器里。清缓存、换设备或误删都可能丢掉，建议偶尔导出一次备份。
       </div>
       <div style="text-align:center;font-size:9.5px;letter-spacing:3px;color:var(--ink3);margin:26px 0 0;opacity:.6">EARTH ONLINE</div>
@@ -234,19 +234,19 @@
   <nav class="nav" id="nav">
     <button data-page="pToday" class="on">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>
-      <span>今日</span>
+      <span data-i18n="今日">今日</span>
     </button>
     <button data-page="pDecide">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>
-      <span>决策</span>
+      <span data-i18n="决策">决策</span>
     </button>
     <button data-page="pRecords">
       <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
-      <span>记录</span>
+      <span data-i18n="记录">记录</span>
     </button>
     <button data-page="pSettings">
       <svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
-      <span>设置</span>
+      <span data-i18n="设置">设置</span>
     </button>
   </nav>
 
@@ -262,8 +262,8 @@
       <div class="m-s" id="mSub"></div>
       <div id="mBody"></div>
       <div class="acts">
-        <button class="btn g" id="mCancel">取消</button>
-        <button class="btn p" id="mOk">确定</button>
+        <button class="btn g" id="mCancel" data-i18n="取消">取消</button>
+        <button class="btn p" id="mOk" data-i18n="确定">确定</button>
       </div>
     </div>
   </div>
@@ -276,13 +276,24 @@
 <!-- PDF 报告预览：放在 #app 之外，打印时不受手机宽度限制 -->
 <div id="printView">
   <div class="pv-bar">
-    <button class="btn g sm" id="pvClose">关闭</button>
-    <span class="pv-bar-t">打印预览 · 在打印窗口选「存储为 PDF」</span>
-    <button class="btn p sm" id="pvPrint">打印 / 存 PDF</button>
+    <button class="btn g sm" id="pvClose" data-i18n="关闭">关闭</button>
+    <span class="pv-bar-t" data-i18n="打印预览 · 在打印窗口选「存储为 PDF」">打印预览 · 在打印窗口选「存储为 PDF」</span>
+    <button class="btn p sm" id="pvPrint" data-i18n="打印 / 存 PDF">打印 / 存 PDF</button>
   </div>
   <div class="pv-paper" id="pvPaper"></div>
 </div>
 
+<script src="config/index.js"></script>
+<script src="config/common.js"></script>
+<script src="config/home.js"></script>
+<script src="config/decision.js"></script>
+<script src="config/records.js"></script>
+<script src="config/settings.js"></script>
+<script src="config/diet.js"></script>
+<script src="config/backup.js"></script>
+<script src="config/messages.js"></script>
+<script src="config/plugins.js"></script>
+<script src="config/writer.js"></script>
 <script src="vendor/dexie.min.js"></script>
 <script src="db.js"></script>
 <script src="legacy.js"></script>

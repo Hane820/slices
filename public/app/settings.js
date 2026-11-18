@@ -6,8 +6,8 @@ function renderSettings(){
   rb.innerHTML = '';
   var r1 = el('div','row');
   var rm = el('div','row-main');
-  rm.appendChild(el('div','row-t','首页提醒'));
-  rm.appendChild(el('div','row-s','打开应用就能看到，关掉应用不会弹系统通知'));
+  rm.appendChild(el('div','row-t',OLT('首页提醒')));
+  rm.appendChild(el('div','row-s',OLT('打开应用就能看到，关掉应用不会弹系统通知')));
   r1.appendChild(rm);
   var rsw = el('button','sw' + (S.settings.remind ? ' on' : ''));
   rsw.addEventListener('click', function(){ S.settings.remind = !S.settings.remind; save(); renderSettings(); renderRemind(); });
@@ -17,7 +17,7 @@ function renderSettings(){
   var isRest = S.restDays.indexOf(TODAY()) >= 0;
   var r2 = el('div','row');
   var r2m = el('div','row-main');
-  r2m.appendChild(el('div','row-t','今天算休息日'));
+  r2m.appendChild(el('div','row-t',OLT('今天算休息日')));
   r2m.appendChild(el('div','row-s', isRest ? '今天不提醒，目标也不算数' : '想休息就打开，今天不会有提醒'));
   r2.appendChild(r2m);
   var r2s = el('button','sw' + (isRest ? ' on' : ''));
@@ -43,18 +43,18 @@ function renderSettings(){
     var x = el('button','x','×');
     x.addEventListener('click', function(ev){
       ev.stopPropagation();
-      if(S.pens.length <= 1){ toast('至少留一个标记'); return; }
+      if(S.pens.length <= 1){ toast(OLT('至少留一个标记')); return; }
       confirmBox('删掉「' + (p.name||'未命名') + '」？', '用过这个标记的日期会变回空白。', function(){
         S.pens = S.pens.filter(function(y){ return y.id !== p.id; });
         for(var k in S.marks){ S.marks[k].items = (S.marks[k].items || []).filter(function(it){ return it.penId !== p.id; }); if(!S.marks[k].items.length) delete S.marks[k]; }
-        save(function(){ toast('已删除'); }); renderSettings();
+        save(function(){ toast(OLT('已删除')); }); renderSettings();
       });
     });
     pill.appendChild(x);
     pill.addEventListener('click', function(){ openPenEdit(p); });
     pp.appendChild(pill);
   });
-  var addP = el('button','pill add','+ 新标记');
+  var addP = el('button','pill add',OLT('+ 新标记'));
   addP.addEventListener('click', function(){ openPenEdit(null); });
   pp.appendChild(addP);
 
@@ -70,25 +70,25 @@ function renderSettings(){
       confirmBox('删除标签「' + t.name + '」？', '之前的打卡记录会一起消失。', function(){
         S.tags = S.tags.filter(function(y){ return y.id !== t.id; });
         S.tagLogs = S.tagLogs.filter(function(l){ return l.tagId !== t.id; });
-        save(function(){ toast('已删除'); }); renderSettings();
+        save(function(){ toast(OLT('已删除')); }); renderSettings();
       });
     });
     pill.appendChild(x);
     pill.addEventListener('click', function(){
       openModal({
         title:'改标签名', sub:'', input:true, value:t.name, placeholder:'标签名', okText:'保存',
-        onOk:function(v){ t.name = v; save(function(){ toast('改好了'); }); renderSettings(); }
+        onOk:function(v){ t.name = v; save(function(){ toast(OLT('改好了')); }); renderSettings(); }
       });
     });
     tp.appendChild(pill);
   });
-  var addT = el('button','pill add','+ 新标签');
+  var addT = el('button','pill add',OLT('+ 新标签'));
   addT.addEventListener('click', function(){
     openModal({
       title:'新建标签', sub:'点一下记一次，用来数频率', input:true, placeholder:'比如「晒了太阳」', okText:'加上',
       onOk:function(v){
         S.tags.push({ id: uid('tag'), name:v });
-        save(function(){ toast('标签已加上'); }); renderSettings(); renderTagsRow();
+        save(function(){ toast(OLT('标签已加上')); }); renderSettings(); renderTagsRow();
       }
     });
   });
@@ -124,13 +124,13 @@ function renderSettings(){
   ob.innerHTML = '';
   var rr = el('div','row');
   var rrm = el('div','row-main');
-  rrm.appendChild(el('div','row-t','几点算新的一天'));
-  rrm.appendChild(el('div','row-s','每天重复的清单在这个时间清零'));
+  rrm.appendChild(el('div','row-t',OLT('几点算新的一天')));
+  rrm.appendChild(el('div','row-s',OLT('每天重复的清单在这个时间清零')));
   rr.appendChild(rrm);
   rr.appendChild(el('div','row-a', '凌晨 ' + S.settings.resetHour + ':00'));
   rr.addEventListener('click', function(){
     askNumber('几点算新的一天（0-6 点）', S.settings.resetHour, 0, 6, function(v){
-      S.settings.resetHour = v; save(function(){ toast('改好了'); }); renderSettings(); renderToday();
+      S.settings.resetHour = v; save(function(){ toast(OLT('改好了')); }); renderSettings(); renderToday();
     });
   });
   ob.appendChild(rr);
@@ -148,8 +148,8 @@ function renderSettings(){
   ];
   var trow = el('div','row');
   var trowm = el('div','row-main');
-  trowm.appendChild(el('div','row-t','主题色'));
-  trowm.appendChild(el('div','row-s','莫兰迪色系，点一个全局换色'));
+  trowm.appendChild(el('div','row-t',OLT('主题色')));
+  trowm.appendChild(el('div','row-s',OLT('莫兰迪色系，点一个全局换色')));
   trow.appendChild(trowm);
   lb.appendChild(trow);
   var tgrid = el('div','themes');
@@ -161,7 +161,7 @@ function renderSettings(){
     sw.addEventListener('click', function(){
       if(S.settings.theme === t[0]) return;
       S.settings.theme = t[0];
-      save(function(){ toast('换成「' + t[1] + '」了'); }); applyTheme(); renderSettings();
+      save(function(){ toast(OLT('换成「') + t[1] + '」了'); }); applyTheme(); renderSettings();
     });
     tgrid.appendChild(sw);
   });
@@ -169,8 +169,8 @@ function renderSettings(){
   var lrow = el('div','row');
   lrow.style.marginTop = '10px';
   var lrm = el('div','row-main');
-  lrm.appendChild(el('div','row-t','字号'));
-  lrm.appendChild(el('div','row-s','拖到喜欢的大小就行，全 App 一起变'));
+  lrm.appendChild(el('div','row-t',OLT('字号')));
+  lrm.appendChild(el('div','row-s',OLT('拖到喜欢的大小就行，全 App 一起变')));
   lrow.appendChild(lrm);
   var lval = el('div','row-a', Math.round((S.settings.uiScale || 1.12) * 100) + '%');
   lrow.appendChild(lval);
@@ -186,7 +186,7 @@ function renderSettings(){
     applyUiScale();
     lval.textContent = Math.round(v * 100) + '%';
   });
-  slider.addEventListener('change', function(){ save(function(){ toast('字号记下了'); }, { highFrequency:true }); });
+  slider.addEventListener('change', function(){ save(function(){ toast(OLT('字号记下了')); }, { highFrequency:true }); });
   lb.appendChild(slider);
 
   renderFocusSet();
@@ -204,18 +204,18 @@ function renderSettings(){
     r.addEventListener('click', fn);
     db.appendChild(r);
   }
-  dataRow('导出 PDF 记录', '月历 + 时间轴 + 小结，打印或存成 PDF', openPdfPanel);
-  dataRow('导出备份', '一个 JSON 文件，包含全部记录', exportJSON);
-  dataRow('导出表格', '把记录按日期排成一张表，Excel / WPS 能打开', exportTable);
-  dataRow('导出配置文件', '笔 / 标签 / 决策库 / 偏好设置，不含日常记录，换设备导入用', exportConfig);
-  dataRow('导入配置文件', '先给你看预览和冲突，确认后才会写进来', importConfig);
-  dataRow('从备份恢复', '会先给你看摘要，再决定合并还是替换', importJSON);
-  dataRow('清空全部数据', '不可恢复，请先导出', function(){
+  dataRow(OLT('导出 PDF 记录'), OLT('月历 + 时间轴 + 小结，打印或存成 PDF'), openPdfPanel);
+  dataRow(OLT('导出备份'), OLT('一个 JSON 文件，包含全部记录'), exportJSON);
+  dataRow(OLT('导出表格'), OLT('把记录按日期排成一张表，Excel / WPS 能打开'), exportTable);
+  dataRow(OLT('导出配置文件'), OLT('笔 / 标签 / 决策库 / 偏好设置，不含日常记录，换设备导入用'), exportConfig);
+  dataRow(OLT('导入配置文件'), OLT('先给你看预览和冲突，确认后才会写进来'), importConfig);
+  dataRow(OLT('从备份恢复'), OLT('会先给你看摘要，再决定合并还是替换'), importJSON);
+  dataRow(OLT('清空全部数据'), OLT('不可恢复，请先导出'), function(){
     if(bizWriteBlocked()){ bizWriteBlockedNotice(); return; }   /* idb 模式：入口拦截，S 不被清空 */
     confirmBox('清空全部数据？', '所有待办、标记、记录、训练都会消失，而且找不回来。', function(){
       S = defaults();
       normalize();
-      save(); renderAll(); toast('已经清空了');
+      save(); renderAll(); toast(OLT('已经清空了'));
     });
   });
 }
@@ -225,7 +225,7 @@ function askNumber(title, cur, min, max, cb){
     title: title, sub: min + ' 到 ' + max + ' 之间', input:true, value:String(cur), numeric:true, okText:'保存',
     onOk:function(v){
       var n = parseInt(v, 10);
-      if(isNaN(n) || n < min || n > max){ toast('填 ' + min + ' 到 ' + max + ' 之间的数字'); return; }
+      if(isNaN(n) || n < min || n > max){ toast(OLT('填 ') + min + ' 到 ' + max + ' 之间的数字'); return; }
       cb(n);
     }
   });
@@ -288,23 +288,23 @@ function openPenEdit(existing){
   body.querySelector('#penNo').addEventListener('click', closeSheet);
   if(existing){
     body.querySelector('#penDel').addEventListener('click', function(){
-      if(S.pens.length <= 1){ toast('至少留一个标记'); return; }
+      if(S.pens.length <= 1){ toast(OLT('至少留一个标记')); return; }
       confirmBox('删掉这个标记？', '用过它的日期会变回空白。', function(){
         S.pens = S.pens.filter(function(y){ return y.id !== existing.id; });
         for(var k in S.marks){ S.marks[k].items = (S.marks[k].items || []).filter(function(it){ return it.penId !== existing.id; }); if(!S.marks[k].items.length) delete S.marks[k]; }
-        save(function(){ toast('已删除'); }); closeSheet(); renderSettings();
+        save(function(){ toast(OLT('已删除')); }); closeSheet(); renderSettings();
       });
     });
   }
   body.querySelector('#penOk').addEventListener('click', function(){
     var n = nameInp.value.trim();
-    if(!n){ toast('给它起个名字'); return; }
+    if(!n){ toast(OLT('给它起个名字')); return; }
     if(existing){
       existing.color = draft.color; existing.emoji = draft.emoji; existing.name = n;
     }else{
       S.pens.push({ id: uid('p'), color: draft.color, emoji: draft.emoji, name: n });
     }
-    save(function(){ toast('已保存'); }); closeSheet(); renderSettings();
+    save(function(){ toast(OLT('已保存')); }); closeSheet(); renderSettings();
   });
 }
 
@@ -318,17 +318,17 @@ function renderFocusSet(){
 
   var head = el('div','row');
   var hm = el('div','row-main');
-  hm.appendChild(el('div','row-t','今日重点条目'));
-  hm.appendChild(el('div','row-s','首页一行三张；「健身」「学习」是默认预设，可改可删'));
+  hm.appendChild(el('div','row-t',OLT('今日重点条目')));
+  hm.appendChild(el('div','row-s',OLT('首页一行三张；「健身」「学习」是默认预设，可改可删')));
   head.appendChild(hm);
-  var add = el('div','row-a','＋ 加一条');
+  var add = el('div','row-a',OLT('＋ 加一条'));
   add.style.color = 'var(--sage-d)';
   add.addEventListener('click', function(){ openFocusEdit(null, true); });
   head.appendChild(add);
   box.appendChild(head);
 
   if(!list.length){
-    box.appendChild(el('div','row-s','还没有条目，点右上角加一条。'));
+    box.appendChild(el('div','row-s',OLT('还没有条目，点右上角加一条。')));
     return;
   }
 
@@ -403,8 +403,8 @@ function openFocusEdit(it, isNew){
       });
       box.querySelector('#fxOptAdd').addEventListener('click', function(){
         var v = box.querySelector('#fxOptIn').value.trim();
-        if(!v){ toast('写个选项名'); return; }
-        if(opts.indexOf(v) >= 0){ toast('已经有这个选项了'); return; }
+        if(!v){ toast(OLT('写个选项名')); return; }
+        if(opts.indexOf(v) >= 0){ toast(OLT('已经有这个选项了')); return; }
         opts.push(v);
         renderModeBox();
         var again = box.querySelector('#fxOptIn');
@@ -500,14 +500,14 @@ function openFocusEdit(it, isNew){
   body.querySelector('#fxNo').addEventListener('click', closeSheet);
   body.querySelector('#fxOk').addEventListener('click', function(){
     var name = body.querySelector('#fxName').value.trim();
-    if(!name){ toast('写个名字'); return; }
-    if(mode === 'multi' && !opts.length){ toast('多选至少要有一个选项'); return; }
+    if(!name){ toast(OLT('写个名字')); return; }
+    if(mode === 'multi' && !opts.length){ toast(OLT('多选至少要有一个选项')); return; }
     var gu = String(unit || '').trim().slice(0, 4);
     var goal = null;
     if(!noGoal){
       var gv = parseFloat(goalInp.value);
-      if(!(gv > 0)){ goalInp.classList.add('err'); goalInp.focus(); toast('目标写个大于 0 的数'); return; }
-      if(!gu){ customInp.classList.add('err'); customInp.focus(); toast('写个单位名'); return; }
+      if(!(gv > 0)){ goalInp.classList.add('err'); goalInp.focus(); toast(OLT('目标写个大于 0 的数')); return; }
+      if(!gu){ customInp.classList.add('err'); customInp.focus(); toast(OLT('写个单位名')); return; }
       goal = { value: Math.round(gv * 100) / 100, unit: gu };
     }
     var fields = (mode === 'multi')
@@ -543,9 +543,9 @@ function openFocusEdit(it, isNew){
         setTimeout(function(){
           S.settings.focusItems = S.settings.focusItems.filter(function(x){ return x !== it; });
           save(function(){
-            toast('已删除「' + it.text + '」', '撤销', function(){
+            toast(OLT('已删除「') + it.text + '」', '撤销', function(){
               S.settings.focusItems.splice(Math.min(pos, S.settings.focusItems.length), 0, it);
-              save(function(){ toast('已恢复'); }); renderFocusSet(); renderGoals();
+              save(function(){ toast(OLT('已恢复')); }); renderFocusSet(); renderGoals();
               if(currentPage === 'pRecords') renderProject();
             });
           }); renderFocusSet(); renderGoals();
@@ -569,8 +569,8 @@ function renderSceneSet(){
   if(!list.length){
     var empty = el('div', 'row');
     var em = el('div', 'row-main');
-    em.appendChild(el('div', 'row-t', '还没有情况'));
-    em.appendChild(el('div', 'row-s', '点右上角「+ 新建」加一个'));
+    em.appendChild(el('div', 'row-t', OLT('还没有情况')));
+    em.appendChild(el('div', 'row-s', OLT('点右上角「+ 新建」加一个')));
     empty.appendChild(em);
     box.appendChild(empty);
     return;
@@ -605,7 +605,7 @@ function sceneMove(id, dir){
   if(i < 0 || j < 0 || j >= S.scenes.length) return;
   var t = S.scenes[i]; S.scenes[i] = S.scenes[j]; S.scenes[j] = t;
   normalize();
-  save(function(){ toast('顺序调好了'); });
+  save(function(){ toast(OLT('顺序调好了')); });
   renderSettings();
   if(typeof renderScenes === 'function') renderScenes();
 }
@@ -629,15 +629,15 @@ function openSceneEdit(id){
   body.querySelector('#scOk').addEventListener('click', function(){
     var name = body.querySelector('#scN').value.trim();
     var desc = body.querySelector('#scD').value.trim();
-    if(!name){ toast('写个名字'); return; }
+    if(!name){ toast(OLT('写个名字')); return; }
     if(isNew){
       S.scenes.push({ id: uid('sc'), name: name, desc: desc, sys: false, enabled: true });
       normalize();
-      save(function(){ toast('加好了，决策页马上能用'); });
+      save(function(){ toast(OLT('加好了，决策页马上能用')); });
     } else {
       sc.name = name; sc.desc = desc; sc.enabled = enabled;
       normalize();
-      save(function(){ toast('改好了'); });
+      save(function(){ toast(OLT('改好了')); });
     }
     closeSheet();
     renderSettings();
@@ -654,7 +654,7 @@ function openSceneEdit(id){
       });
       S.scenes = S.scenes.filter(function(x){ return x.id !== sc.id; });
       normalize();
-      save(function(){ toast('删掉了'); });
+      save(function(){ toast(OLT('删掉了')); });
       closeSheet();
       renderSettings();
       if(typeof renderScenes === 'function') renderScenes();

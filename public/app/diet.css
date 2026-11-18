@@ -70,7 +70,7 @@
 }
 .diet-addfood:active{ color:var(--ink); }
 .diet-btns{ padding-top:8px; }
-.diet-btns .ok{ width:100%; }
+.diet-btns .btn{ width:100%; padding:13px 0; }
 
 /* 历史导航 */
 .diet-hnav{

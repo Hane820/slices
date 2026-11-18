@@ -120,7 +120,7 @@ function renderSceneResult(k){
 
   var list = sceneSuggestions(k);
   if(!list.length){
-    box.appendChild(el('div','empty','这个情境下还没有建议，或者今天都做过了。到建议库新建一条，勾上这个情境就行。'));
+    box.appendChild(el('div','empty',OLT('这个情境下还没有建议，或者今天都做过了。到建议库新建一条，勾上这个情境就行。')));
     return;
   }
   var card = el('div','card');
@@ -137,9 +137,9 @@ function renderSceneResult(k){
     if(sg.note) d.appendChild(el('span', null, sg.note));
     main.appendChild(d);
     var acts = el('div','scene-acts');
-    var go = el('button','btn p sm','现在开始');
+    var go = el('button','btn p sm',OLT('现在开始'));
     go.addEventListener('click', function(){ startPomo(suggPick(sg), go); });
-    var add = el('button','btn o sm','加入待办');
+    var add = el('button','btn o sm',OLT('加入待办'));
     add.addEventListener('click', function(){ addAsTask(suggPick(sg), add); });
     acts.appendChild(go); acts.appendChild(add);
     item.appendChild(main); item.appendChild(acts);
@@ -172,7 +172,7 @@ function addAsTask(c, btnEl){
     btnEl.disabled = true;
     setTimeout(function(){ if(btnEl){ btnEl.textContent = '加入待办'; btnEl.disabled = false; } }, 1400);
   }
-  toast('已加入今日待办');
+  toast(OLT('已加入今日待办'));
 }
 
 /* 飞点：一个小点从起点飞到终点（底部任务栏） */
@@ -281,7 +281,7 @@ function pomoNotifyDone(name){
       return;
     }catch(e){}
   }
-  toast('时间到 · ' + name);
+  toast(OLT('时间到 · ') + name);
   pomoTitleFlash();                      /* 被拒 / 不支持 API 时的页面内兜底 */
 }
 /* 专注统计：按实际走过的秒数写回本次决策记录，不用预计值 */
@@ -321,7 +321,7 @@ function pomoBigOn(){
   box.classList.add('big');
   var ex = document.getElementById('pomoExit');
   if(ex) ex.textContent = '收起';
-  toast('全屏用不了，已换成大窗口');
+  toast(OLT('全屏用不了，已换成大窗口'));
 }
 function pomoLeaveBig(){
   if(pomoFsEl()){ pomoFsExit(); return; }
@@ -410,7 +410,7 @@ function pomoDestPoint(target){
 /* 动画收尾才写状态：打钩 + 高亮脉冲 */
 function pomoMarkDone(target){
   var task = target && target.task;
-  if(!task){ toast('这一段做完了'); return; }
+  if(!task){ toast(OLT('这一段做完了')); return; }
   var t0 = TODAY();
   if(!isDone(task, t0)){
     task.done = task.done || {};
@@ -510,7 +510,7 @@ function cancelPomo(){
   var wasFs = !!pomoFsEl();
   if(wasFs) pomoFsExit();
   confirmBox('取消本次专注？', '本次时长不会计入统计。', function(){
-    var notify = function(){ toast('已取消，这次不计入'); };
+    var notify = function(){ toast(OLT('已取消，这次不计入')); };
     if(logId){
       S.decisionLog = S.decisionLog.filter(function(x){ return x.id !== logId; });
       save(notify);
@@ -584,7 +584,7 @@ function startPomo(c, btnEl){
     barEl.style.width = (pomo.left / pomo.total * 100).toFixed(1) + '%';
   }, 1000);
 
-  toast('开始计时 ' + fmtPomo(total));
+  toast(OLT('开始计时 ') + fmtPomo(total));
   pomoAskNotification();                /* 首次点「现在开始」时请求权限，用户手势内 */
   if(btnEl){ btnEl.textContent = '计时中'; }
 }
@@ -596,7 +596,7 @@ function renderDecisionResult(){
   if(!decState.list.length) return;
   var c = decState.list[decState.idx % decState.list.length];
   var card = el('div','res');
-  card.appendChild(el('div','res-k','随机抽到'));
+  card.appendChild(el('div','res-k',OLT('随机抽到')));
   card.appendChild(el('div','res-t', c.name));
   if(c.sub) card.appendChild(el('div','res-d', c.sub));
   var meta = el('div','res-meta');
@@ -604,11 +604,11 @@ function renderDecisionResult(){
   if(c.duration) meta.appendChild(el('span','mtag', '大约 ' + durText(c.duration)));
   card.appendChild(meta);
   var acts = el('div','res-acts');
-  var go = el('button','btn p','现在开始');
+  var go = el('button','btn p',OLT('现在开始'));
   go.addEventListener('click', function(){ startPomo(c, go); });
-  var add = el('button','btn g','加入待办');
+  var add = el('button','btn g',OLT('加入待办'));
   add.addEventListener('click', function(){ addAsTask(c, add); });
-  var again = el('button','btn o','换一个');
+  var again = el('button','btn o',OLT('换一个'));
   again.addEventListener('click', function(){
     card.style.transition = 'opacity .45s var(--ease), transform .45s var(--ease)';
     card.style.opacity = '0';
@@ -622,7 +622,7 @@ function renderDecisionResult(){
 
 function runRandom(){
   var p = randomPick(S.settings.randFilter);
-  if(!p){ toast('清单里没有可抽的，先加几条待办'); return; }
+  if(!p){ toast(OLT('清单里没有可抽的，先加几条待办')); return; }
   decState.mode = 'random';
   decState.list = [p]; decState.idx = 0;
   decState.filter = S.settings.randFilter;
@@ -680,7 +680,7 @@ function renderLib(){
     var d = el('div','lib-d');
     d.appendChild(el('span', null, sg.cat));
     if(sg.duration) d.appendChild(el('span', null, durText(sg.duration)));
-    if(!sg.random) d.appendChild(el('span', null, '不参与随机'));
+    if(!sg.random) d.appendChild(el('span', null, OLT('不参与随机')));
     if((sg.scenes||[]).length){
       d.appendChild(el('span', null, '情境：' + sg.scenes.map(sceneName).join('、')));
     }
@@ -782,13 +782,13 @@ function openSuggEdit(sg){
     body.querySelector('#sgDel').addEventListener('click', function(){
       confirmBox('删掉这条建议？', '它不会再出现在情境和随机里。', function(){
         S.suggestions = S.suggestions.filter(function(x){ return x.id !== item.id; });
-        save(function(){ toast('已删除'); }); closeSheet(); renderLib();
+        save(function(){ toast(OLT('已删除')); }); closeSheet(); renderLib();
       });
     });
   }
   body.querySelector('#sgOk').addEventListener('click', function(){
     var n = body.querySelector('#sgN').value.trim();
-    if(!n){ toast('写一下做什么'); return; }
+    if(!n){ toast(OLT('写一下做什么')); return; }
     item.name = n;
     item.cat = body.querySelector('#sgC').value.trim() || '其它';
     item.duration = durFromInputs(body.querySelector('#sgM'), body.querySelector('#sgS'));
@@ -798,7 +798,7 @@ function openSuggEdit(sg){
     item.scenes = scenes;
     item.random = body.querySelector('#sgR').classList.contains('on');
     if(isNew){ item.enabled = true; item.priority = 2; item.tags = []; S.suggestions.push(item); }
-    save(function(){ toast('已保存'); }); closeSheet(); renderLib();
+    save(function(){ toast(OLT('已保存')); }); closeSheet(); renderLib();
     if(decState.scene && decState.mode === 'scene' && currentPage === 'pDecide') renderSceneResult(decState.scene);
   });
 }
@@ -873,7 +873,7 @@ function renderDecideShell(){
   if(eating) renderEat();
 }
 function switchDecideTab(k){
-  if(k === 'eat' && !pluginOn('food')){ toast('「吃什么」还关着，去设置里打开'); return; }
+  if(k === 'eat' && !pluginOn('food')){ toast(OLT('「吃什么」还关着，去设置里打开')); return; }
   eatState.tab = k === 'eat' ? 'eat' : 'do';
   renderDecideShell();
   if(eatState.tab === 'eat') window.scrollTo(0, 0);
@@ -914,7 +914,7 @@ function renderEatToday(){
   var list = foodTodayLog();
   if(!list.length) return;
   var line = el('div','eat-log');
-  line.appendChild(el('span','eat-log-k','今天吃了'));
+  line.appendChild(el('span','eat-log-k',OLT('今天吃了')));
   list.slice(-6).forEach(function(l){
     line.appendChild(el('span','eat-log-i', (l.slot ? foodSlotName(l.slot) + ' · ' : '') + l.name));
   });
@@ -936,9 +936,9 @@ function renderEatResult(){
   meta.appendChild(el('span','mtag', foodSlotName(eatState.slot)));
   card.appendChild(meta);
   var acts = el('div','res-acts');
-  var ok = el('button','btn p','就吃这个');
+  var ok = el('button','btn p',OLT('就吃这个'));
   ok.addEventListener('click', function(){ logEat(c.item, ok); });
-  var again = el('button','btn o','换一个');
+  var again = el('button','btn o',OLT('换一个'));
   again.addEventListener('click', function(){
     card.style.transition = 'opacity .4s var(--ease), transform .4s var(--ease)';
     card.style.opacity = '0';
@@ -951,11 +951,11 @@ function renderEatResult(){
 }
 
 function runEatPick(){
-  if(!pluginOn('food')){ toast('「吃什么」还关着，去设置里打开'); return; }
+  if(!pluginOn('food')){ toast(OLT('「吃什么」还关着，去设置里打开')); return; }
   if(!eatState.slot) eatState.slot = foodSlotNow();
-  if(!foodList().length){ toast('菜单还是空的，先加两道'); return; }
+  if(!foodList().length){ toast(OLT('菜单还是空的，先加两道')); return; }
   var r = pickFood(eatState.slot);
-  if(!r){ toast('这个饭点没有能抽的，去菜单加两道'); return; }
+  if(!r){ toast(OLT('这个饭点没有能抽的，去菜单加两道')); return; }
   eatState.pick = r;
   renderEatResult();
   var b = $('eatResult');
@@ -973,7 +973,7 @@ function logEat(item, btnEl){
     save(function(){ toast('记下了：' + item.name); });
   }
   renderEatToday();
-  if(dup) toast('今天就记过「' + item.name + '」了');
+  if(dup) toast(OLT('今天就记过「') + item.name + '」了');
   if(btnEl){
     btnEl.textContent = dup ? '已记过' : '已记下';
     btnEl.disabled = true;
@@ -1089,13 +1089,13 @@ function openFoodEdit(it){
       confirmBox('删掉「' + item.name + '」？', '它不会再出现在抽取里，吃过的记录还留着。', function(){
         S.settings.foodItems = foodList().filter(function(x){ return x.id !== item.id; });
         if(eatState.pick && eatState.pick.item.id === item.id) eatState.pick = null;
-        save(function(){ toast('已删除'); }); closeSheet(); renderEat();
+        save(function(){ toast(OLT('已删除')); }); closeSheet(); renderEat();
       });
     });
   }
   body.querySelector('#fdOk').addEventListener('click', function(){
     var n = body.querySelector('#fdN').value.trim();
-    if(!n){ toast('写一下吃什么'); return; }
+    if(!n){ toast(OLT('写一下吃什么')); return; }
     var data = {
       id: item.id || uid('fd'),
       name: n.slice(0, 20),
@@ -1107,7 +1107,7 @@ function openFoodEdit(it){
     if(isNew) S.settings.foodItems = foodList().concat([data]);
     else S.settings.foodItems = foodList().map(function(x){ return x.id === item.id ? data : x; });
     if(eatState.pick && eatState.pick.item.id === data.id) eatState.pick = null;
-    save(function(){ toast('已保存'); }); closeSheet(); renderEat();
+    save(function(){ toast(OLT('已保存')); }); closeSheet(); renderEat();
   });
 }
 

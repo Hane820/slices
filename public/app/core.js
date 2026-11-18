@@ -1,4 +1,13 @@
 /* core.js — 常量/工具/数据/导航/头部/通用面板·弹窗/导入导出/PDF */
+/* ==================== 文案 ====================
+   OLT(原文)：把界面文字交给 config/ 下的分组配置统一管理。
+   配置先于本脚本加载，传入的原文作为键去查显示文字；查不到就原样返回，
+   所以即使配置缺失（例如某些测试只加载部分脚本）也不会影响功能与文案。 */
+function OLT(s){
+  var C = window.OLText;
+  if(C && typeof C.text === 'function') return C.text(s);
+  return s;
+}
 /* ==================== 常量 ==================== */
 var KEY = 'earthonline-v4';
 var OLD = 'earthonline-v3';
@@ -495,7 +504,7 @@ function bizWriteBlockedNotice(){
   var now = Date.now();
   if(now - bizWriteNoticeAt < 3000) return;
   bizWriteNoticeAt = now;
-  toast('保存不可用：写入还没准备好，这次改动不会保存');
+  toast(OLT('保存不可用：写入还没准备好，这次改动不会保存'));
 }
 var bizSaveFailAt = 0;
 var bizSaveFailSig = '';
@@ -523,7 +532,7 @@ function bizSaveFailed(code, actions, jobId, force){
      用户点过重试 / 恢复后 force=true，保证再次失败一定重新提示。 */
   if(!force && sig === bizSaveFailSig && now - bizSaveFailAt < 1200) return;
   bizSaveFailSig = sig; bizSaveFailAt = now;
-  toast('没保存成功' + (code ? '（' + saveFailText(code) + '）' : '') + '，改动还在内存里', actions || []);
+  toast(OLT('没保存成功') + (code ? '（' + saveFailText(code) + '）' : '') + '，改动还在内存里', actions || []);
 }
 function saveResultFailed(r, fallback){
   bizSaveFailed((r && r.code) || fallback, [], null, true);
@@ -929,6 +938,295 @@ function openSheet(html){
 }
 function closeSheet(){ $('mask').classList.remove('on'); }
 
+/* 选择器的独立浮层：不能复用 #sheet，否则会把正在编辑的表单顶掉 */
+var OLPickLayer = (function(){
+  function layer(){
+    var l = document.getElementById('olPickMask');
+    if(l) return l;
+    l = document.createElement('div');
+    l.id = 'olPickMask';
+    l.className = 'mask pk';
+    l.innerHTML = '<div class="sheet"><div class="handle"></div><div id="olPickBody"></div></div>';
+    document.body.appendChild(l);
+    return l;
+  }
+  function open(html){
+    var l = layer();
+    l.querySelector('#olPickBody').innerHTML = html;
+    l.classList.add('on');
+    l.querySelector('.sheet').scrollTop = 0;
+    return l.querySelector('#olPickBody');
+  }
+  function close(){
+    var l = document.getElementById('olPickMask');
+    if(l) l.classList.remove('on');
+  }
+  return { open: open, close: close };
+})();
+
+/* ==================== 时间输入：滚轮选择 ====================
+   浏览器自带的 type="time" 桌面是弹窗、iPhone 是系统滚轮，长相和操作都不一致，
+   这里统一成两列滚轮：点输入框打开弹层，滚到哪就是哪。
+   输入框还是普通 <input>，值仍是 "HH:MM"，读取方式不变。 */
+var OLTimePicker = (function(){
+  var ITEM = 36, PAD = 72;
+  var HOURS = [], MINS = [];
+  for(var hh = 0; hh < 24; hh++) HOURS.push(pad2(hh));
+  for(var mm = 0; mm < 60; mm++) MINS.push(pad2(mm));
+  var CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.6V12l3.1 1.9"/></svg>';
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function parse(v){
+    var m = /^(\d{1,2}):(\d{1,2})$/.exec(String(v == null ? '' : v).trim());
+    if(!m) return null;
+    var h = +m[1], mi = +m[2];
+    return (h < 24 && mi < 60) ? { h: h, m: mi } : null;
+  }
+  function nowHM(){ var d = new Date(); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
+  function colHtml(list, idx){
+    var s = '<div class="tp-pad"></div>';
+    for(var i = 0; i < list.length; i++){
+      s += '<div class="tp-item' + (i === idx ? ' on' : '') + '" data-i="' + i + '">' + list[i] + '</div>';
+    }
+    return s + '<div class="tp-pad"></div>';
+  }
+
+  /* 一列：滚动停稳后取最近的一格，并把位置吸附过去 */
+  function bindCol(col, onChange){
+    var timer = null;
+    function items(){ return col.querySelectorAll('.tp-item'); }
+    function paint(i){
+      var list = items();
+      for(var k = 0; k < list.length; k++) list[k].classList.toggle('on', k === i);
+      onChange(i);
+    }
+    function settle(){
+      var list = items();
+      var i = Math.round(col.scrollTop / ITEM);
+      i = Math.max(0, Math.min(list.length - 1, i));
+      paint(i);
+      var target = i * ITEM;
+      if(Math.abs(col.scrollTop - target) > 1) col.scrollTop = target;
+    }
+    col.addEventListener('scroll', function(){
+      clearTimeout(timer);
+      timer = setTimeout(settle, 90);
+    }, { passive: true });
+    col.addEventListener('click', function(e){
+      var it = e.target.closest ? e.target.closest('.tp-item') : null;
+      if(!it) return;
+      var i = +it.dataset.i;
+      if(col.scrollTo) col.scrollTo({ top: i * ITEM, behavior: 'smooth' });
+      else col.scrollTop = i * ITEM;
+      paint(i);
+    });
+    return settle;
+  }
+
+  function fire(input){
+    try{
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }catch(e){}
+  }
+
+  function open(input, opts){
+    opts = opts || {};
+    var cur = parse(input.value) || parse(nowHM());
+    var picked = { h: cur.h, m: cur.m };
+    var body = OLPickLayer.open(
+      '<div class="shd"><div class="shd-t">' + OLT('选择时间') + '</div></div>' +
+      '<div class="tp-head"><span>' + OLT('时') + '</span><span>' + OLT('分') + '</span></div>' +
+      '<div class="tp-wheel">' +
+        '<div class="tp-col" id="tpHour">' + colHtml(HOURS, cur.h) + '</div>' +
+        '<div class="tp-col" id="tpMin">' + colHtml(MINS, cur.m) + '</div>' +
+      '</div>' +
+      (opts.allowEmpty ? '<button class="tp-clear" id="tpClear">' + OLT('清空') + '</button>' : '') +
+      '<div class="acts"><button class="btn g" id="tpNo">' + OLT('取消') + '</button>' +
+      '<button class="btn p" id="tpOk">' + OLT('确定') + '</button></div>'
+    );
+    var hCol = body.querySelector('#tpHour'), mCol = body.querySelector('#tpMin');
+    var hSettle = bindCol(hCol, function(i){ picked.h = i; });
+    var mSettle = bindCol(mCol, function(i){ picked.m = i; });
+    /* 打开时直接定位，不要从 00 滚上来 */
+    requestAnimationFrame(function(){
+      hCol.scrollTop = cur.h * ITEM;
+      mCol.scrollTop = cur.m * ITEM;
+    });
+    body.querySelector('#tpNo').addEventListener('click', function(){
+      hSettle(); mSettle();
+      OLPickLayer.close();
+    });
+    if(opts.allowEmpty){
+      body.querySelector('#tpClear').addEventListener('click', function(){
+        input.value = '';
+        OLPickLayer.close();
+        fire(input);
+      });
+    }
+    body.querySelector('#tpOk').addEventListener('click', function(){
+      input.value = pad2(picked.h) + ':' + pad2(picked.m);
+      OLPickLayer.close();
+      fire(input);
+    });
+  }
+
+  /* 把现有 <input type="time"> 换成点了就开滚轮的输入框 */
+  function attach(input, opts){
+    if(!input || input.__olTp) return input;
+    input.__olTp = true;
+    input.readOnly = true;
+    input.setAttribute('type', 'text');
+    input.setAttribute('inputmode', 'none');
+    input.setAttribute('autocomplete', 'off');
+    if(input.parentNode){
+      var box = el('div', 'tp-field');
+      input.parentNode.insertBefore(box, input);
+      box.appendChild(input);
+      var ico = el('span', 'tp-ico');
+      ico.innerHTML = CLOCK;
+      box.appendChild(ico);
+    }
+    input.addEventListener('click', function(e){
+      e.preventDefault();
+      open(input, opts || {});
+    });
+    input.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); open(input, opts || {}); }
+    });
+    return input;
+  }
+
+  return { attach: attach, open: open, now: nowHM };
+})();
+
+/* ==================== 日期输入：月历选择 ====================
+   原生 type="date" 各浏览器长相不一，这里统一成月历弹层：翻月、点日、确定。
+   输入框还是普通 <input>，值仍是 "YYYY-MM-DD"，读取方式不变。 */
+var OLDatePicker = (function(){
+  var WD = ['日', '一', '二', '三', '四', '五', '六'];
+  var ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.7" y="5.3" width="16.6" height="15" rx="2.6"/><path d="M8 3.5v3.4M16 3.5v3.4M3.7 10.1h16.6"/></svg>';
+
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function parse(v){
+    var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(v == null ? '' : v).trim());
+    if(!m) return null;
+    var o = { y: +m[1], m: +m[2], d: +m[3] };
+    if(o.m < 1 || o.m > 12 || o.d < 1 || o.d > 31) return null;
+    if(o.d > new Date(o.y, o.m, 0).getDate()) return null;
+    return o;
+  }
+  function key(o){ return o.y + '-' + pad2(o.m) + '-' + pad2(o.d); }
+  function todayObj(){
+    var t = String(TODAY()).split('-');
+    return { y: +t[0], m: +t[1], d: +t[2] };
+  }
+  function same(a, b){ return !!a && !!b && a.y === b.y && a.m === b.m && a.d === b.d; }
+
+  function cellsHtml(view, sel){
+    var today = todayObj();
+    var first = new Date(view.y, view.m - 1, 1).getDay();
+    var len = new Date(view.y, view.m, 0).getDate();
+    var out = [];
+    for(var i = 0; i < first; i++) out.push('<span class="dp-cell mute"></span>');
+    for(var d = 1; d <= len; d++){
+      var cls = 'dp-cell';
+      if(same(sel, { y: view.y, m: view.m, d: d })) cls += ' on';
+      else if(same(today, { y: view.y, m: view.m, d: d })) cls += ' today';
+      out.push('<button class="' + cls + '" data-d="' + d + '">' + d + '</button>');
+    }
+    return out.join('');
+  }
+
+  function fire(input){
+    try{
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }catch(e){}
+  }
+
+  function open(input, opts){
+    opts = opts || {};
+    var cur = parse(input.value) || todayObj();
+    var sel = { y: cur.y, m: cur.m, d: cur.d };
+    var view = { y: cur.y, m: cur.m };
+    var body = OLPickLayer.open(
+      '<div class="shd"><div class="shd-t">' + OLT('选择日期') + '</div></div>' +
+      '<div class="dp-head"><button class="dp-nav" id="dpPrev">‹</button>' +
+        '<div class="dp-title" id="dpTitle"></div>' +
+        '<button class="dp-nav" id="dpNext">›</button></div>' +
+      '<div class="dp-wd">' + WD.map(function(w){ return '<span>' + w + '</span>'; }).join('') + '</div>' +
+      '<div class="dp-grid" id="dpGrid"></div>' +
+      '<div class="dp-quick"><button class="tp-clear" id="dpToday">' + OLT('今天') + '</button>' +
+        (opts.allowEmpty ? '<button class="tp-clear" id="dpClear">' + OLT('清空') + '</button>' : '') + '</div>' +
+      '<div class="acts"><button class="btn g" id="dpNo">' + OLT('取消') + '</button>' +
+        '<button class="btn p" id="dpOk">' + OLT('确定') + '</button></div>'
+    );
+    var title = body.querySelector('#dpTitle');
+    var grid = body.querySelector('#dpGrid');
+    function paint(){
+      title.textContent = view.y + ' 年 ' + view.m + ' 月';
+      grid.innerHTML = cellsHtml(view, sel);
+    }
+    function shift(n){
+      var m = view.m + n, y = view.y;
+      if(m < 1){ m = 12; y--; }
+      if(m > 12){ m = 1; y++; }
+      view = { y: y, m: m };
+      paint();
+    }
+    body.querySelector('#dpPrev').addEventListener('click', function(){ shift(-1); });
+    body.querySelector('#dpNext').addEventListener('click', function(){ shift(1); });
+    grid.addEventListener('click', function(e){
+      var c = e.target.closest ? e.target.closest('.dp-cell') : null;
+      if(!c || !c.dataset.d) return;
+      sel = { y: view.y, m: view.m, d: +c.dataset.d };
+      paint();
+    });
+    body.querySelector('#dpToday').addEventListener('click', function(){
+      sel = todayObj(); view = { y: sel.y, m: sel.m }; paint();
+    });
+    if(opts.allowEmpty){
+      body.querySelector('#dpClear').addEventListener('click', function(){
+        input.value = ''; OLPickLayer.close(); fire(input);
+      });
+    }
+    body.querySelector('#dpNo').addEventListener('click', closeSheet);
+    body.querySelector('#dpOk').addEventListener('click', function(){
+      input.value = key(sel); OLPickLayer.close(); fire(input);
+    });
+    paint();
+  }
+
+  function attach(input, opts){
+    if(!input || input.__olDp || input.disabled) return input;
+    input.__olDp = true;
+    input.readOnly = true;
+    input.setAttribute('type', 'text');
+    input.setAttribute('inputmode', 'none');
+    input.setAttribute('autocomplete', 'off');
+    if(input.parentNode){
+      var box = el('div', 'tp-field');
+      input.parentNode.insertBefore(box, input);
+      box.appendChild(input);
+      var ico = el('span', 'tp-ico');
+      ico.innerHTML = ICON;
+      box.appendChild(ico);
+    }
+    input.addEventListener('click', function(e){
+      e.preventDefault();
+      open(input, opts || {});
+    });
+    input.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); open(input, opts || {}); }
+    });
+    return input;
+  }
+
+  return { attach: attach, open: open };
+})();
+
 /* ==================== 统一记录弹层 ====================
    健身 / 学习 / 手账共用同一套版式：标题 → 日期时间 → 快捷时长 → 时长+补充 → 标签 → 备注 → 按钮
    cfg: title sub date time minutes(false 隐藏) minutesLabel extra{label,value,placeholder}
@@ -984,6 +1282,8 @@ function openLogSheet(cfg){
     '<button class="btn g" id="lgNo">取消</button><button class="btn p" id="lgOk">' + esc(cfg.okText || '保存') + '</button></div>';
 
   var body = openSheet(html);
+  if(OLTimePicker && body.querySelector('#lgTime')) OLTimePicker.attach(body.querySelector('#lgTime'), { allowEmpty: true });
+  if(OLDatePicker && body.querySelector('#lgDate')) OLDatePicker.attach(body.querySelector('#lgDate'), { allowEmpty: false });
   var minEl = body.querySelector('#lgMin');
   var qk = body.querySelector('#lgQuick');
   if(qk && minEl){
@@ -1084,7 +1384,7 @@ function writeBackupFile(data){
   a.download = 'earthonline-' + todayReal() + '.json';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
-  toast('已导出备份');
+  toast(OLT('已导出备份'));
 }
 
 /* idb 模式：导出必须等于 IndexedDB 里已持久化的数据，不能夹带内存中未保存的改动。
@@ -1119,7 +1419,7 @@ function readExportSource(onOk, onFail){
 }
 
 function exportFromIdb(){
-  readExportSource(writeBackupFile, function(msg){ toast('导出失败：' + msg + '，未生成备份'); });
+  readExportSource(writeBackupFile, function(msg){ toast(OLT('导出失败：') + msg + '，未生成备份'); });
 }
 
 function exportJSON(){
@@ -1217,10 +1517,10 @@ function importConfig(){
 
 function importConfigStart(fileObj){
   var CIO = window.OLConfigIO;
-  if(!CIO || typeof CIO.parseConfigFile !== 'function'){ toast('导入失败：配置模块未加载'); return; }
+  if(!CIO || typeof CIO.parseConfigFile !== 'function'){ toast(OLT('导入失败：配置模块未加载')); return; }
   var MAXB = CIO.MAX_IMPORT_CHARS || (2 * 1024 * 1024);
   if(typeof fileObj.size === 'number' && fileObj.size > MAXB){
-    toast('导入失败：文件太大（上限约 2MB），已拒绝'); return;
+    toast(OLT('导入失败：文件太大（上限约 2MB），已拒绝')); return;
   }
   CI_STATE.reading = true;
   var fr = new FileReader();
@@ -1230,10 +1530,10 @@ function importConfigStart(fileObj){
   };
   fr.onerror = function(){
     CI_STATE.reading = false;
-    toast('导入失败：文件读不出来');
+    toast(OLT('导入失败：文件读不出来'));
   };
   try{ fr.readAsText(fileObj); }
-  catch(e){ CI_STATE.reading = false; toast('导入失败：文件读不出来'); }
+  catch(e){ CI_STATE.reading = false; toast(OLT('导入失败：文件读不出来')); }
 }
 
 function importConfigPreview(text, fileName){
@@ -1242,7 +1542,7 @@ function importConfigPreview(text, fileName){
     pluginIds: defaultPlugins().map(function(p){ return p.id; })
   });
   if(!parsed.ok){
-    toast('导入失败：' + parsed.message + '，本机没有任何改动');
+    toast(OLT('导入失败：') + parsed.message + '，本机没有任何改动');
     return;
   }
   CI_STATE.file = parsed.file;
@@ -1251,13 +1551,13 @@ function importConfigPreview(text, fileName){
   if(bizWriteBlocked()){
     /* idb：基线必须来自已持久化数据，不能拿可能含未保存改动的内存 S */
     if(window.OLBoot && typeof OLBoot.hasUnsavedSnapshot === 'function' && OLBoot.hasUnsavedSnapshot()){
-      toast('导入失败：有一份未处理的恢复副本，先在顶部横幅里处理它'); return;
+      toast(OLT('导入失败：有一份未处理的恢复副本，先在顶部横幅里处理它')); return;
     }
     readConfigSource(function(data, meta){
       var local = CIO.buildConfigPayload(data);
       ciEnterPreview('idb', local, meta && typeof meta.bizRev === 'number' ? meta.bizRev : null);
     }, function(msg){
-      toast('导入失败：' + msg + '，本机没有任何改动');
+      toast(OLT('导入失败：') + msg + '，本机没有任何改动');
     });
   } else {
     ciEnterPreview('legacy', CIO.buildConfigPayload(S), null);
@@ -1274,7 +1574,7 @@ function ciPluginNames(){
 function ciEnterPreview(mode, local, baselineRev){
   var CIO = window.OLConfigIO;
   var preview = CIO.previewConfigImport(local, CI_STATE.file.config, { pluginNames: ciPluginNames() });
-  if(!preview || preview.ok !== true){ toast('导入失败：预览计算失败，本机没有任何改动'); return; }
+  if(!preview || preview.ok !== true){ toast(OLT('导入失败：预览计算失败，本机没有任何改动')); return; }
   CI_STATE.mode = mode;
   CI_STATE.preview = preview;
   CI_STATE.baselineRev = baselineRev;
@@ -1403,24 +1703,24 @@ function confirmConfigImport(){
   for(var i = 0; i < st.preview.conflicts.length; i++){
     var key = st.preview.conflicts[i].key;
     if(st.choices[key] !== 'local' && st.choices[key] !== 'incoming'){
-      toast('还有冲突没选好，每一条都要选'); return;
+      toast(OLT('还有冲突没选好，每一条都要选')); return;
     }
   }
   /* 无实际变化（全部冲突保留本机且无新增/设置/插件变化）：不提交、不动 bizRev */
   if(!window.OLConfigIO.previewHasEffectiveChange(st.preview, st.choices)){
-    toast('没有要导入的变更，本机没有任何改动');
+    toast(OLT('没有要导入的变更，本机没有任何改动'));
     closeSheet();
     st.file = null; st.preview = null; st.choices = {};
     return;
   }
   if(st.mode === 'legacy'){
     var res = OLConfigIO.applyResolutions(st.preview, st.choices);
-    if(!res){ toast('导入失败：合并结果异常'); return; }
+    if(!res){ toast(OLT('导入失败：合并结果异常')); return; }
     applyConfigImport(res.merged);
     closeSheet();
     st.file = null; st.preview = null; st.choices = {};
-    var okL = save(function(){ toast('配置已导入'); });
-    if(!okL) toast('导入没存上，再试一次');
+    var okL = save(function(){ toast(OLT('配置已导入')); });
+    if(!okL) toast(OLT('导入没存上，再试一次'));
     return;
   }
   /* idb：确认时复核 队列空闲 / writer 仍有效 / bizRev 未变 */
@@ -1428,40 +1728,40 @@ function confirmConfigImport(){
   var qs = (Q && typeof Q.status === 'function') ? Q.status() : null;
   if(!Q || !W || typeof W.readBizRev !== 'function' || !W.wired ||
      !qs || qs.state !== 'idle' || qs.inFlight || qs.pending || qs.recoveringJob){
-    toast('当前保存还没就绪（队列忙或写入未接线），稍后再确认'); return;
+    toast(OLT('当前保存还没就绪（队列忙或写入未接线），稍后再确认')); return;
   }
   if(st.reading) return;
   st.reading = true;
   W.readBizRev().then(function(rr){
     st.reading = false;
-    if(!rr || rr.ok !== true){ toast('导入失败：读不到当前版本号，请重试'); return; }
+    if(!rr || rr.ok !== true){ toast(OLT('导入失败：读不到当前版本号，请重试')); return; }
     if(st.baselineRev !== null && rr.rev !== st.baselineRev){
       /* 预览已过期：重读库、重算预览、要求再次确认；绝不用旧预览覆盖新状态 */
       readConfigSource(function(data, meta){
         var local = OLConfigIO.buildConfigPayload(data);
         var p2 = OLConfigIO.previewConfigImport(local, st.file.config, { pluginNames: ciPluginNames() });
-        if(!p2 || p2.ok !== true){ toast('导入失败：重算预览失败'); return; }
+        if(!p2 || p2.ok !== true){ toast(OLT('导入失败：重算预览失败')); return; }
         CI_STATE.preview = p2;
         CI_STATE.baselineRev = (meta && typeof meta.bizRev === 'number') ? meta.bizRev : null;
         renderImportSheetBody();
-        toast('本机数据在这期间有变化，预览已重算，请再确认一次');
+        toast(OLT('本机数据在这期间有变化，预览已重算，请再确认一次'));
       }, function(msg){
-        toast('重算预览失败：' + msg);
+        toast(OLT('重算预览失败：') + msg);
       });
       return;
     }
     var res2 = OLConfigIO.applyResolutions(st.preview, st.choices);
-    if(!res2){ toast('导入失败：合并结果异常'); return; }
+    if(!res2){ toast(OLT('导入失败：合并结果异常')); return; }
     st.submitting = true;
     /* 同一个 JS 回合内完成：改 S → 入队（快照克隆）→ CAS 提交，中间无等待点 */
     applyConfigImport(res2.merged);
     closeSheet();
     st.file = null; st.preview = null; st.choices = {}; st.submitting = false;
-    var ok = save(function(){ toast('配置已导入并保存'); });
-    if(!ok) toast('导入没存上（队列拒绝了这次提交）');
+    var ok = save(function(){ toast(OLT('配置已导入并保存')); });
+    if(!ok) toast(OLT('导入没存上（队列拒绝了这次提交）'));
   }, function(){
     st.reading = false;
-    toast('导入失败：读不到当前版本号，请重试');
+    toast(OLT('导入失败：读不到当前版本号，请重试'));
   });
 }
 
@@ -1576,7 +1876,7 @@ function buildTableRows(D){
 function writeTableFile(D){
   var rows;
   try{ rows = buildTableRows(D); }
-  catch(e){ toast('导出失败：整理记录时出错，未生成表格'); return; }
+  catch(e){ toast(OLT('导出失败：整理记录时出错，未生成表格')); return; }
   var lines = [['日期', '类别', '内容', '补充']].concat(rows).map(function(r){
     return r.map(tableCsvCell).join(',');
   });
@@ -1588,14 +1888,14 @@ function writeTableFile(D){
   a.download = 'earthonline-表格-' + todayReal() + '.csv';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
-  toast('已导出表格');
+  toast(OLT('已导出表格'));
 }
 
 function exportTable(){
   /* 与 JSON 备份共用同一个 idb 判据和同一条只读取数路径：
      本地库里已保存的数据才进表格，读失败就报错且不生成文件。 */
   if(bizWriteBlocked()){
-    readExportSource(writeTableFile, function(msg){ toast('导出失败：' + msg + '，未生成表格'); });
+    readExportSource(writeTableFile, function(msg){ toast(OLT('导出失败：') + msg + '，未生成表格'); });
     return;
   }
   writeTableFile(S);
@@ -1612,9 +1912,9 @@ function importJSON(){
     var fr = new FileReader();
     fr.onload = function(){
       var parsed = null;
-      try{ parsed = JSON.parse(fr.result); }catch(e){ toast('这个文件读不出来'); return; }
+      try{ parsed = JSON.parse(fr.result); }catch(e){ toast(OLT('这个文件读不出来')); return; }
       var data = parsed && parsed.data ? parsed.data : parsed;
-      if(!data || typeof data !== 'object' || !Array.isArray(data.tasks)){ toast('不像是备份文件'); return; }
+      if(!data || typeof data !== 'object' || !Array.isArray(data.tasks)){ toast(OLT('不像是备份文件')); return; }
       var n = 0;
       ['tasks','marks','tagLogs','workouts','studyLogs','decisionLog'].forEach(function(k){
         if(Array.isArray(data[k])) n += data[k].length;
@@ -1629,7 +1929,7 @@ function importJSON(){
           S = defaults();
           deepMerge(S, data);
           normalize();
-          save(); renderAll(); toast('已恢复');
+          save(); renderAll(); toast(OLT('已恢复'));
         }
       });
     };
@@ -1874,11 +2174,15 @@ function openPdfPanel(){
     '</div>' +
     '<div class="acts"><button class="btn g" id="pdfCancel">取消</button><button class="btn p" id="pdfMake">生成预览</button></div>'
   );
+  if(OLDatePicker){
+    OLDatePicker.attach(body.querySelector('#pdfFrom'));
+    OLDatePicker.attach(body.querySelector('#pdfTo'));
+  }
   body.querySelector('#pdfCancel').addEventListener('click', closeSheet);
   body.querySelector('#pdfMake').addEventListener('click', function(){
     var from = body.querySelector('#pdfFrom').value || addDays(TODAY(), -30);
     var to = body.querySelector('#pdfTo').value || TODAY();
-    if(from > to){ toast('开始日期要在结束日期前面'); return; }
+    if(from > to){ toast(OLT('开始日期要在结束日期前面')); return; }
     closeSheet();
     setTimeout(function(){
       buildPdfReport(from, to, {
