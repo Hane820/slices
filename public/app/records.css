@@ -5,7 +5,7 @@
   padding:15px 17px;font-family:inherit;cursor:pointer;box-shadow:var(--sh1);margin-bottom:14px;
   transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .4s var(--ease)}
 .item-cur:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:#E2D8C6}
-.item-cur .ic-n{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:600;color:var(--ink);letter-spacing:1px}
+.item-cur .ic-n{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:700;color:var(--ink);letter-spacing:1px}
 .item-cur .ic-a{font-size:12px;color:var(--ink3);white-space:nowrap}
 
 /* ---------- 时间轴 ---------- */
@@ -15,7 +15,7 @@
 .tl-item::before{content:"";position:absolute;left:-19px;top:7px;width:8px;height:8px;border-radius:50%;background:var(--paper);border:1.6px solid #D7CDBC}
 .tl-item.today::before{background:var(--sage);border-color:var(--sage)}
 .tl-h{display:flex;align-items:baseline;gap:8px;margin-bottom:7px;cursor:pointer}
-.tl-date{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:600;letter-spacing:.3px}
+.tl-date{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:700;letter-spacing:.3px}
 .tl-wd{font-size:11px;color:var(--ink3)}
 .tl-n{margin-left:auto;font-size:10.5px;color:var(--ink3);letter-spacing:.5px}
 .tl-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:4px 13px;box-shadow:var(--sh1)}
@@ -33,7 +33,7 @@
 .mmeta{font-size:11px;color:var(--ink3);margin-top:5px}
 .mnav{display:flex;gap:6px}
 .mnav button{
-  width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:10px;color:var(--ink2);
+  width:34px;height:34px;border:1px solid var(--line);background:var(--paper);border-radius:10px;color:var(--ink2);
   font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;
 }
 .mnav button:active{background:var(--paper2)}
