@@ -116,9 +116,6 @@ function renderSettings(){
     gl.appendChild(r);
   });
 
-  // 决策情况（自定义）
-  renderSceneSet();
-
   // 其它
   var ob = $('otherSet');
   ob.innerHTML = '';
@@ -138,18 +135,19 @@ function renderSettings(){
   // 外观：主题色（莫兰迪预设）+ 全局字号（滑杆，自由选，不搞大中小）
   var lb = $('lookSet');
   lb.innerHTML = '';
+  /* [键, 名称, 主色, 背景色, 深色锚点/主色/次级面/点缀色] —— 预览直接展示整条色板 */
   var THEME_LIST = [
-    ['default', '灰绿', '#6F8F7E', '#FAF7F1'],
-    ['mist', '雾霾蓝', '#61728D', '#F7F8FB'],
-    ['clay', '陶土橘', '#B7715F', '#FAF5F1'],
-    ['matcha', '抹茶绿', '#5C7561', '#F6FAF6'],
-    ['lotus', '藕荷紫', '#8E7A8E', '#F9F7F9'],
-    ['warm', '暖米灰', '#6A5D57', '#F9F6F3']
+    ['default', '青绿冰茶', '#6E9B80', '#F6F8F3', ['#2B3A31','#6E9B80','#EAF1E7','#A8C8BE']],
+    ['mist', '海盐奶盖', '#7186B2', '#F7F6FA', ['#2F3448','#7186B2','#EAEAF4','#C795A4']],
+    ['clay', '橘子汽水', '#C1795C', '#FDF8F1', ['#392D27','#C1795C','#F7EDE0','#7FA596']],
+    ['matcha', '咸柠汽水', '#8BA663', '#F8F9EF', ['#30382B','#8BA663','#F0F4E2','#8FB7A2']],
+    ['lotus', '草莓奶霜', '#B96A85', '#FCF5F8', ['#3A2B33','#B96A85','#F8EAF0','#8FC2B8']],
+    ['warm', '小茶狐狸', '#9C6B52', '#FAF7F3', ['#352D28','#9C6B52','#F3EDE5','#8FA993']]
   ];
   var trow = el('div','row');
   var trowm = el('div','row-main');
   trowm.appendChild(el('div','row-t',OLT('主题色')));
-  trowm.appendChild(el('div','row-s',OLT('莫兰迪色系，点一个全局换色')));
+  trowm.appendChild(el('div','row-s',OLT('一套四层配色，点一个全局换色')));
   trow.appendChild(trowm);
   lb.appendChild(trow);
   var tgrid = el('div','themes');
@@ -157,7 +155,9 @@ function renderSettings(){
     var cur = (S.settings.theme || 'default') === t[0];
     var sw = el('button','theme-sw' + (cur ? ' on' : ''));
     sw.style.background = t[3];
-    sw.innerHTML = '<i style="background:' + t[2] + '"></i><b>' + t[1] + '</b>' + (cur ? '<span class="ck">✓</span>' : '');
+    var band = t[4].map(function(c, i){ return c + ' ' + (i * 25) + '%,' + c + ' ' + ((i + 1) * 25) + '%'; }).join(',');
+    sw.innerHTML = '<span class="sw-band" style="background:linear-gradient(90deg,' + band + ')"></span>' +
+      '<i style="background:' + t[2] + '"></i><b>' + t[1] + '</b>' + (cur ? '<span class="ck">✓</span>' : '');
     sw.addEventListener('click', function(){
       if(S.settings.theme === t[0]) return;
       S.settings.theme = t[0];
@@ -561,43 +561,7 @@ function openFocusEdit(it, isNew){
    内置情境是系统项——不可删除、缺失自动补回，可改名/停用；
    删除自定义情况不级联删除历史决策记录（记录存的是 id，展示也不查这里）。
    全部改动走 save() 串行队列，不碰其他业务数据。 */
-function renderSceneSet(){
-  var box = $('sceneSet');
-  if(!box) return;
-  box.innerHTML = '';
-  var list = allScenes();
-  if(!list.length){
-    var empty = el('div', 'row');
-    var em = el('div', 'row-main');
-    em.appendChild(el('div', 'row-t', OLT('还没有情况')));
-    em.appendChild(el('div', 'row-s', OLT('点右上角「+ 新建」加一个')));
-    empty.appendChild(em);
-    box.appendChild(empty);
-    return;
-  }
-  list.forEach(function(sc, i){
-    var r = el('div', 'row');
-    var m = el('div', 'row-main');
-    m.appendChild(el('div', 'row-t', sc.name + (sc.sys ? '（系统）' : '') + (sc.enabled ? '' : '（停用）')));
-    m.appendChild(el('div', 'row-s', sc.desc || ''));
-    r.appendChild(m);
-    var acts = el('div', 'row-a');
-    if(i > 0){
-      var up = el('span', 'sc-move', '↑');
-      up.addEventListener('click', function(e){ e.stopPropagation(); sceneMove(sc.id, -1); });
-      acts.appendChild(up);
-    }
-    if(i < list.length - 1){
-      var dn = el('span', 'sc-move', '↓');
-      dn.addEventListener('click', function(e){ e.stopPropagation(); sceneMove(sc.id, 1); });
-      acts.appendChild(dn);
-    }
-    r.appendChild(acts);
-    r.addEventListener('click', function(){ openSceneEdit(sc.id); });
-    box.appendChild(r);
-  });
-}
-function sceneMove(id, dir){
+function sceneMove(id, dir, onDone){
   if(!Array.isArray(S.scenes)) return;
   var i = -1;
   S.scenes.forEach(function(sc, j){ if(sc && sc.id === id) i = j; });
@@ -608,8 +572,9 @@ function sceneMove(id, dir){
   save(function(){ toast(OLT('顺序调好了')); });
   renderSettings();
   if(typeof renderScenes === 'function') renderScenes();
+  if(typeof onDone === 'function') onDone();
 }
-function openSceneEdit(id){
+function openSceneEdit(id, onDone){
   var isNew = !id;
   var sc = isNew ? null : byId(S.scenes, id);
   if(!isNew && !sc) return;
@@ -642,6 +607,7 @@ function openSceneEdit(id){
     closeSheet();
     renderSettings();
     if(typeof renderScenes === 'function') renderScenes();
+  if(typeof onDone === 'function') onDone();
   });
   var delBtn = body.querySelector('#scDel');
   if(delBtn) delBtn.addEventListener('click', function(){
@@ -658,6 +624,7 @@ function openSceneEdit(id){
       closeSheet();
       renderSettings();
       if(typeof renderScenes === 'function') renderScenes();
+  if(typeof onDone === 'function') onDone();
     });
   });
 }

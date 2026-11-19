@@ -110,9 +110,9 @@
 .lib-item:first-child{border-top:none}
 .lib-h{display:flex;align-items:center;gap:8px}
 .lib-t{font-size:13.5px;flex:1;min-width:0;line-height:1.4}
-.lib-item.off .lib-t{color:var(--ink3);text-decoration:line-through;text-decoration-color:#DED5C6}
+.lib-item.off .lib-t{color:var(--ink3);text-decoration:line-through;text-decoration-color:var(--line)}
 .lib-d{font-size:10.5px;color:var(--ink3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.lib-search{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 12px;font-family:inherit;font-size:16px;color:var(--ink);outline:none;margin-bottom:9px}
+.lib-search{width:100%;border:1px solid var(--line);background:var(--paper);border-radius:11px;padding:10px 12px;font-family:inherit;font-size:16px;color:var(--ink);outline:none;margin-bottom:9px}
 .lib-search:focus{border-color:var(--sage)}
 .lib-search::placeholder{font-size:13px;color:var(--ink3)}
 
@@ -157,3 +157,31 @@
   background:var(--paper2);border:1px solid var(--line2);border-radius:100px;
   padding:3px 9px;color:var(--ink2);font-size:10.5px;
 }
+
+/* 情景管理：与正常决策同一张卡片，换色 + 管理列表，一眼能分清模式 */
+.ask-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ask.editing{border-color:rgba(var(--sage-rgb),.42);background:var(--sage-l)}
+.ask.editing .ask-t{color:var(--sage-d)}
+.scm-h{display:flex;align-items:center;justify-content:space-between;margin:12px 0 2px}
+.scm-h .scm-t{font-size:13px;font-weight:600;color:var(--sage-d)}
+.scm-row{
+  display:flex;align-items:center;gap:10px;padding:9px 0;
+  border-bottom:1px solid var(--line);
+}
+.scm-row:last-of-type{border-bottom:none}
+.scm-m{flex:1;min-width:0}
+.scm-n{font-size:13px;font-weight:600;color:var(--ink);line-height:1.5}
+.scm-d{font-size:10.5px;color:var(--ink3);line-height:1.6;margin-top:2px;word-break:break-all}
+.scm-tag{
+  display:inline-block;margin-left:6px;padding:0 5px;border-radius:5px;
+  background:var(--paper2);color:var(--ink3);font-size:9.5px;font-weight:400;vertical-align:1px;
+}
+.scm-a{flex:none;display:flex;gap:10px}
+.scm-b{font-size:11.5px;color:var(--sage-d);cursor:pointer;white-space:nowrap;padding:2px 0}
+.scm-b:active{color:var(--ink)}
+.scm-add{
+  text-align:center;font-size:12px;color:var(--sage-d);cursor:pointer;
+  padding:10px 0 2px;letter-spacing:.5px;
+}
+.scm-add:active{color:var(--ink)}
+.scm-none{font-size:11.5px;color:var(--ink3);padding:14px 0 4px;text-align:center}

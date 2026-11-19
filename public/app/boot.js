@@ -139,7 +139,6 @@ $('thisM').addEventListener('click', function(){
 
 // 设置页
 $('addPen').addEventListener('click', function(){ openPenEdit(null); });
-$('addScene').addEventListener('click', function(){ openSceneEdit(null); });
 $('addTag').addEventListener('click', function(){
   openModal({
     title:'新建标签', sub:'点一下记一次，用来数频率', input:true, placeholder:'比如「晒了太阳」', okText:'加上',
@@ -214,18 +213,18 @@ function bootBlocked(title, detail){
   var ov = document.createElement('div');
   ov.className = 'boot-block';
   ov.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:9999;'
-    + 'background:#f6f5f0;color:#191918;display:flex;align-items:center;justify-content:center;padding:2rem;';
+    + 'background:var(--paper2);color:var(--ink);display:flex;align-items:center;justify-content:center;padding:2rem;';
   var card = document.createElement('div');
-  card.style.cssText = 'max-width:30rem;border:1px solid #d8d6cc;padding:2rem 2.2rem;background:#f6f5f0;';
+  card.style.cssText = 'max-width:30rem;border:1px solid var(--line);padding:2rem 2.2rem;background:var(--paper);';
   var h = document.createElement('h2');
   h.style.cssText = 'margin:0 0 .8rem;font-size:1.4rem;letter-spacing:-.02em;';
   h.textContent = title;
   var p = document.createElement('p');
-  p.style.cssText = 'margin:0 0 1.4rem;color:#77766f;font-size:.92rem;line-height:1.6;word-break:break-all;';
+  p.style.cssText = 'margin:0 0 1.4rem;color:var(--ink2);font-size:.92rem;line-height:1.6;word-break:break-all;';
   p.textContent = detail || '';
   var b = document.createElement('button');
   b.textContent = '刷新重试';
-  b.style.cssText = 'padding:.6rem 1.2rem;border:1px solid #191918;background:none;color:#191918;cursor:pointer;font:inherit;';
+  b.style.cssText = 'padding:.6rem 1.2rem;border:1px solid var(--ink);background:none;color:var(--ink);cursor:pointer;font:inherit;';
   b.addEventListener('click', function(){ location.reload(); });
   card.appendChild(h); card.appendChild(p); card.appendChild(b);
   ov.appendChild(card);
@@ -733,10 +732,10 @@ function bootWriter(){
     conflicts.forEach(function(c, i){
       function brief(v){ if(v === undefined || v === null) return '（已删除 / 无）';
         var s = JSON.stringify(v); return s.length > 120 ? s.slice(0, 117) + '…' : s; }
-      html += '<div class="field" style="border-top:1px solid #e5e3da;padding-top:10px;margin-top:10px">' +
+      html += '<div class="field" style="border-top:1px solid var(--line);padding-top:10px;margin-top:10px">' +
         '<div class="field-l">' + esc(c.owner + (c.key !== null && c.key !== undefined ? ' · ' + c.key : '')) + '（' + esc(c.kind) + '）</div>' +
-        '<div style="font:400 11px/1.6 ui-monospace,Menlo,monospace;color:#77766f;word-break:break-all">本机：' + esc(brief(c.local)) + '</div>' +
-        '<div style="font:400 11px/1.6 ui-monospace,Menlo,monospace;color:#77766f;word-break:break-all">最新：' + esc(brief(c.remote)) + '</div>' +
+        '<div style="font:400 11px/1.6 ui-monospace,Menlo,monospace;color:var(--ink2);word-break:break-all">本机：' + esc(brief(c.local)) + '</div>' +
+        '<div style="font:400 11px/1.6 ui-monospace,Menlo,monospace;color:var(--ink2);word-break:break-all">最新：' + esc(brief(c.remote)) + '</div>' +
         '<div class="chips" id="cfChips' + i + '">' +
         '<button class="chip" id="cfL' + i + '">保留本机</button>' +
         '<button class="chip" id="cfR' + i + '">用最新</button>' +
@@ -872,7 +871,7 @@ function showReadOnlyBanner(){
   bar.id = 'ol-readonly-bar';
   bar.setAttribute('role', 'status');
   bar.style.cssText = 'position:fixed;left:0;top:0;right:0;z-index:55;'
-    + 'background:rgba(246,245,240,.94);color:#77766f;border-bottom:1px solid #d8d6cc;'
+    + 'background:var(--bg);color:var(--ink2);border-bottom:1px solid var(--line);'
     + 'font:400 12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;'
     + 'letter-spacing:.04em;text-align:center;padding:6px 12px;pointer-events:none;';
   var txt = document.createElement('span');
@@ -923,8 +922,8 @@ function setWriterBanner(text, canRetry, tech){
       btn.id = 'ol-writer-retry';
       btn.type = 'button';
       btn.textContent = '重试';
-      btn.style.cssText = 'pointer-events:auto;margin-left:10px;border:1px solid #c9c6ba;'
-        + 'background:#fff;color:#4a4943;border-radius:100px;'
+      btn.style.cssText = 'pointer-events:auto;margin-left:10px;border:1px solid var(--line);'
+        + 'background:var(--paper);color:var(--ink);border-radius:100px;'
         + 'font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;'
         + 'padding:5px 12px;cursor:pointer;';
       btn.addEventListener('click', function(){

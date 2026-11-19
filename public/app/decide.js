@@ -65,6 +65,7 @@ function randomPick(filterCat){
 var decState = { list:[], idx:0, mode:'scene', filter:'全部', scene:'' };
 var libOpen = false;
 var libQuery = '';
+var sceneEditMode = false;      /* 情景管理：在决策页原地切换，默认关闭 */
 
 function renderScenes(){
   var box = $('sceneChips');
@@ -77,9 +78,74 @@ function renderScenes(){
       b.dataset.k = sc.id;
       box.appendChild(b);
     });
+    box.style.display = sceneEditMode ? 'none' : '';
   }
+  var ask = $('sceneAsk');
+  if(ask) ask.classList.toggle('editing', sceneEditMode);
+  var askT = $('sceneAskT');
+  if(askT) askT.textContent = OLT(sceneEditMode ? '管理情景' : '你现在是什么情况');
+  var customBtn = $('sceneCustomBtn');
+  if(customBtn) customBtn.textContent = OLT(sceneEditMode ? '完成' : '自定义');
+  var mg = $('sceneManage');
+  if(mg) mg.style.display = sceneEditMode ? '' : 'none';
+  var decBar = document.querySelector('#decPaneDo .dec-bar'), decResult = $('decResult');
+  if(decBar) decBar.style.display = sceneEditMode ? 'none' : '';
+  if(decResult) decResult.style.display = sceneEditMode ? 'none' : '';
+  if(sceneEditMode) renderSceneManage();
   renderDecideShell();          /* 决策页外壳：按插件开关与当前标签，决定显示哪一块 */
 }
+
+/* ---------- 情景管理（复用 settings.js 的 openSceneEdit / sceneMove，都走 save()） ---------- */
+function renderSceneManage(){
+  var box = $('sceneManage');
+  if(!box) return;
+  var list = allScenes();
+  var html = '';
+  if(!list.length) html += '<div class="scm-none">' + OLT('还没有情景') + '</div>';
+  list.forEach(function(sc, i){
+    html += '<div class="scm-row" data-i="' + i + '">' +
+      '<div class="scm-m"><div class="scm-n">' + esc(sc.name) +
+        (sc.sys ? '<span class="scm-tag">' + OLT('系统') + '</span>' : '') +
+        (sc.enabled ? '' : '<span class="scm-tag">' + OLT('停用') + '</span>') + '</div>' +
+      (sc.desc ? '<div class="scm-d">' + esc(sc.desc) + '</div>' : '') + '</div>' +
+      '<div class="scm-a">' +
+        '<span class="scm-b" data-act="edit">' + OLT('编辑') + '</span>' +
+        (i > 0 ? '<span class="scm-b" data-act="up">↑</span>' : '') +
+        (i < list.length - 1 ? '<span class="scm-b" data-act="down">↓</span>' : '') +
+      '</div></div>';
+  });
+  html += '<div class="scm-add" id="scmAdd">＋ ' + OLT('新建情景') + '</div>';
+  box.innerHTML = html;
+}
+
+function setSceneEditMode(on){
+  sceneEditMode = !!on;
+  renderScenes();
+  if(sceneEditMode) window.scrollTo(0, Math.max(0, ($('sceneAsk') ? $('sceneAsk').getBoundingClientRect().top + window.scrollY - 12 : 0)));
+}
+
+(function bindSceneManage(){
+  var btn = $('sceneCustomBtn');
+  if(btn) btn.addEventListener('click', function(){ setSceneEditMode(!sceneEditMode); });
+  var box = $('sceneManage');
+  if(!box) return;
+  box.addEventListener('click', function(e){
+    if(e.target.closest && e.target.closest('#scmAdd')){
+      openSceneEdit(null, function(){ renderScenes(); });
+      return;
+    }
+    var actEl = e.target.closest ? e.target.closest('[data-act]') : null;
+    if(!actEl) return;
+    var row = actEl.closest('.scm-row');
+    if(!row) return;
+    var sc = allScenes()[+row.dataset.i];
+    if(!sc) return;
+    var act = actEl.dataset.act;
+    if(act === 'edit') openSceneEdit(sc.id, function(){ renderScenes(); });
+    if(act === 'up') sceneMove(sc.id, -1, function(){ renderScenes(); });
+    if(act === 'down') sceneMove(sc.id, 1, function(){ renderScenes(); });
+  });
+})();
 
 /* 选情境：列出绑在这个情境上的建议，并直接落到结果顶部 */
 function chooseScene(k){

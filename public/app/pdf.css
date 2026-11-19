@@ -4,9 +4,9 @@
 .pdfck input{width:17px;height:17px;accent-color:var(--sage)}
 
 /* 预览浮层与纸面 */
-#printView{position:fixed;inset:0;background:#EDE7DD;z-index:90;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#printView{position:fixed;inset:0;background:var(--frame);z-index:90;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}
 #printView.on{display:block}
-.pv-bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;background:#FAF7F1;border-bottom:1px solid var(--line);padding:9px 14px}
+.pv-bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;background:var(--bg);border-bottom:1px solid var(--line);padding:9px 14px}
 .pv-bar-t{flex:1;text-align:center;font-size:11px;color:var(--ink3)}
 .pv-paper{width:210mm;min-height:297mm;background:#fff;margin:18px auto;padding:16mm 14mm;box-shadow:0 10px 40px rgba(60,50,40,.16);color:#2E2C28;font-size:12px;line-height:1.75}
 @media(max-width:800px){.pv-paper{width:100%;min-height:0;margin:0;padding:18px;box-shadow:none}}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#FAF7F1">
+<meta name="theme-color" content="#F6F8F3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title data-i18n="地球online">地球online</title>
@@ -74,9 +74,10 @@
       <button data-tab="eat" data-i18n="吃什么">吃什么</button>
     </div>
     <div class="pad dec-pane" id="decPaneDo">
-      <div class="ask">
-        <div class="ask-t" data-i18n="你现在是什么情况">你现在是什么情况</div>
+      <div class="ask" id="sceneAsk">
+        <div class="ask-h"><div class="ask-t" id="sceneAskT" data-i18n="你现在是什么情况">你现在是什么情况</div><span class="sec-a" id="sceneCustomBtn" data-i18n="自定义">自定义</span></div>
         <div class="scene-grid" id="sceneChips" style="margin-top:12px"></div>
+        <div id="sceneManage" style="display:none"></div>
       </div>
       <div class="dec-bar">
         <button class="btn g" id="randBtn" style="flex:1" data-i18n="随便抽一件">随便抽一件</button>
@@ -213,10 +214,6 @@
       <div class="sec"><span class="sec-t" data-i18n="插件">插件</span><span class="sec-line"></span></div>
       <div class="card plain" id="pluginSet"></div>
       <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6" data-i18n="关掉只是不在首页出现，记过的都还在。">关掉只是不在首页出现，记过的都还在。</div>
-
-      <div class="sec"><span class="sec-t" data-i18n="决策情况">决策情况</span><span class="sec-line"></span><span class="sec-a" id="addScene" data-i18n="+ 新建">+ 新建</span></div>
-      <div class="card plain" id="sceneSet"></div>
-      <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6" data-i18n="系统自带的情境不能删（可以改名或停用），自己加的可以删；顺序就是决策页里的显示顺序。">系统自带的情境不能删（可以改名或停用），自己加的可以删；顺序就是决策页里的显示顺序。</div>
 
       <div class="sec"><span class="sec-t" data-i18n="其它">其它</span><span class="sec-line"></span></div>
       <div class="card plain" id="otherSet"></div>

@@ -372,8 +372,8 @@ function applyTheme(){
 }
 function themeRGB(){
   var map = {
-    default: '111,143,126', mist: '97,114,141', clay: '183,113,95',
-    matcha: '92,117,97', lotus: '142,122,142', warm: '106,93,87'
+    default: '110,155,128', mist: '113,134,178', clay: '193,121,92',
+    matcha: '139,166,99', lotus: '185,106,133', warm: '156,107,82'
   };
   return map[S.settings.theme] || map.default;
 }
@@ -1973,7 +1973,7 @@ function pdfMonthHtml(y, m, from, to){
     var bg = p ? rgba(p.color, .32) : '#fff';
     var inRange = (k >= from && k <= to);
     var emos = items.map(function(it){ var q = penOf(it.penId); return q.emoji || ''; }).filter(Boolean).join(' ');
-    h += '<span style="background:' + bg + ';' + (inRange ? 'border-color:#D8D0C2' : '') + '">' +
+    h += '<span style="background:' + bg + ';' + (inRange ? 'border-color:var(--line)' : '') + '">' +
          dt.getDate() + (emos ? ' ' + esc(emos) : '') + (items.length > 1 ? ' <b style="font-weight:600">×' + items.length + '</b>' : '') + '</span>';
   });
   h += '</div></div>';
