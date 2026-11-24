@@ -3,7 +3,7 @@ title: "给图片写说明，而不是把它们当成装饰"
 description: "影像页需要封面、替代文本和可选的图注。缺了说明，画廊就只是一排色块。"
 locale: zh-cn
 translationKey: image-captions
-publishedAt: 2025-06-19
+pubDate: 2025-06-19
 author: "Site Author"
 tags: [影像, 写作]
 featured: false

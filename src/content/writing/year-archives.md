@@ -3,7 +3,7 @@ title: "年份归档比无限滚动更适合长期写作"
 description: "把文章放回它发表的那一年，读者才能感觉到这份档案真的在变长。"
 locale: zh-cn
 translationKey: year-archives
-publishedAt: 2025-11-03
+pubDate: 2025-11-03
 author: "Site Author"
 tags: [归档, 阅读]
 featured: false

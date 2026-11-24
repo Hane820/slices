@@ -3,6 +3,20 @@ import { z } from 'astro/zod';
 import { glob } from 'astro/loaders';
 
 const locale = z.enum(['zh-cn', 'en']).default('zh-cn');
+
+/* writing 专用日期字段：只接受严格 YYYY-MM-DD 的真实日历日。
+   未加引号的 YAML 日期会被解析成 Date，这里统一归一化后再校验。 */
+const normalizeDate = (value: unknown) => value instanceof Date ? value.toISOString().slice(0, 10) : value;
+const dateOnly = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, '日期必须是 YYYY-MM-DD')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  }, '日期必须是真实存在的日历日')
+  .transform((value) => new Date(`${value}T00:00:00Z`));
+const writingDate = z.preprocess(normalizeDate, dateOnly);
+
 const common = {
   title: z.string(),
   description: z.string(),
@@ -18,12 +32,23 @@ const common = {
 
 const writing = defineCollection({
   loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/writing' }),
+  /* 只要求 title + pubDate；其余全部可选。draft 默认 true：只有显式 draft:false 才发布。 */
   schema: z.object({
-    ...common,
-    publishedAt: z.coerce.date(),
-    updatedAt: z.coerce.date().optional(),
-    author: z.string().optional(),
+    title: z.string().trim().min(1),
+    pubDate: writingDate,
+    description: z.string().optional(),
+    updatedDate: writingDate.optional(),
+    category: z.string().optional(),
     tags: z.array(z.string()).default([]),
+    draft: z.boolean().default(true),
+    featured: z.boolean().default(false),
+    order: z.number().default(0),
+    locale,
+    translationKey: z.string().optional(),
+    seoTitle: z.string().optional(),
+    canonical: z.url().optional(),
+    ogImage: z.string().optional(),
+    author: z.string().optional(),
     column: z.string().optional(),
     columnOrder: z.number().optional(),
     minutes: z.number().positive().optional(),

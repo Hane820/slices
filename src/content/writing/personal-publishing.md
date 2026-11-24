@@ -3,8 +3,8 @@ title: "把个人博客当作一间小型出版社"
 description: "从内容模型、阅读路径到发布边界，整理一个长期可维护的个人出版物应该具备什么。"
 locale: zh-cn
 translationKey: personal-publishing
-publishedAt: 2026-03-18
-updatedAt: 2026-09-02
+pubDate: 2026-03-18
+updatedDate: 2026-09-02
 author: "Site Author"
 tags: [写作, 个人出版, 结构]
 featured: true

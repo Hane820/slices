@@ -1,14 +1,14 @@
 ---
-import { writingPath, tagSlug } from '../../lib/content';
+import { writingPath, tagSlug, descriptionOf } from '../../lib/content';
 import { sitePath } from '../../lib/urls';
 const { entry } = Astro.props;
 const { data } = entry;
 ---
 <article class="post-row">
-  <time class="meta" datetime={data.publishedAt.toISOString()}>{data.publishedAt.toLocaleDateString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit' })}</time>
+  <time class="meta" datetime={data.pubDate.toISOString()}>{data.pubDate.toLocaleDateString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit' })}</time>
   <div>
     <h3><a href={writingPath(entry)}>{data.title}</a></h3>
-    <p>{data.description}</p>
+    <p>{descriptionOf(entry)}</p>
     {data.column && <div class="meta">{data.column}{data.columnOrder ? ` · 第 ${data.columnOrder} 篇` : ''}</div>}
     {data.tags.length > 0 && <div class="tags">{data.tags.map((tag: string) => <a class="tag" href={sitePath(`/tags/${tagSlug(tag)}/`)}>#{tag}</a>)}</div>}
   </div>

@@ -3,7 +3,7 @@ title: "专栏、标签和搜索各管一件事"
 description: "顺序阅读、横向探索和临时查找不该挤在同一个导航里。"
 locale: zh-cn
 translationKey: columns-tags-search
-publishedAt: 2026-05-21
+pubDate: 2026-05-21
 author: "Site Author"
 tags: [信息架构, 专栏, 标签]
 featured: false

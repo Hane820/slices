@@ -575,6 +575,8 @@ function save(onSuccess, opts){
     try{ localStorage.setItem(KEY, JSON.stringify(S)); }
     catch(e){ bizSaveFailed('local-storage'); return false; }
     if(typeof onSuccess === 'function') onSuccess();
+    /* 只在 localStorage 真正写成功后标记云端待备份 */
+    if(window.OLCloudBackup && typeof window.OLCloudBackup.markDirty === 'function') window.OLCloudBackup.markDirty('local');
     return true;
   }
   var Q = window.OLCommitQueue, W = window.OLWrite;
@@ -609,7 +611,13 @@ function save(onSuccess, opts){
     off = Q.onResult(onEvent);
     r = Q.enqueue({
       source: 'business',
-      onResult: function(result){ if(result && result.ok && typeof onSuccess === 'function') onSuccess(); }
+      onResult: function(result){
+        /* 队列终局确认成功才触发云端备份，绝不上传内存中的候选状态 */
+        if(result && result.ok){
+          if(typeof onSuccess === 'function') onSuccess();
+          if(window.OLCloudBackup && typeof window.OLCloudBackup.markDirty === 'function') window.OLCloudBackup.markDirty('idb');
+        }
+      }
     }, opts);
   }catch(e){ if(off) off(); bizSaveFailed((e && e.code) || 'save-threw'); return false; }
   if(!r || !r.ok){ if(off) off(); bizSaveFailed(r && r.code); return false; }
@@ -1373,10 +1381,12 @@ function confirmBox(title, msg, cb, opts){
 /* ==================== 导入导出 ==================== */
 /* 生成备份文件：payload 结构与文件名沿用原有约定，改格式会破坏 importJSON 兼容性。
    只接收待导出的数据，不读全局 S、不写任何存储、不调用 save()。 */
+/* 完整业务备份信封：文件导出与云端上传共用同一份生成逻辑 */
+function buildBackupPayload(data){
+  return { app:'earthonline', version:4, exportedAt:new Date().toISOString(), data:data };
+}
 function writeBackupFile(data){
-  var payload = {
-    app: 'earthonline', version: 4, exportedAt: new Date().toISOString(), data: data
-  };
+  var payload = buildBackupPayload(data);
   var blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');

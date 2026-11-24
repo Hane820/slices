@@ -3,7 +3,7 @@ title: "让读者能回来：RSS、搜索与收藏"
 description: "第一次访问靠导航，下一次访问靠订阅、查找和还留在这台设备上的文章。"
 locale: zh-cn
 translationKey: return-visits
-publishedAt: 2026-06-16
+pubDate: 2026-06-16
 author: "Site Author"
 tags: [RSS, 搜索, 收藏]
 featured: false

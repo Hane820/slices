@@ -3,7 +3,7 @@ title: "一份好的开始页，应该回答什么"
 description: "用问题而不是栏目名称，为第一次来到站点的读者提供一条低摩擦的阅读路径。"
 locale: zh-cn
 translationKey: reading-paths
-publishedAt: 2026-02-11
+pubDate: 2026-02-11
 author: "Site Author"
 tags: [阅读, 信息架构, 写作]
 featured: false

@@ -3,7 +3,7 @@ title: "长文需要目录、上一篇和相关文章"
 description: "文章一长，读者需要知道自己在哪，以及读完以后可以去哪。"
 locale: zh-cn
 translationKey: longform-reading
-publishedAt: 2024-10-08
+pubDate: 2024-10-08
 author: "Site Author"
 tags: [写作, 阅读]
 featured: false

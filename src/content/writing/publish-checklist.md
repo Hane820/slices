@@ -3,8 +3,8 @@ title: "发布前值得看一遍的清单"
 description: "域名、草稿、图片说明和分享卡片，在第一次推上线之前集中检查。"
 locale: zh-cn
 translationKey: publish-checklist
-publishedAt: 2026-07-02
-updatedAt: 2026-09-12
+pubDate: 2026-07-02
+updatedDate: 2026-09-12
 author: "Site Author"
 tags: [发布, 写作]
 featured: true

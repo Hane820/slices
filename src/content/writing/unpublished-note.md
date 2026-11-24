@@ -3,7 +3,7 @@ title: "一篇还不应公开的笔记"
 description: "草稿示例。构建结果、RSS 和搜索里都不应该出现这个标题。"
 locale: zh-cn
 translationKey: unpublished-note
-publishedAt: 2026-09-20
+pubDate: 2026-09-20
 author: "Site Author"
 tags: [写作, 编辑]
 featured: true

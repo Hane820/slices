@@ -137,12 +137,12 @@ function renderSettings(){
   lb.innerHTML = '';
   /* [键, 名称, 主色, 背景色, 深色锚点/主色/次级面/点缀色] —— 预览直接展示整条色板 */
   var THEME_LIST = [
-    ['default', '青绿冰茶', '#6E9B80', '#EEF4E9', ['#2B3A31','#6E9B80','#E4EFDE','#A8C8BE']],
-    ['mist', '海盐奶盖', '#7186B2', '#ECEEF8', ['#2F3448','#7186B2','#E4E7F4','#C795A4']],
-    ['clay', '橘子汽水', '#EE8A64', '#FFF9EC', ['#2D2016','#EE8A64','#FFF2D0','#1A6A71']],
-    ['matcha', '咸柠汽水', '#8BA663', '#F1F4DF', ['#30382B','#8BA663','#E7EED1','#8FB7A2']],
-    ['lotus', '草莓奶霜', '#B96A85', '#FAEBF1', ['#3A2B33','#B96A85','#F5DFE8','#8FC2B8']],
-    ['warm', '小茶狐狸', '#9C6B52', '#F7EDE3', ['#352D28','#9C6B52','#EFE1D3','#8FA993']]
+    ['default', '青绿冰茶', '#6E9B80', '#F6F8F3', ['#2B3A31','#6E9B80','#EAF1E7','#A8C8BE']],
+    ['mist', '海盐奶盖', '#7186B2', '#F7F6FA', ['#2F3448','#7186B2','#EAEAF4','#C795A4']],
+    ['clay', '橘子汽水', '#C1795C', '#FDF8F1', ['#392D27','#C1795C','#F7EDE0','#7FA596']],
+    ['matcha', '咸柠汽水', '#8BA663', '#F8F9EF', ['#30382B','#8BA663','#F0F4E2','#8FB7A2']],
+    ['lotus', '草莓奶霜', '#B96A85', '#FCF5F8', ['#3A2B33','#B96A85','#F8EAF0','#8FC2B8']],
+    ['warm', '小茶狐狸', '#9C6B52', '#FAF7F3', ['#352D28','#9C6B52','#F3EDE5','#8FA993']]
   ];
   var trow = el('div','row');
   var trowm = el('div','row-main');
@@ -218,6 +218,63 @@ function renderSettings(){
       save(); renderAll(); toast(OLT('已经清空了'));
     });
   });
+  renderCloudSet();
+}
+
+/* 云端备份状态区：只读展示 + 立即备份入口，与自动备份共用同一上传队列 */
+function renderCloudSet(){
+  var box = $('cloudSet');
+  if(!box || !window.OLCloudBackup) return;
+  var st = OLCloudBackup.snapshot();
+  var labels = {
+    uploading:'正在上传', pending:'待备份', synced:'已同步备份',
+    'server-only':'云端已有备份（本机未确认）', none:'未备份'
+  };
+  box.innerHTML = '';
+
+  var row = el('div','row');
+  var main = el('div','row-main');
+  main.appendChild(el('div','row-t',OLT('云端备份状态')));
+  main.appendChild(el('div','row-s',labels[st.status] || st.status));
+  row.appendChild(main);
+  row.appendChild(el('div','row-a',st.uploading ? '…' : '›'));
+  box.appendChild(row);
+
+  var time = el('div','row');
+  var tm = el('div','row-main');
+  tm.appendChild(el('div','row-t',OLT('最近成功备份时间')));
+  tm.appendChild(el('div','row-s',st.lastSuccessAt
+    ? new Date(st.lastSuccessAt).toLocaleString('zh-CN')
+    : (st.serverUploadedAt ? '云端有备份，但本机还没确认上传成功' : '还没有成功上传过')));
+  time.appendChild(tm);
+  box.appendChild(time);
+
+  if(st.lastError){
+    var er = el('div','row');
+    var em = el('div','row-main');
+    em.appendChild(el('div','row-t',OLT('最近一次上传失败')));
+    em.appendChild(el('div','row-s',st.lastError + '；待备份数据已保留'));
+    er.appendChild(em);
+    box.appendChild(er);
+  }
+
+  var acts = el('div','row');
+  var now = el('button','btn p sm',OLT('立即备份'));
+  now.type = 'button';
+  now.disabled = !!st.uploading;
+  now.addEventListener('click', function(){
+    if(!OLCloudBackup.backupNow()) toast(OLT('已有上传在进行中'));
+  });
+  var refresh = el('button','btn g sm',OLT('刷新云端状态'));
+  refresh.type = 'button';
+  refresh.addEventListener('click', function(){ OLCloudBackup.refreshStatus(); });
+  acts.appendChild(now);
+  acts.appendChild(refresh);
+  box.appendChild(acts);
+
+  var note = el('div','row-s',OLT('只保存最新一份备份，覆盖旧备份；不做云端恢复和多设备同步。'));
+  note.style.marginTop = '10px';
+  box.appendChild(note);
 }
 
 function askNumber(title, cur, min, max, cb){
@@ -628,3 +685,8 @@ function openSceneEdit(id, onDone){
     });
   });
 }
+
+/* 云端备份状态变化（自动/手动/跨标签页）时刷新设置页区域 */
+window.addEventListener('earthonline-cloud-backup', function(){
+  if($('cloudSet')) renderCloudSet();
+});

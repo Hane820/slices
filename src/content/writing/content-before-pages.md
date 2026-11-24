@@ -3,8 +3,8 @@ title: "先写内容模型，再画页面"
 description: "文章、项目、研究和影像可以共享元数据习惯，但不必变成同一种卡片。"
 locale: zh-cn
 translationKey: content-before-pages
-publishedAt: 2026-04-09
-updatedAt: 2026-08-28
+pubDate: 2026-04-09
+updatedDate: 2026-08-28
 author: "Site Author"
 tags: [写作, 结构, 内容模型]
 featured: true

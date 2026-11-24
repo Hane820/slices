@@ -1,13 +1,14 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostCard from '../components/blog/PostCard.astro';
-import { getPublishedWriting } from '../lib/content';
+import { getPublishedWriting, descriptionOf } from '../lib/content';
 const writing=await getPublishedWriting();
 const query=Astro.url.searchParams.get('q')?.trim() ?? '';
 const normalizedQuery=query.toLowerCase();
-const matches=(entry: typeof writing[number]) => !normalizedQuery || `${entry.data.title} ${entry.data.description} ${entry.data.tags.join(' ')} ${entry.body ?? ''}`.toLowerCase().includes(normalizedQuery);
+const searchText=(entry: typeof writing[number]) => `${entry.data.title} ${descriptionOf(entry)} ${entry.data.tags.join(' ')} ${entry.body ?? ''}`.toLowerCase();
+const matches=(entry: typeof writing[number]) => !normalizedQuery || searchText(entry).includes(normalizedQuery);
 ---
-<BaseLayout title="搜索 · Fourfold" description="搜索标题、摘要、正文和标签。"><section class="search-page narrow"><p class="eyebrow">Search</p><h1>从已经写下的，继续往前找。</h1><input id="search" type="search" value={query} placeholder="搜索文章与标签" autocomplete="off"/><p id="status" class="muted">{query ? `${writing.filter(matches).length} 个结果` : '输入关键词开始搜索。'}</p><div id="results" class="list">{writing.map((entry)=><div data-search-item data-text={`${entry.data.title} ${entry.data.description} ${entry.data.tags.join(' ')} ${entry.body ?? ''}`} hidden={!matches(entry)}><PostCard entry={entry}/></div>)}</div></section></BaseLayout>
+<BaseLayout title="搜索 · Fourfold" description="搜索标题、摘要、正文和标签。"><section class="search-page narrow"><p class="eyebrow">Search</p><h1>从已经写下的，继续往前找。</h1><input id="search" type="search" value={query} placeholder="搜索文章与标签" autocomplete="off"/><p id="status" class="muted">{query ? `${writing.filter(matches).length} 个结果` : '输入关键词开始搜索。'}</p><div id="results" class="list">{writing.map((entry)=><div data-search-item data-text={searchText(entry)} hidden={!matches(entry)}><PostCard entry={entry}/></div>)}</div></section></BaseLayout>
 <script>
   const input=document.querySelector<HTMLInputElement>('#search');
   const items=[...document.querySelectorAll<HTMLElement>('[data-search-item]')];

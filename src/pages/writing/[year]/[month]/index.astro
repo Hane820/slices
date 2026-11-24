@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import PostCard from '../../../../components/blog/PostCard.astro';
+import { getPublishedWriting } from '../../../../lib/content';
+import { sitePath } from '../../../../lib/urls';
+export async function getStaticPaths(){
+  const writing = await getPublishedWriting();
+  const groups = new Map<string, typeof writing>();
+  for (const entry of writing) {
+    const date = entry.data.pubDate;
+    const year = String(date.getUTCFullYear());
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const key = `${year}-${month}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(entry);
+  }
+  return [...groups.entries()].map(([key, entries]) => {
+    const [year, month] = key.split('-');
+    return { params: { year, month }, props: { entries } };
+  });
+}
+const { year, month } = Astro.params;
+const { entries } = Astro.props;
+---
+<BaseLayout title={`${year} 年 ${Number(month)} 月写作 · Fourfold`}><header class="page-head container"><p class="eyebrow">Archive</p><h1>{year} / {month}</h1><p>{entries.length} 篇写作 · <a href={sitePath(`/writing/${year}/`)}>返回年份</a></p></header><section class="container list">{entries.map((entry: any) => <PostCard entry={entry} />)}</section></BaseLayout>
+<style>.page-head{padding:5rem 0 2rem}.page-head h1{font-size:clamp(3rem,9vw,7rem);line-height:.9;letter-spacing:-.07em;margin:.4rem 0}.page-head p{color:var(--muted)}</style>

@@ -9,7 +9,7 @@ export const site = {
   url: siteUrl,
   author: {
     name: 'HANE',
-    bio: '我到底要如何把自己切得足够薄？',
+    bio: '我到底要怎样才能把自己切得足够薄？',
     email: 'hanehane@foxmail.com',
   },
   locale: 'zh-cn',

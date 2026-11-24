@@ -3,8 +3,8 @@ title: "草稿、精选和更新时间各做各的"
 description: "三个容易被混用的开关：什么不公开，什么放上首页，什么只是改过。"
 locale: zh-cn
 translationKey: drafts-and-featured
-publishedAt: 2025-01-24
-updatedAt: 2025-03-02
+pubDate: 2025-01-24
+updatedDate: 2025-03-02
 author: "Site Author"
 tags: [写作, 编辑]
 featured: false

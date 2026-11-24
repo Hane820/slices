@@ -3,7 +3,7 @@ title: "项目站点的域名和子路径要分开写"
 description: "GitHub Pages 项目站点的源站是用户域名，仓库名只是路径。写进同一个变量会让 canonical 重复。"
 locale: zh-cn
 translationKey: github-pages-paths
-publishedAt: 2026-08-14
+pubDate: 2026-08-14
 author: "Site Author"
 tags: [发布, Astro, 静态站点, 架构]
 featured: true

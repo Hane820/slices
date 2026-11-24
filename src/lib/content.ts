@@ -6,10 +6,14 @@ import { sitePath } from './urls';
 export type Writing = CollectionEntry<'writing'>;
 
 export async function getPublishedWriting(locale = site.locale) {
-  const entries = await getCollection('writing', ({ data }) => !data.draft && data.locale === locale);
+  /* 本地草稿预览：只在 astro dev 下，按环境变量放行一篇指定 id 的草稿。
+     import.meta.env.DEV 在生产构建中被静态替换为 false，构建产物永远不带此分支。 */
+  const previewId = import.meta.env.DEV ? import.meta.env.OL_PREVIEW_WRITING_ID : undefined;
+  const entries = await getCollection('writing', ({ id, data }) =>
+    data.locale === locale && (!data.draft || (Boolean(previewId) && id === previewId)));
   return entries.sort((a, b) => {
-    const aDate = a.data.updatedAt ?? a.data.publishedAt;
-    const bDate = b.data.updatedAt ?? b.data.publishedAt;
+    const aDate = a.data.updatedDate ?? a.data.pubDate;
+    const bDate = b.data.updatedDate ?? b.data.pubDate;
     return bDate.valueOf() - aDate.valueOf();
   });
 }
@@ -30,12 +34,19 @@ export function slugFromId(id: string) {
 }
 
 export function writingPath(entry: Writing) {
-  const date = entry.data.publishedAt;
+  const date = entry.data.pubDate;
   return sitePath(`/writing/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${slugFromId(entry.id)}/`);
 }
 
 export function yearOf(entry: Writing) {
-  return entry.data.publishedAt.getFullYear();
+  return entry.data.pubDate.getFullYear();
+}
+
+/* description 可选：缺失时退而取正文开头做摘要，保证列表/RSS/搜索不会空白 */
+export function descriptionOf(entry: Pick<Writing, 'data' | 'body'>): string {
+  const explicit = entry.data.description?.trim();
+  if (explicit) return explicit;
+  return excerpt(entry.body ?? '', 180);
 }
 
 export function getTags(entries: Writing[], threshold = site.tagIndexThreshold) {
@@ -48,6 +59,19 @@ export function getTags(entries: Writing[], threshold = site.tagIndexThreshold) 
 
 export function tagSlug(tag: string) {
   return tag.toLowerCase().trim().replace(/[\\/?#%]+/g, '-').replace(/\s+/g, '-');
+}
+
+/* 分类：只从已发布且填了 category 的文章汇总，不预建空分类 */
+export function getCategories(entries: Writing[]) {
+  return [...new Set(entries.map((entry) => entry.data.category?.trim()).filter((value): value is string => Boolean(value)))];
+}
+
+export function categorySlug(category: string) {
+  return category.toLowerCase().trim().replace(/[\\/?#%]+/g, '-').replace(/\s+/g, '-');
+}
+
+export function categoryPath(category: string) {
+  return sitePath(`/categories/${categorySlug(category)}/`);
 }
 
 export function columnSlug(entry: CollectionEntry<'columns'>) {
