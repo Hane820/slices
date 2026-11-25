@@ -9,7 +9,7 @@
     "dev": "astro dev",
     "start": "astro dev",
     "check": "npm test && npm run validate:content && astro check",
-    "test": "node --test scripts/validate-content.test.mjs",
+    "test": "node --test scripts/validate-content.test.mjs scripts/backup-v2-core.test.cjs",
     "validate:content": "node scripts/validate-content.mjs",
     "build": "npm run validate:content && astro check && astro build",
     "preview": "astro preview"
