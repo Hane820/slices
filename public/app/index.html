@@ -274,7 +274,7 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<button id="toTop" class="to-top" aria-label="回到顶端" data-i18n="common.a11y.backToTop" data-i18n-aria-label="aria-label">↑</button>
+<button id="toTop" class="to-top" aria-label="回到顶端" data-i18n="common.a11y.backToTop" data-i18n-skip-text data-i18n-aria-label>↑</button>
 
 <!-- PDF 报告预览：放在 #app 之外，打印时不受手机宽度限制 -->
 <div id="printView">
@@ -300,6 +300,8 @@
 <script src="config/messages.js"></script>
 <script src="config/plugins.js"></script>
 <script src="config/writer.js"></script>
+<!-- 首次文案替换：必须在上面的分组全部注册完之后、core.js/boot.js 之前 -->
+<script src="config/apply.js"></script>
 <script src="config/toast-text.js"></script>
 <script src="presets.js"></script>
 <script src="vendor/dexie.min.js"></script>

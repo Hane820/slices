@@ -16,12 +16,24 @@
  *      <span data-i18n="today.section.tasks">今日待办</span>
  *    HTML 里的中文是兜底；注册表可用且能查到 key 时，用 textContent 覆盖成配置值。
  *    配置缺失、脚本没加载、key 写错，页面显示的都是原中文 —— 不会闪 key，也不会白屏。
+ *    JS 里调用 U() 查不到 key 时则相反：返回可见标记「［缺少文案：xxx］」，
+ *    让漏配的 key 在界面上立刻暴露，而不是静默变空白（补配置后自动恢复）。
+ *
+ * 首次替换的时机：
+ *    index.js 只定义注册表，**自己不替换 DOM**。所有分组注册完之后由 config/apply.js
+ *    调用一次 applyDom()（顺序见 index.html 的脚本顺序）。这样既不靠 setTimeout 猜时序，
+ *    也不会出现「注册表还空着就先跑一遍」的空转。
  *
  * 属性文案（placeholder / aria-label 等，同样只走属性赋值，不当 HTML）：
  *      <input placeholder="找一下，比如 下课"
  *             data-i18n="decide.placeholder.librarySearch" data-i18n-attr="placeholder">
  *      <button aria-label="回到顶端" data-i18n="common.a11y.backToTop"
- *              data-i18n-aria-label="aria-label">
+ *              data-i18n-aria-label>
+ *
+ *    两种写法的分工（**属性名只取后缀，属性值没有语义**）：
+ *      - 只改一个属性 → data-i18n-<属性名>，值留空即可（写成同名也不会改变行为，但别写别的名字，
+ *        否则读代码的人会以为它指向那个属性；检查脚本会把「值 ≠ 后缀」判为错误）。
+ *      - 一次改多个属性 → data-i18n-attr="title,aria-label"，用逗号分隔。
  *
  * 诊断：地址栏带 ?ui-debug=1 时，缺失的 key、缺失的插值参数会在控制台各警告一次，
  *       并可通过 OLText.missing() 取出。普通用户控制台保持安静。
@@ -46,10 +58,12 @@
   function register(cat, group) {
     if (!group || typeof group !== 'object') return;
     /* 同一个分组的第二个 map 合并进来：分组文件可以先放旧中文 key、再放新英文 key，
-       两批都保留在 OLText.data 里，不会被后一次注册覆盖掉。 */
+       两批都保留在 OLText.data 里，不会被后一次注册覆盖掉。
+       三个表的覆盖语义统一为「首次优先」：先注册的赢，后注册的同名 key 只保留在
+       OLText.data（供排查），不改变 messages / legacy 的实际取值。 */
     var bucket = groups[cat] || (groups[cat] = Object.create(null));
     Object.keys(group).forEach(function (k) {
-      bucket[k] = group[k];
+      if (!(k in bucket)) bucket[k] = group[k];
       if (NEW_KEY.test(k)) {
         if (!(k in messages)) messages[k] = group[k];
       } else if (!(k in legacy)) {
@@ -72,25 +86,37 @@
     return typeof key === 'string' && (key in messages);
   }
 
-  /* {name} 插值：只认已知参数名，undefined/null/对象一律置空，避免 [object Object] */
-  function fmt(tpl, vars) {
+  /* ---------- 可见降级标记 ----------
+   * U() 查不到 key / 缺参数时不返回空串，而是返回下面这种标记，让漏配在界面上看得见。
+   * HTML 侧（applyDom）不用标记：那里有中文兜底，继续显示原文才是对的。 */
+  var MISSING_KEY_HEAD = '［缺少文案：';
+  var MISSING_VAR_HEAD = '［缺参数：';
+  var MISSING_TAIL = '］';
+  function keyMarker(key) { return MISSING_KEY_HEAD + key + MISSING_TAIL; }
+  function varMarker(name) { return MISSING_VAR_HEAD + name + MISSING_TAIL; }
+
+  /* {name} 插值：只接受 string / number（0、负数都合法）。
+     undefined / null / 布尔 / 数组 / 对象 / 函数 → 可见标记「［缺参数：name］」+ 告警一次，
+     既不把 {name} 字面量漏到界面，也不会出现 [object Object]、false 或函数源码。
+     vars 整个没传时按「全部参数缺失」处理。 */
+  function fmt(tpl, vars, key) {
     if (typeof tpl !== 'string') return '';
-    if (!vars) return tpl;
     return tpl.replace(/\{([A-Za-z0-9_]+)\}/g, function (whole, name) {
-      var v = vars[name];
-      if (v === undefined || v === null) { noteMissingVar(name); return ''; }
-      if (typeof v === 'object') { noteMissingVar(name); return ''; }
-      return String(v);
+      var v = (vars && typeof vars === 'object') ? vars[name] : undefined;
+      if (typeof v === 'string') return v;
+      if (typeof v === 'number' && isFinite(v)) return String(v);
+      noteMissingVar(name, key);
+      return varMarker(name);
     });
   }
 
-  /* U(key)：纯文本。缺 key 返回空串并（调试模式）告警，绝不把 key 显示到界面上。 */
+  /* U(key)：纯文本。缺 key 返回可见标记并告警一次，不静默返回空串。 */
   function U(key, vars) {
     if (!(key in messages)) {
       noteMissingKey(key);
-      return '';
+      return keyMarker(key);
     }
-    return fmt(messages[key], vars);
+    return fmt(messages[key], vars, key);
   }
 
   var ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -113,20 +139,27 @@
 
   var missingKeys = [];
   var missingVars = [];
+  var keyHits = Object.create(null);   /* key -> 命中次数（用于「只告警一次 + 统计」） */
+  var varHits = Object.create(null);   /* key.param -> 命中次数 */
 
   function noteMissingKey(key) {
-    if (missingKeys.indexOf(key) >= 0) return;
+    keyHits[key] = (keyHits[key] || 0) + 1;
+    if (keyHits[key] > 1) return;                       /* 同一个 key 只告警一次 */
     missingKeys.push(key);
     if (debug && typeof console !== 'undefined' && console.warn) {
-      console.warn('[ui-text] 缺少文案 key：' + key);
+      console.warn('[ui-text] 缺少文案 key：' + key +
+        '（已显示可见标记；补上配置后自动恢复，HTML 静态兜底不受影响）');
     }
   }
 
-  function noteMissingVar(name) {
-    if (missingVars.indexOf(name) >= 0) return;
-    missingVars.push(name);
+  function noteMissingVar(name, key) {
+    var id = (key || '?') + ' . ' + name;
+    varHits[id] = (varHits[id] || 0) + 1;
+    if (varHits[id] > 1) return;
+    missingVars.push({ key: key || null, name: name });
     if (debug && typeof console !== 'undefined' && console.warn) {
-      console.warn('[ui-text] 缺少插值参数：{' + name + '}');
+      console.warn('[ui-text] 缺少插值参数：{' + name + '}' +
+        (key ? '（key=' + key + '）' : '') + '（已显示可见标记）');
     }
   }
 
@@ -146,6 +179,7 @@
     for (var i = 0; i < attrs.length; i++) {
       var name = attrs[i].name;
       if (name === 'data-i18n') continue;
+      if (name === 'data-i18n-skip-text') continue;   /* 控制开关，不是属性目标 */
       if (name === 'data-i18n-attr') {
         attrs[i].value.split(/[,\s]+/).forEach(function (a) { if (a) list.push(a); });
         continue;
@@ -188,13 +222,16 @@
       var value = null;
       if (key in messages) value = messages[key];
       else if (key in legacy) value = legacy[key];
-      else { noteMissingKey(key); continue; }   /* 查不到就保留 HTML 原文 */
+      else { noteMissingKey(key); continue; }   /* 查不到就保留 HTML 原文；且不标记，补配置后还能再处理 */
 
+      /* 只有真正拿到文案的节点才进 WeakSet：缺 key 的节点不标记，
+         以后配置补上、或再次 applyDom 时仍有机会被处理。 */
       if (applied) applied.add(el);
 
-      /* 纯属性元素（input）没有文本可换，跳过文本赋值 */
+      /* data-i18n-skip-text：只要属性、不动可见文本（例如 #toTop 的 ↑ 箭头） */
+      var skipText = (typeof el.hasAttribute === 'function') && el.hasAttribute('data-i18n-skip-text');
       var isInput = el.tagName === 'INPUT';
-      if (!isInput && replaceText(el, value)) changed++;
+      if (!skipText && !isInput && replaceText(el, value)) changed++;
 
       var attrs = targetAttrs(el);
       for (var j = 0; j < attrs.length; j++) {
@@ -219,7 +256,14 @@
     fmt: fmt,
     escapeHtml: escapeHtml,
     applyDom: applyDom,
-    missing: function () { return { keys: missingKeys.slice(), vars: missingVars.slice() }; },
+    count: function () { return Object.keys(messages).length; },
+    missing: function () {
+      return {
+        keys: missingKeys.slice(),
+        vars: missingVars.slice(),
+        counts: { keys: keyHits, vars: varHits }
+      };
+    },
     isDebug: function () { return debug; }
   };
 
@@ -227,16 +271,7 @@
   global.U = U;
   global.UH = UH;
 
-  function bootApply() {
-    try { applyDom(document); } catch (e) { /* 文案问题绝不影响启动 */ }
-  }
-
-  /* 立刻执行一次（此时 body 标记已解析完、业务脚本还没跑）；
-     DOMContentLoaded 再补一次，覆盖极端情况下后插入的静态节点。 */
-  if (typeof document !== 'undefined') {
-    bootApply();
-    if (document.readyState === 'loading' && document.addEventListener) {
-      document.addEventListener('DOMContentLoaded', bootApply);
-    }
-  }
+  /* 本文件只定义注册表，**不在这里替换 DOM**。
+     首次替换由 config/apply.js 在所有分组注册完成之后调用一次，
+     不依赖 setTimeout / DOMContentLoaded 猜时序（见 index.html 脚本顺序）。 */
 })(window);

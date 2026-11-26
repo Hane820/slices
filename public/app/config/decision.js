@@ -4,7 +4,7 @@
   var T = window.OLText;
   if(!T || typeof T.register !== "function") return;
 
-  T.register('decision', {
+  T.register('decide', {
     '管理情景': '管理情景',
     '完成': '完成',
     '自定义': '自定义',
@@ -24,7 +24,7 @@
   });
 
   /* ===== 英文语义 key · 决策页 / 吃什么（第一批迁移：index.html 静态文案） ===== */
-  T.register('decision', {
+  T.register('decide', {
     'decide.action.backToday': '← 返回今日',
     'decide.page.title': '现在做什么',
     'decide.page.subtitle': '想不清楚的时候，让它替你挑一件。',
