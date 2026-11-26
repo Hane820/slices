@@ -14,21 +14,15 @@ var OLD = 'earthonline-v3';
 
 var COLORS = ['#B6CBA8','#A8C0D8','#E8CEA8','#C9BFDA','#E5B3AC','#A8CFC5','#D8C3A5','#C4C9A8','#B8C4D9','#D9BFBF'];
 var EMOJIS = ['🌿','✨','☁','☾','〰','✓','♡','★','🌙','☀','🌧','🍂','🌸','🕯','💧','🔥'];
-var PARTS  = ['胸','背','腿','肩','手臂','核心','有氧','拉伸','休息'];
+
+/* 默认预设从 presets.js 读（该文件须在 core.js 之前加载）。
+   缺失时给空值兜底，保证只加载 core.js 的合成页/测试不会直接抛错；
+   真实页面一定加载 presets.js，所以正常路径下这些值都来自预设文件。 */
+var PRESETS = window.OLPresets || {};
+var PARTS  = PRESETS.PARTS || [];
 
 /* 情境：点一个，就列出绑在这个情境上的建议。不猜用户写了什么。 */
-var SCENES = [
-  {k:'afterclass', n:'下课后',       d:'刚下课，还没安排'},
-  {k:'noclass',    n:'没课',         d:'一整块空时间'},
-  {k:'tired',      n:'有点累',       d:'做不动大事'},
-  {k:'nofuel',     n:'不想动',       d:'什么都不想开始'},
-  {k:'bored',      n:'有点无聊',     d:'想找点事做'},
-  {k:'meal',       n:'刚吃完饭',     d:'饭后这一会儿'},
-  {k:'move',       n:'想动一动',     d:'想练或出门'},
-  {k:'study',      n:'想学点东西',   d:'有心思看书'},
-  {k:'beforebed',  n:'睡前',         d:'该收尾了'},
-  {k:'lost',       n:'不知道做什么', d:'你替我定'}
-];
+var SCENES = PRESETS.SCENES || [];
 /* 运行时情境清单以 S.scenes 为准（可自定义、稳定 id）；SCENES 只作种子与系统保护基线 */
 function defaultScenes(){
   return SCENES.map(function(sc, i){
@@ -47,37 +41,20 @@ function sceneName(k){
   for(i=0;i<SCENES.length;i++) if(SCENES[i].k === k) return SCENES[i].n;
   return k;
 }
-var DEFAULT_SCENES = {
-  s1:['bored','tired','meal'],
-  s2:['move','noclass'],
-  s3:['tired','move','beforebed'],
-  s4:['tired','nofuel','beforebed'],
-  s5:['afterclass','study'],
-  s6:['study','bored','beforebed'],
-  s7:['beforebed','lost'],
-  s8:['bored','lost'],
-  s9:['lost','noclass'],
-  s10:['afterclass','tired'],
-  s11:['tired','nofuel','meal'],
-  s12:['bored','lost','beforebed'],
-  s13:['beforebed','bored'],
-  s14:['afterclass','beforebed'],
-  s15:['nofuel','tired'],
-  s16:['afterclass','noclass']
-};
+var DEFAULT_SCENES = PRESETS.SUGGESTION_SCENES || {};
 
 var CAT_MUST='must', CAT_WANT='want', CAT_ROUTINE='routine';
-var CAT_LABEL = {};
-CAT_LABEL[CAT_MUST] = '必须处理';
-CAT_LABEL[CAT_WANT] = '今天想完成';
-CAT_LABEL[CAT_ROUTINE] = '每天重复';
+var CAT_LABEL = PRESETS.CAT_LABEL || {};
+if(!CAT_LABEL[CAT_MUST]) CAT_LABEL[CAT_MUST] = '';
+if(!CAT_LABEL[CAT_WANT]) CAT_LABEL[CAT_WANT] = '';
+if(!CAT_LABEL[CAT_ROUTINE]) CAT_LABEL[CAT_ROUTINE] = '';
 
 /* 饭点：「吃什么」按这几个档位分池，任一道菜可以勾多个档或勾「随时」 */
 var FOOD_SLOTS = ['breakfast', 'lunch', 'tea', 'dinner', 'night'];
-var FOOD_SLOT_LABEL = { breakfast:'早餐', lunch:'午餐', tea:'下午茶', dinner:'晚餐', night:'夜宵' };
-var FOOD_CATS = ['家常', '面食', '米饭', '快餐', '清淡', '外卖', '聚餐', '其它'];
+var FOOD_SLOT_LABEL = PRESETS.FOOD_SLOT_LABEL || {};
+var FOOD_CATS = PRESETS.FOOD_CATS || [];
 function foodSlotName(k){
-  if(k === 'any') return '随时';
+  if(k === 'any') return PRESETS.FOOD_SLOT_ANY || '';
   return FOOD_SLOT_LABEL[k] || k;
 }
 
@@ -116,13 +93,14 @@ function el(tag, cls, txt){
 function sum(arr){ var s = 0; for(var i=0;i<arr.length;i++) s += (+arr[i] || 0); return s; }
 /* ---------- 今日重点的度量：目标 {value, unit} 或 null ----------
    计时类（分钟/小时）记分钟数，展示时按单位换算；计数类（次/杯/页/个/自定义）一次记 1。 */
-var FOCUS_UNITS = ['分钟', '小时', '次', '杯', '页', '个'];
-var FOCUS_TIME_UNITS = ['分钟', '小时'];
+var FOCUS_UNITS = PRESETS.FOCUS_UNITS || [];
+var FOCUS_TIME_UNITS = PRESETS.FOCUS_TIME_UNITS || [];
+var UNIT_DEFAULT = PRESETS.UNIT_DEFAULT || '';
 function focusUnit(it){
-  if(!it) return '分钟';
+  if(!it) return UNIT_DEFAULT;
   var g = it.goal;
   if(g && g.unit) return g.unit;
-  return it.unit || '分钟';      /* 不设目标时单位仍留在条目上，值才不会忽然变回分钟 */
+  return it.unit || UNIT_DEFAULT;      /* 不设目标时单位仍留在条目上，值才不会忽然变回分钟 */
 }
 function focusHasGoal(it){
   var g = it && it.goal;
@@ -252,68 +230,31 @@ function floatText(txt, x, y){
 function buzz(){ if(navigator.vibrate) try{ navigator.vibrate(8); }catch(e){} }
 
 /* ==================== 数据 ==================== */
+/* 种子内容统一从 presets.js 读取。深拷贝后再返回，避免运行时改动污染预设对象。 */
+function cloneSeed(v){ return JSON.parse(JSON.stringify(v)); }
 function defaultPens(){
-  return [
-    {id:'p1', color:'#B6CBA8', emoji:'🌿', name:'平稳'},
-    {id:'p2', color:'#A8C0D8', emoji:'✨', name:'不错'},
-    {id:'p3', color:'#E8CEA8', emoji:'☁',  name:'有点累'}
-  ];
+  return cloneSeed(PRESETS.PENS || []);
 }
 function defaultTags(){
-  return ['少刷手机','散步','喝了水','认真一会儿','晚睡了'].map(function(n,i){
-    return {id:'tag'+i, name:n};
-  });
+  return (PRESETS.TAGS || []).map(function(n,i){ return {id:'tag'+i, name:n}; });
 }
 function defaultSuggestions(){
-  return [
-    {id:'s1',  name:'出去走 20 分钟',        cat:'身体', duration:1200, tags:['bored','tired','quiet'],   times:['afternoon','evening'], priority:2, random:true, enabled:true, note:'不带手机，绕一圈就回来'},
-    {id:'s2',  name:'练一组力量',            cat:'健身', duration:2400, tags:['train','fresh'],           times:['afternoon','evening'], priority:3, random:true, enabled:true, note:'主项 4 组，练完拉伸'},
-    {id:'s3',  name:'拉伸 10 分钟',          cat:'健身', duration:600, tags:['tired','sore','train'],    times:['evening','night'],     priority:2, random:true, enabled:true, note:'肩颈和腿后侧'},
-    {id:'s4',  name:'洗澡，把自己收拾干净',  cat:'身体', duration:1200, tags:['tired','empty','low'],     times:['evening','night'],     priority:3, random:true, enabled:true, note:'洗完就算今天完成了一件事'},
-    {id:'s5',  name:'补今天没听懂的那一点',  cat:'学习', duration:1200, tags:['study','postclass'],       times:['afternoon','evening'], priority:3, random:true, enabled:true, note:'只弄一个点，不铺开'},
-    {id:'s6',  name:'看 20 分钟书',          cat:'学习', duration:1200, tags:['study','bored','quiet'],   times:['afternoon','night'],   priority:2, random:true, enabled:true, note:'纸质书，手机放远'},
-    {id:'s7',  name:'写 10 分钟手账',        cat:'生活', duration:600, tags:['journal','sad','quiet'],   times:['evening','night'],     priority:3, random:true, enabled:true, note:'今天发生了什么，三句话就够'},
-    {id:'s8',  name:'把桌面清干净',          cat:'生活', duration:900, tags:['chores','bored','anxious'],times:['afternoon','evening'], priority:1, random:true, enabled:true, note:'只清桌面，不扩大战场'},
-    {id:'s9',  name:'洗衣服',                cat:'生活', duration:600, tags:['chores'],                  times:['afternoon','evening'], priority:1, random:true, enabled:true, note:'顺手把明天要穿的也拿出来'},
-    {id:'s10', name:'吃点东西，别空腹',      cat:'身体', duration:900, tags:['hungry','tired'],          times:['morning','afternoon','evening'], priority:3, random:true, enabled:true, note:'有热的最好'},
-    {id:'s11', name:'睡 20 分钟',            cat:'身体', duration:1200, tags:['tired','sleepy','empty'],  times:['afternoon'],           priority:2, random:true, enabled:true, note:'定个闹钟，别睡过头'},
-    {id:'s12', name:'把手机放远，做件现实里的事', cat:'心情', duration:900, tags:['phone','anxious','bored'], times:['any'],             priority:2, random:true, enabled:true, note:'哪怕只是倒杯水'},
-    {id:'s13', name:'给家里或朋友发个消息',  cat:'心情', duration:300,  tags:['lonely','sad'],            times:['evening'],             priority:1, random:true, enabled:true, note:'不用聊很久'},
-    {id:'s14', name:'明天下课要用的东西先装好', cat:'生活', duration:600, tags:['postclass','chores'],   times:['evening','night'],     priority:2, random:true, enabled:true, note:'装好就不用早上慌'},
-    {id:'s15', name:'什么都不做，躺 10 分钟', cat:'心情', duration:600, tags:['empty','tired'],           times:['any'],                 priority:1, random:true, enabled:true, note:'不算偷懒，算充电'},
-    {id:'s16', name:'取快递',                cat:'生活', duration:900, tags:['parcel'],                  times:['afternoon','evening'], priority:2, random:true, enabled:true, note:'顺手把纸箱带下去'}
-  ].map(function(s){ s.scenes = DEFAULT_SCENES[s.id] || []; return s; });
+  return cloneSeed(PRESETS.SUGGESTIONS || []).map(function(s){
+    s.scenes = DEFAULT_SCENES[s.id] || [];
+    return s;
+  });
 }
 function defaultTasks(){
-  return [
-    {id:'t1', title:'护肤',   cat:CAT_ROUTINE, repeat:'daily', duration:300,  done:{}, createdAt:Date.now()},
-    {id:'t2', title:'刷牙',   cat:CAT_ROUTINE, repeat:'daily', duration:180,  done:{}, createdAt:Date.now()},
-    {id:'t3', title:'洗衣服', cat:CAT_ROUTINE, repeat:'daily', duration:600, done:{}, createdAt:Date.now()}
-  ];
+  return (PRESETS.TASKS || []).map(function(t){
+    return {id:t.id, title:t.title, cat:CAT_ROUTINE, repeat:'daily', duration:t.duration, done:{}, createdAt:Date.now()};
+  });
 }
 function defaultPlugins(){
-  return [
-    { id:'tags', name:'标签打卡', desc:'点一下记一次，用来数频率', enabled:false },
-    { id:'food', name:'吃什么', desc:'到饭点替你抽一个，菜单自己攒', enabled:true },
-    { id:'diet', name:'饮食记录', desc:'记吃了什么、什么时候吃，看进食窗口', enabled:false }
-  ];
+  return cloneSeed(PRESETS.PLUGINS || []);
 }
 /* 菜单种子：只为「第一次就能抽」；用户可改可删，删光也不会再塞回来 */
 function defaultFoodItems(){
-  return [
-    { id:'fd-congee',  name:'粥和小菜',   cat:'清淡', note:'胃不舒服的时候',   slots:['breakfast','night'], enabled:true },
-    { id:'fd-baozi',   name:'小笼包豆浆', cat:'家常', note:'楼下那家',         slots:['breakfast'], enabled:true },
-    { id:'fd-jianbing',name:'煎饼果子',   cat:'快餐', note:'路上带着吃',       slots:['breakfast'], enabled:true },
-    { id:'fd-noodle',  name:'牛肉面',     cat:'面食', note:'多加香菜',         slots:['lunch','dinner'], enabled:true },
-    { id:'fd-rice',    name:'番茄炒蛋盖饭', cat:'米饭', note:'',               slots:['lunch','dinner'], enabled:true },
-    { id:'fd-malatang',name:'麻辣烫',     cat:'快餐', note:'少辣',             slots:['lunch','dinner','night'], enabled:true },
-    { id:'fd-salad',   name:'鸡胸沙拉',   cat:'清淡', note:'想轻一点的时候',   slots:['lunch','tea'], enabled:true },
-    { id:'fd-dumpling',name:'饺子',       cat:'家常', note:'',                 slots:['lunch','dinner'], enabled:true },
-    { id:'fd-hotpot',  name:'火锅',       cat:'聚餐', note:'叫上人一起',       slots:['dinner','night'], enabled:true },
-    { id:'fd-bbq',     name:'烧烤',       cat:'聚餐', note:'',                 slots:['night'], enabled:true },
-    { id:'fd-sandwich',name:'三明治',     cat:'快餐', note:'赶时间',           slots:['breakfast','tea'], enabled:true },
-    { id:'fd-cake',    name:'一个小蛋糕', cat:'其它', note:'下午垫一口',       slots:['tea'], enabled:true }
-  ];
+  return cloneSeed(PRESETS.FOOD_ITEMS || []);
 }
 function defaults(){
   return {
@@ -344,18 +285,18 @@ function defaults(){
       remind: true,
       remindDismissed: '',
       goals: { trainMin: 30, studyMin: 40 },
-      libFilter: '全部',
-      randFilter: '全部',
+      libFilter: PRESETS.FILTER_ALL || '',
+      randFilter: PRESETS.FILTER_ALL || '',
       uiScale: 1.2,
       tasksFold: false,   // 今日待办是否折叠成卡片堆
       focusSeedV: 0,   // 预设补回标记，写过 2 之后用户删掉的预设不再塞回来
       foodItems: defaultFoodItems(),   // 吃什么：菜单库 {id,name,cat,note,slots,enabled}
       foodLog: [],                     // 吃什么：吃过的记录 {id,date,ts,name,slot}，只增不覆写
-      mealSlots: ['早餐', '午餐', '晚餐', '加餐'],   // 饮食记录：餐次清单，可自定义；不入配置文件导出
-      focusItems: [
-        { id:'fi-train', text:'健身', goal:{ value:30, unit:'分钟' }, mode:'multi', options: PARTS.slice() },
-        { id:'fi-study', text:'学习', goal:{ value:40, unit:'分钟' }, mode:'text', label:'学了什么', ph:'高数 / 单词…（可留空）' }
-      ]
+      mealSlots: cloneSeed(PRESETS.MEAL_SLOTS || []),   // 饮食记录：餐次清单，可自定义；不入配置文件导出
+      focusItems: cloneSeed(PRESETS.FOCUS_ITEMS || []).map(function(it){
+        if(it.id === 'fi-train' && it.mode === 'multi') it.options = PARTS.slice();
+        return it;
+      })
     }
   };
 }
@@ -636,8 +577,8 @@ function normalize(){
   if(!S.settings.goals || typeof S.settings.goals !== 'object') S.settings.goals = d.settings.goals;
   if(typeof S.settings.resetHour !== 'number') S.settings.resetHour = 4;
   if(THEME_KEYS.indexOf(S.settings.theme) < 0) S.settings.theme = 'default';
-  if(!S.settings.libFilter) S.settings.libFilter = '全部';
-  if(!S.settings.randFilter) S.settings.randFilter = '全部';
+  if(!S.settings.libFilter) S.settings.libFilter = PRESETS.FILTER_ALL || '';
+  if(!S.settings.randFilter) S.settings.randFilter = PRESETS.FILTER_ALL || '';
   /* 吃什么：菜单与记录都放在 settings 里，随 settings 载荷整体迁移，不新增顶层字段。
      非法项就地丢弃，缺字段补默认值；用户删光菜单不会被种子塞回来。 */
   if(!Array.isArray(S.settings.foodItems)) S.settings.foodItems = d.settings.foodItems;
@@ -704,17 +645,17 @@ function normalize(){
     /* 目标：{ value, unit } 或 null（不设目标）。老存档只有 target（分钟），这里就地迁移 */
     var g = it.goal;
     if(g && typeof g === 'object'){
-      var unit = (typeof g.unit === 'string' && g.unit.trim()) ? g.unit.trim().slice(0, 4) : '分钟';
+      var unit = (typeof g.unit === 'string' && g.unit.trim()) ? g.unit.trim().slice(0, 4) : UNIT_DEFAULT;
       var val = +g.value;
       it.unit = unit;
       it.goal = (val > 0) ? { value: val, unit: unit } : null;
     }else if(it.goal === null){
       it.goal = null;
-      it.unit = (typeof it.unit === 'string' && it.unit.trim()) ? it.unit.trim().slice(0, 4) : '分钟';
+      it.unit = (typeof it.unit === 'string' && it.unit.trim()) ? it.unit.trim().slice(0, 4) : UNIT_DEFAULT;
     }else{
       var oldv = +it.target;
-      it.goal = (oldv > 0) ? { value: oldv, unit: '分钟' } : null;
-      it.unit = '分钟';
+      it.goal = (oldv > 0) ? { value: oldv, unit: UNIT_DEFAULT } : null;
+      it.unit = UNIT_DEFAULT;
     }
     delete it.target;
     delete it.auto;   // 「记录来源」功能已删，重点统一走自己的账本
@@ -729,7 +670,10 @@ function normalize(){
     }
     /* 老存档的预设健身/学习补上各自默认的输入方式（用户没自定义过才补） */
     if(it.id === 'fi-train' && it.mode === 'text' && !it.label && !it.ph){ it.mode = 'multi'; it.options = PARTS.slice(); }
-    if(it.id === 'fi-study' && it.mode === 'text' && !it.label && !it.ph){ it.label = '学了什么'; it.ph = '高数 / 单词…（可留空）'; }
+    if(it.id === 'fi-study' && it.mode === 'text' && !it.label && !it.ph){
+      var studySeed = (PRESETS.FOCUS_ITEMS || []).filter(function(p){ return p.id === 'fi-study'; })[0];
+      if(studySeed){ it.label = studySeed.label; it.ph = studySeed.ph; }
+    }
     return it;
   });
   // 预设「健身」「学习」默认就在；这里一次性补回被清掉的那两条，补过之后用户删掉就不再塞回来

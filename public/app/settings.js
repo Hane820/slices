@@ -135,14 +135,16 @@ function renderSettings(){
   // 外观：主题色（莫兰迪预设）+ 全局字号（滑杆，自由选，不搞大中小）
   var lb = $('lookSet');
   lb.innerHTML = '';
-  /* [键, 名称, 主色, 背景色, 深色锚点/主色/次级面/点缀色] —— 预览直接展示整条色板 */
+  /* [键, 名称, 主色, 背景色, 深色锚点/主色/次级面/点缀色] —— 预览直接展示整条色板
+     名称从 presets.js 的 THEMES 读，颜色是配色方案，留在代码里。 */
+  var THEME_NAMES = (window.OLPresets && window.OLPresets.THEMES) || {};
   var THEME_LIST = [
-    ['default', '青绿冰茶', '#6E9B80', '#F6F8F3', ['#2B3A31','#6E9B80','#EAF1E7','#A8C8BE']],
-    ['mist', '海盐奶盖', '#7186B2', '#F7F6FA', ['#2F3448','#7186B2','#EAEAF4','#C795A4']],
-    ['clay', '橘子汽水', '#C1795C', '#FDF8F1', ['#392D27','#C1795C','#F7EDE0','#7FA596']],
-    ['matcha', '咸柠汽水', '#8BA663', '#F8F9EF', ['#30382B','#8BA663','#F0F4E2','#8FB7A2']],
-    ['lotus', '草莓奶霜', '#B96A85', '#FCF5F8', ['#3A2B33','#B96A85','#F8EAF0','#8FC2B8']],
-    ['warm', '小茶狐狸', '#9C6B52', '#FAF7F3', ['#352D28','#9C6B52','#F3EDE5','#8FA993']]
+    ['default', THEME_NAMES.default || '', '#6E9B80', '#F6F8F3', ['#2B3A31','#6E9B80','#EAF1E7','#A8C8BE']],
+    ['mist', THEME_NAMES.mist || '', '#7186B2', '#F7F6FA', ['#2F3448','#7186B2','#EAEAF4','#C795A4']],
+    ['clay', THEME_NAMES.clay || '', '#C1795C', '#FDF8F1', ['#392D27','#C1795C','#F7EDE0','#7FA596']],
+    ['matcha', THEME_NAMES.matcha || '', '#8BA663', '#F8F9EF', ['#30382B','#8BA663','#F0F4E2','#8FB7A2']],
+    ['lotus', THEME_NAMES.lotus || '', '#B96A85', '#FCF5F8', ['#3A2B33','#B96A85','#F8EAF0','#8FC2B8']],
+    ['warm', THEME_NAMES.warm || '', '#9C6B52', '#FAF7F3', ['#352D28','#9C6B52','#F3EDE5','#8FA993']]
   ];
   var trow = el('div','row');
   var trowm = el('div','row-main');
