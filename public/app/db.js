@@ -17,7 +17,23 @@
 (function (global) {
   'use strict';
 
-  var DB_NAME = 'earthonline';
+  /* 库名来自身份模块（identity.js，必须先于本文件加载）：
+       local → earthonline（默认，行为与以前完全一致）
+       guest → earthonline-guest（游客独立库）
+     只认这两个名字，其余一律回落到正式库名——身份模块自己已经做了
+     「读不懂就 fail-closed 到 guest」的判断，这里不再二次猜测。 */
+  var FORMAL_DB = 'earthonline';
+  var GUEST_DB  = 'earthonline-guest';
+  function resolveDbName() {
+    var want = '';
+    try {
+      if (global.OLIdentity && typeof global.OLIdentity.dbName === 'function') {
+        want = String(global.OLIdentity.dbName() || '');
+      }
+    } catch (e) { want = ''; }
+    return want === GUEST_DB ? GUEST_DB : FORMAL_DB;
+  }
+  var DB_NAME = resolveDbName();
   var DB_VERSION = 1;          /* Dexie 声明版本；原生 IDBDatabase.version 会显示 10（Dexie 内部 ×10 编码） */
   var OPEN_TIMEOUT = 12000;    /* open() 的兜底超时，防「既不成功也不失败」把调用方吊死 */
 

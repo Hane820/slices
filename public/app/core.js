@@ -528,6 +528,12 @@ function saveRecoveryActions(Q){
 /* save(onSuccess, opts) 保持同步。opts.highFrequency 只给确有连续输入的点。 */
 function save(onSuccess, opts){
   opts = opts || {};
+  /* 游客空间的安全带：游客库就绪前（mode 还不是 idb）绝不允许落到 localStorage ——
+     那个键是正式数据的地盘。宁可提示"写入未就绪"，也不写错地方。 */
+  if(!bizWriteBlocked() && window.OLIdentity && typeof OLIdentity.isGuest === 'function' && OLIdentity.isGuest()){
+    bizWriteBlockedNotice();
+    return false;
+  }
   if(!bizWriteBlocked()){
     try{ localStorage.setItem(KEY, JSON.stringify(S)); }
     catch(e){ bizSaveFailed('local-storage'); return false; }
@@ -1895,7 +1901,10 @@ function importJSON(){
         message:'这份备份有 ' + n + ' 条数据，导出于 ' + (parsed.exportedAt ? String(parsed.exportedAt).slice(0,10) : '未知日期') + '。\n恢复会覆盖这台设备上的现有数据；当前数据会先自动存一份到本地，误操作还有退路。',
         okText:'恢复',
         onOk:function(){
-          try{ localStorage.setItem(KEY + '-backup-' + Date.now(), JSON.stringify(S)); }catch(e){}
+          /* 导入前的回滚副本：游客空间用游客自己的前缀，别混进正式库的快照键 */
+          var bkPrefix = (window.OLIdentity && typeof OLIdentity.isGuest === 'function' && OLIdentity.isGuest())
+            ? OLIdentity.GUEST_DB : KEY;
+          try{ localStorage.setItem(bkPrefix + '-backup-' + Date.now(), JSON.stringify(S)); }catch(e){}
           S = defaults();
           deepMerge(S, data);
           normalize();

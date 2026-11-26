@@ -93,4 +93,26 @@
     '颜色越深，那天记的东西越多。点上面的类型可以只看某几类。': '颜色越深，那天记的东西越多。点上面的类型可以只看某几类。',
     '饮食': '饮食',
   });
+
+  /* ===== 英文语义 key · 通用层（第一批迁移：index.html 静态文案） ===== */
+  T.register('common', {
+    'common.app.name': '地球online',
+    'common.action.cancel': '取消',
+    'common.action.confirm': '确定',
+    'common.action.close': '关闭',
+    'common.action.new': '+ 新建',
+    'common.action.add': '加上',
+    'common.action.addOne': '+ 加一条',
+    'common.action.addRecord': '+ 记一条',
+    'common.action.showDone': '显示已完成',
+    'common.action.collapse': '收起 ▴',
+    'common.a11y.backToTop': '回到顶端',
+    'common.weekday.sun': '日',
+    'common.weekday.mon': '一',
+    'common.weekday.tue': '二',
+    'common.weekday.wed': '三',
+    'common.weekday.thu': '四',
+    'common.weekday.fri': '五',
+    'common.weekday.sat': '六',
+  });
 })();

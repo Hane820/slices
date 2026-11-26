@@ -341,6 +341,12 @@
   /* 设置页 · 云端备份 · 触发：已有上传在进行中，忽略重复点击 */
   C.backupUploadBusy = { enabled:true, type:"info", text:"已有上传在进行中", duration:2200 };
 
+  /* 设置页 · 空间 · 触发：游客数据重置时删库失败或被其它标签页占用 */
+  C.guestClearFailed = { enabled:true, type:"error", text:"游客数据没能清掉，可能是别的标签页还开着；关掉后重试", duration:5000 };
+
+  /* 设置页 · 空间 · 触发：浏览器不给用 sessionStorage / 游客模块没加载，无法进入或重置游客空间 */
+  C.guestSpaceUnavailable = { enabled:true, type:"error", text:"这台浏览器不支持游客空间", duration:4000 };
+
   /* 设置页 · 数字输入 · 触发：输入超出允许范围 */
   C.numberOutOfRange = { enabled:true, type:"warning", text:"填 {min} 到 {max} 之间的数字", duration:3500 };
 

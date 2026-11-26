@@ -221,12 +221,90 @@ function renderSettings(){
     });
   });
   renderCloudSet();
+  renderGuestSet();
+}
+
+/* 空间区：游客空间的入口 / 状态 / 重置。
+   产品前提：应用没有账号体系，本轮不提供登录、注册、也不做「登录后切换」；
+   游客身份只活在当前标签页（sessionStorage），关掉标签页就回到本机数据，
+   所以这里不需要、也不该出现任何假的登录状态。 */
+function renderGuestSet(){
+  var box = $('guestSet');
+  if(!box || !window.OLIdentity) return;
+  box.innerHTML = '';
+
+  var guest = OLIdentity.isGuest();
+
+  function infoRow(title, sub, tail){
+    var row = el('div','row');
+    var main = el('div','row-main');
+    main.appendChild(el('div','row-t', title));
+    main.appendChild(el('div','row-s', sub));
+    row.appendChild(main);
+    if(tail) row.appendChild(el('div','row-a', tail));
+    box.appendChild(row);
+    return row;
+  }
+
+  if(guest){
+    infoRow(OLT('当前空间'), OLT('游客体验中：这份数据单独存放，不会和你自己的数据混在一起。'), '●');
+    infoRow(OLT('数据存在哪里'), OLT('只在这台设备的浏览器里；关掉标签页就回到你自己的数据，游客数据仍会留着。'));
+    infoRow(OLT('登录 / 注册'), OLT('尚未开放：应用目前没有账号体系。游客数据不会上传，也不会合并到你自己的数据里。'), OLT('未开放'));
+
+    var reset = el('div','row');
+    var rm = el('div','row-main');
+    rm.appendChild(el('div','row-t', OLT('重置游客数据')));
+    rm.appendChild(el('div','row-s', OLT('只删游客空间里的记录，并重新灌入演示数据；不影响你自己的数据。')));
+    reset.appendChild(rm);
+    reset.appendChild(el('div','row-a','›'));
+    reset.addEventListener('click', function(){
+      confirmBox('重置游客数据？',
+        '游客空间里的增删改都会消失，然后恢复成初始演示数据。你自己的数据完全不受影响。',
+        function(){
+          if(!window.OLGuest){ toastCfg('guestSpaceUnavailable'); return; }
+          OLGuest.clear().then(function(r){
+            if(r && r.ok){ location.reload(); return; }
+            toastCfg('guestClearFailed');
+          }, function(){ toastCfg('guestClearFailed'); });
+        });
+    });
+    box.appendChild(reset);
+    return;
+  }
+
+  var enter = el('div','row');
+  var em = el('div','row-main');
+  em.appendChild(el('div','row-t', OLT('游客体验')));
+  em.appendChild(el('div','row-s', OLT('用一份独立的演示数据试用，随便增删改都不会碰到你自己的数据；关掉标签页就回来。')));
+  enter.appendChild(em);
+  enter.appendChild(el('div','row-a','›'));
+  enter.addEventListener('click', function(){
+    confirmBox('进入游客体验？',
+      '当前标签页会切换到一个独立的演示空间。你自己的数据不会被读取、也不会被修改；关掉这个标签页就回到原来的数据。',
+      function(){
+        if(!OLIdentity.enterGuest()){ toastCfg('guestSpaceUnavailable'); return; }
+        location.reload();
+      });
+  });
+  box.appendChild(enter);
 }
 
 /* 云端备份状态区：只读展示 + 立即备份入口，与自动备份共用同一上传队列 */
 function renderCloudSet(){
   var box = $('cloudSet');
   if(!box || !window.OLCloudBackup) return;
+  /* 游客空间不参与云端备份。这里只给一句说明；真正的门禁在 cloud-backup 的调用层
+     （init / markDirty / backupNow / refreshStatus 全部短路），不依赖这行 UI。 */
+  if(window.OLIdentity && OLIdentity.isGuest()){
+    box.innerHTML = '';
+    var gr = el('div','row');
+    var gm = el('div','row-main');
+    gm.appendChild(el('div','row-t', OLT('游客空间不参与云端备份')));
+    gm.appendChild(el('div','row-s', OLT('备份只针对你自己的数据；游客空间里的任何改动都不会上传。')));
+    gr.appendChild(gm);
+    box.appendChild(gr);
+    return;
+  }
   var st = OLCloudBackup.snapshot();
   var labels = {
     uploading:'正在上传', pending:'待备份', synced:'已同步备份',

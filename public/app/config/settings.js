@@ -37,4 +37,22 @@
     '首页提醒': '首页提醒',
     '＋ 加一条': '＋ 加一条',
   });
+
+  /* ===== 英文语义 key · 设置页（第一批迁移：index.html 静态文案） ===== */
+  T.register('settings', {
+    'settings.page.title': '设置',
+    'settings.page.subtitle': '东西都只在这台设备上。',
+    'settings.section.remind': '提醒',
+    'settings.section.pens': '我的标记',
+    'settings.hint.pens': '点标记改名字和颜色，点 × 删掉。',
+    'settings.section.tags': '标签',
+    'settings.section.look': '外观',
+    'settings.section.plugins': '插件',
+    'settings.hint.plugins': '关掉只是不在首页出现，记过的都还在。',
+    'settings.section.other': '其它',
+    'settings.section.cloud': '云端备份',
+    'settings.section.space': '空间',
+    'settings.section.data': '数据',
+    'settings.hint.data': '数据只存在这个浏览器里。清缓存、换设备或误删都可能丢掉，建议偶尔导出一次备份。',
+  });
 })();

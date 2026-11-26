@@ -112,6 +112,21 @@
 .lib-t{font-size:13.5px;flex:1;min-width:0;line-height:1.4}
 .lib-item.off .lib-t{color:var(--ink3);text-decoration:line-through;text-decoration-color:var(--line)}
 .lib-d{font-size:10.5px;color:var(--ink3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+/* 分类标签：小型色块，给每行一个视觉锚点，和后面的饭点、备注拉开层次。
+   颜色取主题变量，换主题自动跟着走；c0–c5 六档，同一分类永远同色。 */
+.lib-cat{
+  display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:7px;
+  background:var(--paper2);color:var(--ink2);
+  font-size:10px;font-weight:600;letter-spacing:.2px;white-space:nowrap;
+}
+.lib-cat.c0{background:var(--sage-l);color:var(--sage-d)}      /* 主色：身体 / 清淡 */
+.lib-cat.c1{background:var(--accent-l);color:var(--accent-d)}  /* 青：学习 / 蛋白质 */
+.lib-cat.c2{background:var(--warn-l);color:var(--warn-d)}      /* 琥珀：生活 / 外卖 */
+.lib-cat.c3{background:var(--ok-l);color:var(--ok-d)}          /* 绿：健身 / 减脂 */
+.lib-cat.c4{background:var(--err-l);color:var(--err-d)}        /* 陶红：心情 / 聚餐（借色值做标签，与状态无关） */
+.lib-cat.c5{background:var(--paper2);color:var(--ink2)}        /* 中性：随便吃 / 其它 */
+/* 关掉的条目：标签退成中性灰，别比标题还抢眼 */
+.lib-item.off .lib-cat{background:var(--paper2);color:var(--ink3)}
 .lib-search{width:100%;border:1px solid var(--line);background:var(--paper);border-radius:11px;padding:10px 12px;font-family:inherit;font-size:16px;color:var(--ink);outline:none;margin-bottom:9px}
 .lib-search:focus{border-color:var(--sage)}
 .lib-search::placeholder{font-size:13px;color:var(--ink3)}
@@ -119,8 +134,25 @@
 /* ---------- 情境列表 / 情境卡 ---------- */
 .sec-t.strong{letter-spacing:.5px}
 .scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.scene-card{background:var(--paper2);border:1px solid var(--line);border-radius:12px;padding:10px 11px;cursor:pointer;text-align:left;font-family:inherit;transition:all .16s}
+.scene-card{
+  background:var(--paper2);border:1px solid var(--line);border-radius:12px;padding:10px 11px;
+  cursor:pointer;text-align:left;font-family:inherit;
+  transition:transform .3s var(--ease),box-shadow .3s var(--ease),
+             background-color .16s var(--ease),border-color .16s var(--ease);
+}
 .scene-card:active{transform:scale(.97)}
+/* 悬停浮起：位移与缩放由 JS 写到 inline transform（跟手），这里负责阴影、层级和快速跟随的过渡。
+   注意：这块刻意不用 translateZ / will-change —— 一旦把卡片提升为合成层，
+   浏览器会按 1x 栅格化再交给合成器放大，10px 的小字就会发虚。 */
+.scene-card.lift{
+  position:relative;z-index:3;
+  box-shadow:0 16px 30px -18px rgba(var(--sage-rgb),.75);
+  transition:transform .09s linear,box-shadow .28s var(--ease);
+}
+.scene-card.lift .n{color:var(--sage-d)}
+@media (prefers-reduced-motion:reduce){
+  .scene-card,.scene-card.lift{transition:background-color .16s,border-color .16s}
+}
 .scene-card.on{background:var(--sage-l);border-color:rgba(var(--sage-rgb),.4)}
 .scene-card .n{font-size:13px;font-weight:600;color:var(--ink)}
 .scene-card.on .n{color:var(--sage-d)}
@@ -157,6 +189,12 @@
   background:var(--paper2);border:1px solid var(--line2);border-radius:100px;
   padding:3px 9px;color:var(--ink2);font-size:10.5px;
 }
+/* 筛选条：未选中也带一层淡底，从页面背景里浮出来；选中仍用主色实心。
+   只作用于 #eatFilter / #libFilter，不动全站其它 .chip（设置、待办那边保持原样）。 */
+#eatFilter .chip,#libFilter .chip{background:var(--paper2);border-color:var(--line2);color:var(--ink2)}
+#eatFilter .chip:hover,#libFilter .chip:hover{background:var(--line);border-color:var(--line);color:var(--ink)}
+#eatFilter .chip.on,#libFilter .chip.on{background:var(--sage);border-color:var(--sage);color:var(--paper);font-weight:600}
+#eatFilter .chip.on:hover,#libFilter .chip.on:hover{background:var(--sage-d);border-color:var(--sage-d)}
 
 /* 情景管理：与正常决策同一张卡片，换色 + 管理列表，一眼能分清模式 */
 .ask-h{display:flex;align-items:center;justify-content:space-between;gap:10px}

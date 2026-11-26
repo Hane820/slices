@@ -16,6 +16,13 @@
   var TAB_ID = 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
   var listeners = [];
+  /* 游客空间不参与云端备份：门禁放在这里（真实调用层），而不是靠设置页隐藏按钮。
+     命中后 init / markDirty / backupNow / refreshStatus 全部短路，
+     不读也不写 STATE_KEY / LEASE_KEY，不发任何请求、不碰 R2 与正式备份 pointer。 */
+  function guestBlocked(){
+    try { return !!(window.OLIdentity && typeof OLIdentity.isGuest === 'function' && OLIdentity.isGuest()); }
+    catch (e) { return true; }        /* 判定不了就按游客处理：宁可不备份，也不误传 */
+  }
   var state = {
     pending: false, seq: 0, dirtyAt: 0,
     lastSuccessAt: null, lastError: '', lastFailureAt: 0,
@@ -167,6 +174,7 @@
   }
 
   function refreshStatus(){
+    if(guestBlocked()) return Promise.resolve(null);   /* 游客：连状态都不查 */
     return fetch(endpoint() + '/api/backup/status', { method:'GET', credentials:'include' })
       .then(parseResponse)
       .then(function(r){
@@ -185,6 +193,7 @@
   }
 
   function markDirty(source){
+    if(guestBlocked()) return;                /* 游客：不记待备份、不排上传 */
     state.pending = true;
     state.seq++;
     state.dirtyAt = Date.now();
@@ -195,6 +204,7 @@
 
   function backupNow(){
     /* 手动与自动共用同一队列：上传中重复点击不再改序号，避免成功后误以为有新提交 */
+    if(guestBlocked()) return false;          /* 游客：手动也拒绝，不给任何上传入口 */
     if(uploading) return false;
     state.pending = true; state.seq++; state.dirtyAt = Date.now(); persist();
     clearTimer();
@@ -202,6 +212,8 @@
   }
 
   function init(){
+    /* 游客：不读数、不挂心跳、不监听 online/storage —— 连"待备份"状态都不存在 */
+    if(guestBlocked()){ emit(); return; }
     readState();
     refreshStatus();
     if(state.pending) schedule(1500);         /* 启动补传：不因刷新误判已备份 */

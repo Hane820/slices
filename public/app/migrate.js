@@ -1137,6 +1137,12 @@
   function run(options) {
     options = options || {};
 
+    /* 游客库不参与迁移：迁移的源是 localStorage 里的正式数据，
+       任何情况下都不允许把它搬进 earthonline-guest（产品决策：游客库只放静态种子）。 */
+    if (global.OLIdentity && typeof global.OLIdentity.isGuest === 'function' && global.OLIdentity.isGuest()) {
+      return Promise.resolve({ ok: false, reason: 'guest-space-refused', message: '游客空间不使用迁移流程' });
+    }
+
     if (options.confirm !== true) {
       return Promise.resolve({ ok: false, reason: 'not-confirmed', message: '迁移必须显式传 {confirm:true}' });
     }

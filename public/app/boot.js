@@ -263,7 +263,7 @@ function finishBoot(){
   $('randFilterBtn').textContent = S.settings.randFilter === '全部' ? '全部类型' : S.settings.randFilter;
   if(migrated){
     setTimeout(function(){ toastCfg('legacyMigrated'); }, 800);
-  }else if(!allRecordDates().length){
+  }else if(!allRecordDates().length && !OLBoot.guest){
     setTimeout(function(){ toastCfg('firstUseHint'); }, 1000);
   }
   OLBoot.booted = true;
@@ -969,7 +969,39 @@ function tryMigrate(){
   });
 }
 
+/* 游客空间启动：只开 earthonline-guest，不查迁移状态、不读 localStorage 正式数据、不迁移。
+   初始化失败一律阻断启动 —— 绝不退回 legacy 路径，否则就会去读写正式 localStorage。 */
+function bootGuest(){
+  OLBoot.guest = true;
+  OLBoot.mode = 'guest';
+  if(!window.OLIdentity || !OLIdentity.isGuest()){
+    bootBlocked('游客空间状态异常', '身份模块报告的当前空间不是游客空间，已停止启动');
+    return;
+  }
+  if(!window.OLGuest || typeof OLGuest.prepare !== 'function'){
+    bootBlocked('游客空间不可用', '缺少游客数据模块，已停止启动');
+    return;
+  }
+  if(!window.OLDB || !OLDB.isSupported || !OLDB.isSupported()){
+    /* 关键：没有 IndexedDB 时不能退回 legacy —— 那正是正式数据的所在地 */
+    bootBlocked('这台浏览器不支持本地数据库',
+      '游客空间需要 IndexedDB。为了不碰你自己的数据，这里不会退回到旧的存储方式。');
+    return;
+  }
+  OLDB.open().then(function(){
+    return OLGuest.prepare();
+  }).then(function(r){
+    if(OLBoot.blocked || OLBoot.booted) return;
+    if(!r || !r.ok){ bootBlocked('游客空间初始化失败', (r && (r.reason + (r.message ? '：' + r.message : ''))) || 'unknown'); return; }
+    bootFromIdb();
+  }, function(e){
+    bootBlocked('游客空间无法打开', (e && (e.code || e.message)) || 'unknown');
+  });
+}
+
 function startBoot(){
+  /* 身份只有一个权威来源：identity.js。游客空间走独立分支，与正式路径零交叉。 */
+  if(window.OLIdentity && OLIdentity.isGuest()){ bootGuest(); return; }
   /* 连 IndexedDB 都没有的旧浏览器：没有迁移目标，旧路径继续可用 */
   if(!window.OLDB || !OLDB.isSupported || !OLDB.isSupported()){
     bootLegacy();

@@ -18,9 +18,13 @@
 (function(){
   var P = {};
 
-  /* ---------- 情境：点一个，就列出绑在这个情境上的建议 ---------- */
+  /* ---------- 情境：点一个，就列出绑在这个情境上的建议 ----------
+     注意：afterclass（下课后）与 inclass（上课时）是两个独立情境，
+     各自有独立键名。afterclass 是老版本就有的，老用户的历史数据和建议
+     绑定都挂在它上面——永远不要删除或改名这两个键。 */
   P.SCENES = [
-    { k:'inclass',    n:'上水课',       d:'妈妈人生是旷课' },
+    { k:'afterclass', n:'下课后',       d:'刚下课，还没安排' },
+    { k:'inclass',    n:'上课时',       d:'妈妈人生是旷课' },
     { k:'noclass',    n:'没课',         d:'悠哉悠哉' },
     { k:'tired',      n:'疲惫',         d:'累了' },
     { k:'nofuel',     n:'不想动',       d:'什么都不想开始' },
@@ -65,11 +69,11 @@
   /* ---------- 建议默认绑哪些情境：情境键与上表 k 一一对应，改名后这里必须同步 ---------- */
   P.SUGGESTION_SCENES = {
     s1:['bored','tired','meal'],        s2:['move','noclass'],           s3:['tired','move','beforebed'],
-    s4:['tired','nofuel','beforebed'], s5:['inclass','study'],          s6:['study','bored','beforebed'],
+    s4:['tired','nofuel','beforebed'], s5:['afterclass','study'],       s6:['study','bored','beforebed'],
     s7:['beforebed','lost'],            s8:['bored','lost'],             s9:['lost','noclass'],
-    s10:['inclass','tired'],            s11:['tired','nofuel','meal'],   s12:['bored','lost','beforebed'],
-    s13:['lost','bored'],               s14:['inclass','beforebed'],     s15:['nofuel','tired'],
-    s16:['inclass','noclass']
+    s10:['afterclass','tired'],         s11:['tired','nofuel','meal'],   s12:['bored','lost','beforebed'],
+    s13:['lost','bored'],               s14:['afterclass','beforebed'],  s15:['nofuel','tired'],
+    s16:['afterclass','noclass']
   };
 
   /* ---------- 每日重复待办（默认三条） ---------- */

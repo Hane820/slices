@@ -700,6 +700,25 @@ function runRandom(){
 }
 
 /* ---------- 建议库 ---------- */
+/* 分类标签配色：常用分类固定映射（同一类永远同色），自定义分类按名称哈希取一色，
+   保证「清淡」在菜单里和「身体」在建议库里都稳定不跳色。颜色本身在 decide.css。 */
+var CAT_TONE = {
+  /* 建议库 */
+  '身体':'c0', '健身':'c3', '学习':'c1', '生活':'c2', '心情':'c4',
+  /* 菜单 */
+  '清淡':'c0', '减脂':'c3', '蛋白质':'c1', '外卖':'c2', '聚餐':'c4',
+  '随便吃':'c5', '其它':'c5'
+};
+function catTone(c){
+  var k = String(c || '其它');
+  if(CAT_TONE[k]) return CAT_TONE[k];
+  var h = 0;
+  for(var i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) % 6;
+  return 'c' + h;
+}
+function catTag(c){
+  return el('span', 'lib-cat ' + catTone(c), c || '其它');
+}
 function libCats(){
   var set = {};
   S.suggestions.forEach(function(sg){ set[sg.cat] = 1; });
@@ -744,7 +763,7 @@ function renderLib(){
     item.appendChild(h);
 
     var d = el('div','lib-d');
-    d.appendChild(el('span', null, sg.cat));
+    d.appendChild(catTag(sg.cat));
     if(sg.duration) d.appendChild(el('span', null, durText(sg.duration)));
     if(!sg.random) d.appendChild(el('span', null, OLT('不参与随机')));
     if((sg.scenes||[]).length){
@@ -1094,7 +1113,7 @@ function renderEatLib(){
     h.appendChild(sw);
     item.appendChild(h);
     var d = el('div','lib-d');
-    d.appendChild(el('span', null, it.cat || '其它'));
+    d.appendChild(catTag(it.cat));
     d.appendChild(el('span', null, (it.slots || ['any']).map(foodSlotName).join('、')));
     if(it.note) d.appendChild(el('span', null, it.note));
     item.appendChild(d);
@@ -1176,4 +1195,69 @@ function openFoodEdit(it){
     save(function(){ toastCfg('foodItemSaved'); }); closeSheet(); renderEat();
   });
 }
+
+/* ---------- 情景卡片悬停：浮起 + 放大 + 轻微跟手 ----------
+   覆盖所有 .scene-card —— 「做什么」的情境卡和「吃什么」的饭点卡共用这一个类，所以一起生效。
+   鼠标进入时卡片放大到 1.04、整体上浮 2.5px，并按指针在卡片内的相对位置做 ±3px 的位移
+   （外加不超过 1° 的轻微倾斜），跟随由 rAF 节流，离开即还原。
+   触屏（无 hover）和系统「减少动态效果」下一个都不启用，只保留原有底色变化。 */
+(function(){
+  var noHover = window.matchMedia && window.matchMedia('(hover:none)').matches;
+  var reduce  = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(noHover || reduce) return;
+
+  var cur = null, raf = 0, px = 0, py = 0, pressed = false;
+
+  function leave(){
+    if(!cur) return;
+    cur.classList.remove('lift');
+    cur.style.transform = '';
+    cur = null;
+  }
+
+  function apply(){
+    raf = 0;
+    if(!cur) return;
+    if(!cur.isConnected){ leave(); return; }   /* 重绘后旧节点已脱离，别往孤儿上写样式 */
+    if(pressed) return;
+    var r = cur.getBoundingClientRect();
+    if(!r.width || !r.height) return;
+    var mx = clamp((px - (r.left + r.width / 2)) / (r.width / 2), -1, 1);
+    var my = clamp((py - (r.top + r.height / 2)) / (r.height / 2), -1, 1);
+    /* 位移取整、用 2D translate：小数位移 + 3D 变换都会让合成器插值，10px 小字跟着发虚 */
+    var tx = Math.round(mx * 5);
+    var ty = Math.round(my * 3.4 - 3);
+    cur.style.transform = 'translate(' + tx + 'px,' + ty + 'px) rotate(' + (mx * 1.4).toFixed(2) + 'deg) scale(1.05)';
+  }
+
+  function schedule(){ if(!raf) raf = requestAnimationFrame(apply); }
+
+  document.addEventListener('pointermove', function(e){
+    if(e.pointerType === 'touch') return;
+    var card = (e.target && e.target.closest) ? e.target.closest('.scene-card') : null;
+    if(card !== cur){
+      leave();
+      if(card){ cur = card; card.classList.add('lift'); }
+    }
+    if(!cur) return;
+    px = e.clientX; py = e.clientY;
+    schedule();
+  }, { passive: true });
+
+  /* 按下时保留缩放反馈：JS 写了 inline transform，:active 会被盖掉，这里手动顶一下 */
+  document.addEventListener('pointerdown', function(e){
+    if(!cur || !cur.contains(e.target)) return;
+    pressed = true;
+    cur.style.transform = 'scale(.972)';
+  }, { passive: true });
+
+  document.addEventListener('pointerup', function(){
+    if(!pressed) return;
+    pressed = false;
+    schedule();
+  }, { passive: true });
+
+  /* 滚轮/触摸板滚动时卡片坐标变了，重算一次免得跟手偏移错位 */
+  window.addEventListener('scroll', function(){ if(cur) schedule(); }, { passive: true });
+})();
 
