@@ -25,7 +25,7 @@ function renderSettings(){
     var t0 = TODAY();
     if(isRest) S.restDays = S.restDays.filter(function(d){ return d !== t0; });
     else S.restDays.push(t0);
-    save(function(){ toast(isRest ? '恢复提醒' : '今天好好休息'); }); renderSettings(); renderRemind();
+    save(function(){ toastCfg(isRest ? 'remindRestOn' : 'remindRestOff'); }); renderSettings(); renderRemind();
   });
   r2.appendChild(r2s);
   rb.appendChild(r2);
@@ -43,11 +43,11 @@ function renderSettings(){
     var x = el('button','x','×');
     x.addEventListener('click', function(ev){
       ev.stopPropagation();
-      if(S.pens.length <= 1){ toast(OLT('至少留一个标记')); return; }
+      if(S.pens.length <= 1){ toastCfg('lastMarkerProtected'); return; }
       confirmBox('删掉「' + (p.name||'未命名') + '」？', '用过这个标记的日期会变回空白。', function(){
         S.pens = S.pens.filter(function(y){ return y.id !== p.id; });
         for(var k in S.marks){ S.marks[k].items = (S.marks[k].items || []).filter(function(it){ return it.penId !== p.id; }); if(!S.marks[k].items.length) delete S.marks[k]; }
-        save(function(){ toast(OLT('已删除')); }); renderSettings();
+        save(function(){ toastCfg('markerDeleted'); }); renderSettings();
       });
     });
     pill.appendChild(x);
@@ -70,14 +70,14 @@ function renderSettings(){
       confirmBox('删除标签「' + t.name + '」？', '之前的打卡记录会一起消失。', function(){
         S.tags = S.tags.filter(function(y){ return y.id !== t.id; });
         S.tagLogs = S.tagLogs.filter(function(l){ return l.tagId !== t.id; });
-        save(function(){ toast(OLT('已删除')); }); renderSettings();
+        save(function(){ toastCfg('tagDeleted'); }); renderSettings();
       });
     });
     pill.appendChild(x);
     pill.addEventListener('click', function(){
       openModal({
         title:'改标签名', sub:'', input:true, value:t.name, placeholder:'标签名', okText:'保存',
-        onOk:function(v){ t.name = v; save(function(){ toast(OLT('改好了')); }); renderSettings(); }
+        onOk:function(v){ t.name = v; save(function(){ toastCfg('tagRenamed'); }); renderSettings(); }
       });
     });
     tp.appendChild(pill);
@@ -88,7 +88,7 @@ function renderSettings(){
       title:'新建标签', sub:'点一下记一次，用来数频率', input:true, placeholder:'比如「晒了太阳」', okText:'加上',
       onOk:function(v){
         S.tags.push({ id: uid('tag'), name:v });
-        save(function(){ toast(OLT('标签已加上')); }); renderSettings(); renderTagsRow();
+        save(function(){ toastCfg('tagAdded'); }); renderSettings(); renderTagsRow();
       }
     });
   });
@@ -108,7 +108,7 @@ function renderSettings(){
     r.appendChild(sw);
     r.addEventListener('click', function(){
       p.enabled = !p.enabled;
-      save(function(){ toast(p.enabled ? '「' + p.name + '」打开了' : '「' + p.name + '」关掉了'); });
+      save(function(){ toastCfg(p.enabled ? 'pluginOn' : 'pluginOff', { name: p.name }); });
       renderSettings();
       renderToday();
       if(typeof renderDecideShell === 'function') renderDecideShell();
@@ -127,7 +127,7 @@ function renderSettings(){
   rr.appendChild(el('div','row-a', '凌晨 ' + S.settings.resetHour + ':00'));
   rr.addEventListener('click', function(){
     askNumber('几点算新的一天（0-6 点）', S.settings.resetHour, 0, 6, function(v){
-      S.settings.resetHour = v; save(function(){ toast(OLT('改好了')); }); renderSettings(); renderToday();
+      S.settings.resetHour = v; save(function(){ toastCfg('resetHourSaved'); }); renderSettings(); renderToday();
     });
   });
   ob.appendChild(rr);
@@ -163,7 +163,7 @@ function renderSettings(){
     sw.addEventListener('click', function(){
       if(S.settings.theme === t[0]) return;
       S.settings.theme = t[0];
-      save(function(){ toast(OLT('换成「') + t[1] + '」了'); }); applyTheme(); renderSettings();
+      save(function(){ toastCfg('themeChanged', { name: t[1] }); }); applyTheme(); renderSettings();
     });
     tgrid.appendChild(sw);
   });
@@ -188,7 +188,7 @@ function renderSettings(){
     applyUiScale();
     lval.textContent = Math.round(v * 100) + '%';
   });
-  slider.addEventListener('change', function(){ save(function(){ toast(OLT('字号记下了')); }, { highFrequency:true }); });
+  slider.addEventListener('change', function(){ save(function(){ toastCfg('fontScaleSaved'); }, { highFrequency:true }); });
   lb.appendChild(slider);
 
   renderFocusSet();
@@ -217,7 +217,7 @@ function renderSettings(){
     confirmBox('清空全部数据？', '所有待办、标记、记录、训练都会消失，而且找不回来。', function(){
       S = defaults();
       normalize();
-      save(); renderAll(); toast(OLT('已经清空了'));
+      save(); renderAll(); toastCfg('allDataCleared');
     });
   });
   renderCloudSet();
@@ -265,7 +265,7 @@ function renderCloudSet(){
   now.type = 'button';
   now.disabled = !!st.uploading;
   now.addEventListener('click', function(){
-    if(!OLCloudBackup.backupNow()) toast(OLT('已有上传在进行中'));
+    if(!OLCloudBackup.backupNow()) toastCfg('backupUploadBusy');
   });
   var refresh = el('button','btn g sm',OLT('刷新云端状态'));
   refresh.type = 'button';
@@ -284,7 +284,7 @@ function askNumber(title, cur, min, max, cb){
     title: title, sub: min + ' 到 ' + max + ' 之间', input:true, value:String(cur), numeric:true, okText:'保存',
     onOk:function(v){
       var n = parseInt(v, 10);
-      if(isNaN(n) || n < min || n > max){ toast(OLT('填 ') + min + ' 到 ' + max + ' 之间的数字'); return; }
+      if(isNaN(n) || n < min || n > max){ toastCfg('numberOutOfRange', { min: min, max: max }); return; }
       cb(n);
     }
   });
@@ -347,23 +347,23 @@ function openPenEdit(existing){
   body.querySelector('#penNo').addEventListener('click', closeSheet);
   if(existing){
     body.querySelector('#penDel').addEventListener('click', function(){
-      if(S.pens.length <= 1){ toast(OLT('至少留一个标记')); return; }
+      if(S.pens.length <= 1){ toastCfg('lastMarkerProtected'); return; }
       confirmBox('删掉这个标记？', '用过它的日期会变回空白。', function(){
         S.pens = S.pens.filter(function(y){ return y.id !== existing.id; });
         for(var k in S.marks){ S.marks[k].items = (S.marks[k].items || []).filter(function(it){ return it.penId !== existing.id; }); if(!S.marks[k].items.length) delete S.marks[k]; }
-        save(function(){ toast(OLT('已删除')); }); closeSheet(); renderSettings();
+        save(function(){ toastCfg('markerDeleted'); }); closeSheet(); renderSettings();
       });
     });
   }
   body.querySelector('#penOk').addEventListener('click', function(){
     var n = nameInp.value.trim();
-    if(!n){ toast(OLT('给它起个名字')); return; }
+    if(!n){ toastCfg('markerNameRequired'); return; }
     if(existing){
       existing.color = draft.color; existing.emoji = draft.emoji; existing.name = n;
     }else{
       S.pens.push({ id: uid('p'), color: draft.color, emoji: draft.emoji, name: n });
     }
-    save(function(){ toast(OLT('已保存')); }); closeSheet(); renderSettings();
+    save(function(){ toastCfg('markerSaved'); }); closeSheet(); renderSettings();
   });
 }
 
@@ -462,8 +462,8 @@ function openFocusEdit(it, isNew){
       });
       box.querySelector('#fxOptAdd').addEventListener('click', function(){
         var v = box.querySelector('#fxOptIn').value.trim();
-        if(!v){ toast(OLT('写个选项名')); return; }
-        if(opts.indexOf(v) >= 0){ toast(OLT('已经有这个选项了')); return; }
+        if(!v){ toastCfg('optionNameRequired'); return; }
+        if(opts.indexOf(v) >= 0){ toastCfg('optionDuplicate'); return; }
         opts.push(v);
         renderModeBox();
         var again = box.querySelector('#fxOptIn');
@@ -559,14 +559,14 @@ function openFocusEdit(it, isNew){
   body.querySelector('#fxNo').addEventListener('click', closeSheet);
   body.querySelector('#fxOk').addEventListener('click', function(){
     var name = body.querySelector('#fxName').value.trim();
-    if(!name){ toast(OLT('写个名字')); return; }
-    if(mode === 'multi' && !opts.length){ toast(OLT('多选至少要有一个选项')); return; }
+    if(!name){ toastCfg('focusNameRequired'); return; }
+    if(mode === 'multi' && !opts.length){ toastCfg('focusNeedsOption'); return; }
     var gu = String(unit || '').trim().slice(0, 4);
     var goal = null;
     if(!noGoal){
       var gv = parseFloat(goalInp.value);
-      if(!(gv > 0)){ goalInp.classList.add('err'); goalInp.focus(); toast(OLT('目标写个大于 0 的数')); return; }
-      if(!gu){ customInp.classList.add('err'); customInp.focus(); toast(OLT('写个单位名')); return; }
+      if(!(gv > 0)){ goalInp.classList.add('err'); goalInp.focus(); toastCfg('focusGoalInvalid'); return; }
+      if(!gu){ customInp.classList.add('err'); customInp.focus(); toastCfg('focusUnitRequired'); return; }
       goal = { value: Math.round(gv * 100) / 100, unit: gu };
     }
     var fields = (mode === 'multi')
@@ -578,7 +578,7 @@ function openFocusEdit(it, isNew){
       it.text = name; it.goal = goal; it.unit = gu || '分钟';
       it.mode = fields.mode; it.options = fields.options; it.label = fields.label; it.ph = fields.ph;
     }
-    save(function(){ toast(isNew ? '加好了' : '改好了'); }); closeSheet(); renderFocusSet(); renderGoals(); renderRemind();
+    save(function(){ toastCfg(isNew ? 'focusAdded' : 'focusSaved'); }); closeSheet(); renderFocusSet(); renderGoals(); renderRemind();
     if(currentPage === 'pRecords') renderProject();
   });
   if(!isNew){
@@ -602,9 +602,9 @@ function openFocusEdit(it, isNew){
         setTimeout(function(){
           S.settings.focusItems = S.settings.focusItems.filter(function(x){ return x !== it; });
           save(function(){
-            toast(OLT('已删除「') + it.text + '」', '撤销', function(){
+            toastCfg('focusDeleted', { name: it.text }, '撤销', function(){
               S.settings.focusItems.splice(Math.min(pos, S.settings.focusItems.length), 0, it);
-              save(function(){ toast(OLT('已恢复')); }); renderFocusSet(); renderGoals();
+              save(function(){ toastCfg('focusRestored'); }); renderFocusSet(); renderGoals();
               if(currentPage === 'pRecords') renderProject();
             });
           }); renderFocusSet(); renderGoals();
@@ -628,7 +628,7 @@ function sceneMove(id, dir, onDone){
   if(i < 0 || j < 0 || j >= S.scenes.length) return;
   var t = S.scenes[i]; S.scenes[i] = S.scenes[j]; S.scenes[j] = t;
   normalize();
-  save(function(){ toast(OLT('顺序调好了')); });
+  save(function(){ toastCfg('scenesReordered'); });
   renderSettings();
   if(typeof renderScenes === 'function') renderScenes();
   if(typeof onDone === 'function') onDone();
@@ -653,15 +653,15 @@ function openSceneEdit(id, onDone){
   body.querySelector('#scOk').addEventListener('click', function(){
     var name = body.querySelector('#scN').value.trim();
     var desc = body.querySelector('#scD').value.trim();
-    if(!name){ toast(OLT('写个名字')); return; }
+    if(!name){ toastCfg('sceneNameRequired'); return; }
     if(isNew){
       S.scenes.push({ id: uid('sc'), name: name, desc: desc, sys: false, enabled: true });
       normalize();
-      save(function(){ toast(OLT('加好了，决策页马上能用')); });
+      save(function(){ toastCfg('sceneAdded'); });
     } else {
       sc.name = name; sc.desc = desc; sc.enabled = enabled;
       normalize();
-      save(function(){ toast(OLT('改好了')); });
+      save(function(){ toastCfg('sceneSaved'); });
     }
     closeSheet();
     renderSettings();
@@ -679,7 +679,7 @@ function openSceneEdit(id, onDone){
       });
       S.scenes = S.scenes.filter(function(x){ return x.id !== sc.id; });
       normalize();
-      save(function(){ toast(OLT('删掉了')); });
+      save(function(){ toastCfg('sceneDeleted'); });
       closeSheet();
       renderSettings();
       if(typeof renderScenes === 'function') renderScenes();

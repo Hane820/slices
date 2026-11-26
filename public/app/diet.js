@@ -268,7 +268,7 @@ function renderDiet(){
     if(t.dataset.del){
       confirmBox('删除这条进食记录？', '记录会从存档里删掉，不影响其他数据。', function(){
         dietRemove(t.dataset.del, function(ok){
-          if(ok) toast(OLT('删掉了'));
+          if(ok) toastCfg('dietLogDeleted');
           renderDiet();
         });
       });
@@ -330,11 +330,11 @@ function renderDiet(){
   });
   addC.querySelector('#dietCopyBtn').addEventListener('click', function(){
     var foods = dietCopyLastFoods();
-    if(!foods){ toast(OLT('还没有可复制的一餐')); return; }
+    if(!foods){ toastCfg('dietNoCopySource'); return; }
     dietForm.foods = foods.map(function(f){ return { name:f.name, portion:f.portion || '' }; });
     if(dietForm.foods.length < 8) dietForm.foods.push({ name:'', portion:'' });
     renderFoodRows();
-    toast(OLT('上一餐的食物填好了'));
+    toastCfg('dietCopyFilled');
   });
   secT.querySelector('#dietSlotsBtn').addEventListener('click', dietOpenSlots);
   form.querySelector('#dietSave').addEventListener('click', function(){
@@ -343,9 +343,9 @@ function renderDiet(){
     var foods = dietForm.foods.map(function(f){
       return { name: (f.name || '').trim(), portion: (f.portion || '').trim() };
     }).filter(function(f){ return f.name; });
-    if(!foods.length && !note){ toast(OLT('吃的东西写一样就行，份量可以空着')); return; }
+    if(!foods.length && !note){ toastCfg('dietFoodDuplicateLong'); return; }
     dietPush({ time: time, slot: dietForm.slot, foods: foods, note: note }, function(rec, ok){
-      if(ok) toast(OLT('记下了'));
+      if(ok) toastCfg('dietLogged');
       else bizSaveFailed('save-enqueue-failed', saveRecoveryActions(window.OLCommitQueue));
       dietForm.foods = [{ name:'', portion:'' }, { name:'', portion:'' }];
       dietForm.note = '';
@@ -387,7 +387,7 @@ function renderDiet(){
     if(t && t.dataset.del){
       confirmBox('删除这条进食记录？', '记录会从存档里删掉，不影响其他数据。', function(){
         dietRemove(t.dataset.del, function(ok){
-          if(ok) toast(OLT('删掉了'));
+          if(ok) toastCfg('dietLogDeleted');
           renderDiet();
         });
       });
@@ -398,7 +398,7 @@ function renderDiet(){
     renderDiet();
   });
   hist.querySelector('#dietNext').addEventListener('click', function(){
-    if(dietState.histDate >= today){ toast(OLT('已经是最新的那天了')); return; }
+    if(dietState.histDate >= today){ toastCfg('dietAlreadyLatest'); return; }
     dietState.histDate = dietShiftDate(dietState.histDate, 1);
     renderDiet();
   });
@@ -475,7 +475,7 @@ function dietOpenEdit(id){
   body.querySelector('#deNo').addEventListener('click', closeSheet);
   body.querySelector('#deOk').addEventListener('click', function(){
     var fs = collectFoods();
-    if(!fs.length && !body.querySelector('#deNote').value.trim()){ toast(OLT('吃的东西写一样就行')); return; }
+    if(!fs.length && !body.querySelector('#deNote').value.trim()){ toastCfg('dietFoodDuplicateEdit'); return; }
     dietUpdate(id, {
       time: body.querySelector('#deTime').value,
       slot: curSlot,
@@ -483,7 +483,7 @@ function dietOpenEdit(id){
       note: body.querySelector('#deNote').value.trim()
     }, function(ok){
       closeSheet();
-      if(ok) toast(OLT('改好了'));
+      if(ok) toastCfg('dietEdited');
       else bizSaveFailed('save-enqueue-failed', saveRecoveryActions(window.OLCommitQueue));
       renderDiet();
     });
@@ -514,9 +514,9 @@ function dietOpenSlots(){
     });
     body.querySelector('#dsAdd').addEventListener('click', function(){
       var v = body.querySelector('#dsNew').value.trim();
-      if(!v){ toast(OLT('写个名字')); return; }
-      if(dietSlots().indexOf(v) >= 0){ toast(OLT('已经有这个餐次了')); return; }
-      if(dietSlots().length >= 8){ toast(OLT('餐次最多 8 个')); return; }
+      if(!v){ toastCfg('mealSlotNameRequired'); return; }
+      if(dietSlots().indexOf(v) >= 0){ toastCfg('mealSlotDuplicate'); return; }
+      if(dietSlots().length >= 8){ toastCfg('mealSlotLimit'); return; }
       S.settings.mealSlots.push(v);
       save(function(){}, { highFrequency:true });
       draw();

@@ -52,7 +52,7 @@ if(goPlanEl) goPlanEl.addEventListener('click', openPlanView);
         });
       }
     }
-    toast(OLT('记好了，时间轴里能看到'));
+    toastCfg('flashSaved');
   });
 })();
 
@@ -144,7 +144,7 @@ $('addTag').addEventListener('click', function(){
     title:'新建标签', sub:'点一下记一次，用来数频率', input:true, placeholder:'比如「晒了太阳」', okText:'加上',
     onOk:function(v){
       S.tags.push({ id: uid('tag'), name:v });
-      save(function(){ toast(OLT('标签已加上')); }); renderSettings();
+      save(function(){ toastCfg('tagAdded'); }); renderSettings();
     }
   });
 });
@@ -157,7 +157,7 @@ bindOnce($('modalMask'), 'click', function(e){
 bindOnce($('mCancel'), 'click', closeModal);
 bindOnce($('mOk'), 'click', function(){
   var v = modalInput ? modalInput.value.trim() : null;
-  if(modalCfg && modalCfg.input && !v){ toast(OLT('写点东西吧')); return; }
+  if(modalCfg && modalCfg.input && !v){ toastCfg('contentEmpty'); return; }
   var cb = modalCfg && modalCfg.onOk;
   closeModal();
   if(cb) cb(v);
@@ -262,9 +262,9 @@ function finishBoot(){
   bindAppActions();
   $('randFilterBtn').textContent = S.settings.randFilter === '全部' ? '全部类型' : S.settings.randFilter;
   if(migrated){
-    setTimeout(function(){ toast(OLT('已把旧版记录搬过来')); }, 800);
+    setTimeout(function(){ toastCfg('legacyMigrated'); }, 800);
   }else if(!allRecordDates().length){
-    setTimeout(function(){ toast(OLT('先勾掉一件小事试试')); }, 1000);
+    setTimeout(function(){ toastCfg('firstUseHint'); }, 1000);
   }
   OLBoot.booted = true;
 }
@@ -491,7 +491,7 @@ function bootWriter(){
 
   function notifyUnsaved() {
     try {
-      toast('本页有未保存的修改，已保留副本，没有自动覆盖最新数据', [
+      toastCfg('unsavedSnapshotFound', null, [
         { label:'恢复我的修改', cb:function(){ OLBoot.keepUnsavedSnapshot(); } },
         { label:'放弃副本', cb:function(){ OLBoot.discardUnsavedSnapshot(); } }
       ]);
@@ -829,7 +829,7 @@ function bootWriter(){
             var resolved = snap(m.value);
             applyResolutions(resolved, m.conflicts, choices);
             commitMerged(resolved, revRemote, round).then(function(res){
-              if(res && res.ok) toast(OLT('修改已合并并提交'));
+              if(res && res.ok) toastCfg('unsavedMerged');
               else bizSaveFailed((res && res.code) || 'merge-commit-failed', [], null, true);
             });
           });

@@ -334,7 +334,7 @@ function toggleTask(t, row){
 function toggleAll(cat, card){
   var t0 = TODAY();
   var list = tasksOf(cat, t0);
-  if(!list.length){ toast(OLT('这里还没有条目')); return; }
+  if(!list.length){ toastCfg('focusEmptyHint'); return; }
   var allDone = list.every(function(t){ return isDone(t, t0); });
   list.forEach(function(t){
     if(allDone){ delete t.done[t0]; if(t.doneTime) delete t.doneTime[t0]; }
@@ -357,7 +357,7 @@ function toggleAll(cat, card){
     renderTasks();
   }
   renderRemind();
-  toast(allDone ? '这一组已取消' : '这一组都勾完了');
+  toastCfg(allDone ? 'taskGroupCancelled' : 'taskGroupAllDone');
 }
 
 /* ---------- 输入行的动作：改 state → render → （按需）聚焦 ---------- */
@@ -384,7 +384,7 @@ function commitInline(){
       repeat: st.cat === CAT_ROUTINE ? 'daily' : 'once',
       due:'', duration:0, done:{}, createdAt: Date.now()
     });
-    save(function(){ toast(st.cat === CAT_ROUTINE ? '已加入每天重复' : '已加入今天'); });
+    save(function(){ toastCfg(st.cat === CAT_ROUTINE ? 'taskAddedRoutine' : 'taskAddedTodayList'); });
   }
   /* 加完留一个空输入行，连着加第二条第三条；不再靠 DOM 残留来「保持焦点」 */
   taskUI.inline = { cat:st.cat, value:'' };
@@ -548,17 +548,17 @@ function openTaskActions(t){
     row('延期到明天', '不改内容，只往后推一天', function(){
       if(t.due) t.due = addDays(t.due, 1);
       else t.due = addDays(TODAY(), 1);
-      save(function(){ toast(OLT('已推到明天')); }); closeSheet(); renderTasks();
+      save(function(){ toastCfg('taskPostponed'); }); closeSheet(); renderTasks();
     });
   }else{
     row('今天跳过', '今天不显示这条，明天照常', function(){
-      t.done[TODAY()] = 2; save(function(){ toast(OLT('今天跳过这条')); }); closeSheet(); renderTasks();
+      t.done[TODAY()] = 2; save(function(){ toastCfg('taskSkippedToday'); }); closeSheet(); renderTasks();
     });
   }
   row('删除', '删掉之后找不回来', function(){
     confirmBox('删掉「' + t.title + '」？', '这条会从清单里消失，历史记录保留。', function(){
       S.tasks = S.tasks.filter(function(x){ return x.id !== t.id; });
-      save(function(){ toast(OLT('已删除')); }); closeSheet(); renderTasks();
+      save(function(){ toastCfg('taskDeleted'); }); closeSheet(); renderTasks();
     });
   }, true);
 }
@@ -583,14 +583,14 @@ function openTaskEdit(t){
   body.querySelector('#teNo').addEventListener('click', closeSheet);
   body.querySelector('#teOk').addEventListener('click', function(){
     var v = body.querySelector('#teTitle').value.trim();
-    if(!v){ toast(OLT('写点内容')); return; }
+    if(!v){ toastCfg('contentEmpty'); return; }
     t.title = v;
     t.cat = body.querySelector('#teCat').value;
     t.due = body.querySelector('#teDue').value || '';
     t.duration = durFromInputs(body.querySelector('#teMin'), body.querySelector('#teSec'));
     t.note = body.querySelector('#teNote').value.trim();
     if(t.cat !== CAT_ROUTINE && !t.repeat) t.repeat = 'once';
-    save(function(){ toast(OLT('改好了')); }); closeSheet(); renderTasks();
+    save(function(){ toastCfg('taskEdited'); }); closeSheet(); renderTasks();
   });
 }
 
@@ -648,7 +648,7 @@ function tapFocusItem(it, node){
   buzz();
   renderRemind();
   if(currentPage === 'pRecords') renderProject();
-  toast(it.text + ' 记了 1 ' + focusUnit(it), '撤销', function(){
+  toastCfg('focusPlusOne', { name: it.text, unit: focusUnit(it) }, '撤销', function(){
     S.itemLogs = S.itemLogs.filter(function(x){ return x.id !== rec.id; });
     save();
     renderGoals(); renderRemind();
@@ -673,7 +673,7 @@ function openFocusLog(it, log){
     onDelete: isNew ? null : function(){
       confirmBox('删掉这条记录？', '这条会消失，那天的统计也跟着变。', function(){
         S.itemLogs = S.itemLogs.filter(function(x){ return x.id !== rec.id; });
-        save(function(){ toast(OLT('删掉了')); }); closeSheet(); renderGoals(); renderRemind();
+        save(function(){ toastCfg('itemLogDeleted'); }); closeSheet(); renderGoals(); renderRemind();
         if(currentPage === 'pRecords') renderProject();
       });
     },
@@ -682,7 +682,7 @@ function openFocusLog(it, log){
       if(isMulti){ rec.tags = d.tags || []; rec.what = ''; }
       else { rec.what = d.tagFree || ''; rec.tags = []; }
       if(isNew) S.itemLogs.push(rec);
-      save(function(){ toast('记了 ' + fmtNum(d.minutes) + ' 分钟'); }); closeSheet(); renderGoals(); renderRemind();
+      save(function(){ toastCfg('focusSavedMinutes', { minutes: fmtNum(d.minutes), unit: OLToastText.text('分钟') }); }); closeSheet(); renderGoals(); renderRemind();
       if(currentPage === 'pRecords') renderProject();
     }
   };
@@ -716,7 +716,7 @@ function openCountLog(it, log){
     onDelete: isNew ? null : function(){
       confirmBox('删掉这条记录？', '这条会消失，那天的统计也跟着变。', function(){
         S.itemLogs = S.itemLogs.filter(function(x){ return x.id !== rec.id; });
-        save(function(){ toast(OLT('删掉了')); }); closeSheet(); renderGoals(); renderRemind();
+        save(function(){ toastCfg('itemLogDeleted'); }); closeSheet(); renderGoals(); renderRemind();
         if(currentPage === 'pRecords') renderProject();
       });
     },
@@ -726,7 +726,7 @@ function openCountLog(it, log){
       if(isMulti){ rec.tags = d.tags || []; rec.what = ''; }
       else { rec.what = d.tagFree || ''; rec.tags = []; }
       if(isNew) S.itemLogs.push(rec);
-      save(function(){ toast('记了 ' + fmtNum(d.minutes) + ' ' + unit); }); closeSheet(); renderGoals(); renderRemind();
+      save(function(){ toastCfg('focusSavedMinutes', { minutes: fmtNum(d.minutes), unit: unit }); }); closeSheet(); renderGoals(); renderRemind();
       if(currentPage === 'pRecords') renderProject();
     }
   };
@@ -880,7 +880,7 @@ function renderPlan(){
         ev.stopPropagation();
         confirmBox('删掉「' + p.title + '」？', '这条计划会消失。', function(){
           S.plans = S.plans.filter(function(y){ return y.id !== p.id; });
-          save(function(){ toast(OLT('已删除')); }); renderPlan(); renderUpcoming(); renderTasks();
+          save(function(){ toastCfg('planDeleted'); }); renderPlan(); renderUpcoming(); renderTasks();
         });
       });
       row.appendChild(x);
@@ -894,19 +894,19 @@ function renderPlan(){
 function addPlan(){
   var inp = $('planInput');
   var v = inp.value.trim();
-  if(!v){ toast(OLT('写一下要做什么')); inp.focus(); return; }
+  if(!v){ toastCfg('planTextRequired'); inp.focus(); return; }
   S.plans.push({
     id: uid('pl'), date: planDateDraft, title: v,
     note:'', done:false, createdAt: Date.now()
   });
-  save(function(){ toast(OLT('加到 ') + countdownText(planDateDraft)); });
+  save(function(){ toastCfg('planAdded', { date: countdownText(planDateDraft) }); });
   inp.value = '';
   renderPlan(); renderUpcoming(); renderTasks();
 }
 function togglePlanDone(p){
   p.done = !p.done;
   if(p.done){ p.doneAt = TODAY(); p.doneTime = nowHHMM(); } else { delete p.doneAt; delete p.doneTime; }
-  save(function(){ toast(p.done ? '做完了' : '放回来了'); });
+  save(function(){ toastCfg(p.done ? 'planDone' : 'planUndone'); });
   renderPlan(); renderUpcoming(); renderTasks(); renderRecent();
 }
 function openPlanEdit(p){
@@ -923,16 +923,16 @@ function openPlanEdit(p){
   body.querySelector('#peDel').addEventListener('click', function(){
     confirmBox('删掉这条计划？', '找不回来了。', function(){
       S.plans = S.plans.filter(function(y){ return y.id !== p.id; });
-      save(function(){ toast(OLT('已删除')); }); closeSheet(); renderPlan(); renderUpcoming(); renderTasks();
+      save(function(){ toastCfg('planDeleted'); }); closeSheet(); renderPlan(); renderUpcoming(); renderTasks();
     });
   });
   body.querySelector('#peOk').addEventListener('click', function(){
     var t = body.querySelector('#peTitle').value.trim();
-    if(!t){ toast(OLT('写一下做什么')); return; }
+    if(!t){ toastCfg('planTextRequired'); return; }
     p.date = body.querySelector('#peDate').value || p.date;
     p.title = t;
     p.note = body.querySelector('#peNote').value.trim();
-    save(function(){ toast(OLT('改好了')); }); closeSheet(); renderPlan(); renderUpcoming(); renderTasks();
+    save(function(){ toastCfg('planEdited'); }); closeSheet(); renderPlan(); renderUpcoming(); renderTasks();
   });
 }
 
@@ -986,13 +986,13 @@ function openPlanActions(p){
   }
   row('推到明天', '不改内容，只换一天', function(){
     p.date = addDays(TODAY(), 1);
-    save(function(){ toast(OLT('推到明天了')); }); closeSheet(); renderTasks(); renderUpcoming(); renderPlan();
+    save(function(){ toastCfg('taskPostponed'); }); closeSheet(); renderTasks(); renderUpcoming(); renderPlan();
   });
   row('编辑', '改日期、内容和备注', function(){ closeSheet(); setTimeout(function(){ openPlanEdit(p); }, 180); });
   row('删除', '删掉之后找不回来', function(){
     confirmBox('删掉「' + p.title + '」？', '这条计划会消失。', function(){
       S.plans = S.plans.filter(function(y){ return y.id !== p.id; });
-      save(function(){ toast(OLT('已删除')); }); closeSheet(); renderTasks(); renderUpcoming(); renderPlan();
+      save(function(){ toastCfg('planDeleted'); }); closeSheet(); renderTasks(); renderUpcoming(); renderPlan();
     });
   }, true);
 }
@@ -1089,13 +1089,13 @@ function openSchEdit(s){
     body.querySelector('#seDel').addEventListener('click', function(){
       confirmBox('删掉这条安排？', '只是不再显示，已经过去的记录不受影响。', function(){
         S.schedule = S.schedule.filter(function(x){ return x.id !== item.id; });
-        save(function(){ toast(OLT('已删除')); }); closeSheet(); renderToday();
+        save(function(){ toastCfg('ideaDeleted'); }); closeSheet(); renderToday();
       });
     });
   }
   body.querySelector('#seOk').addEventListener('click', function(){
     var title = body.querySelector('#seT').value.trim();
-    if(!title){ toast(OLT('写一下是什么')); return; }
+    if(!title){ toastCfg('ideaTextRequired'); return; }
     item.title = title;
     item.start = body.querySelector('#seStart').value;
     item.end = body.querySelector('#seEnd').value;
@@ -1108,7 +1108,7 @@ function openSchEdit(s){
       item.weekday = null;
     }
     if(isNew) S.schedule.push(item);
-    save(function(){ toast(OLT('已保存')); }); closeSheet(); renderToday();
+    save(function(){ toastCfg('ideaSaved'); }); closeSheet(); renderToday();
   });
 }
 function todayReal(){ return fmt(new Date()); }
@@ -1127,7 +1127,7 @@ function openStudy(itemId){
     needMinutes: true, okText: '记上',
     onSave: function(d){
       S.studyLogs.push({ id: uid('st'), date: d.date, minutes: d.minutes, time: d.time || nowHHMM(), what: d.tagFree, note: d.note, itemId: itemId || '' });
-      save(function(){ toast('记了 ' + d.minutes + ' 分钟'); }); closeSheet();
+      save(function(){ toastCfg('focusSavedMinutes', { minutes: d.minutes, unit: OLToastText.text('分钟') }); }); closeSheet();
       renderGoals(); renderRemind();
       if(currentPage === 'pRecords') renderProject();
     }
@@ -1145,7 +1145,7 @@ function openNote(dateKey){
     notePlaceholder: '今天怎么样了？', okText: '记下',
     onSave: function(dt){
       if(dt.note) S.notes[dateKey] = dt.note; else delete S.notes[dateKey];
-      save(function(){ toast(dt.note ? '已记下' : '清空了'); }); closeSheet(); renderGoals(); renderRemind();
+      save(function(){ toastCfg(dt.note ? 'noteSaved' : 'noteCleared'); }); closeSheet(); renderGoals(); renderRemind();
       if(currentPage === 'pRecords') renderRecords();
     }
   });

@@ -293,6 +293,13 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
   box-shadow:0 8px 24px rgba(0,0,0,.18);
 }
 .toast.on{opacity:1;transform:translate(-50%,0)}
+/* 类型区分：success / warning / error（info 用默认深色）。色值取自现有莫兰迪色板的深色调，白字对比达标 */
+.toast.t-success{background:rgba(74,103,86,.96)}
+.toast.t-warning{background:rgba(146,110,58,.96)}
+.toast.t-error{background:rgba(139,73,63,.96)}
+.toast .t-ico{
+  display:inline-block;margin-right:7px;font-weight:700;transform:translateY(-.5px);
+}
 .float{
   position:fixed;pointer-events:none;font-size:13px;font-weight:700;color:var(--sage-d);z-index:96;
   animation:fu 1.5s var(--ease) forwards;text-shadow:0 1px 4px rgba(255,255,255,.9);

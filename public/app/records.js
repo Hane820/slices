@@ -466,7 +466,7 @@ function openDayDetail(key){
         if(has(p.id)){
           sel = sel.filter(function(it){ return it.penId !== p.id; });
         }else{
-          if(sel.length >= 3){ toast(OLT('一天最多 3 个标记')); return; }
+          if(sel.length >= 3){ toastCfg('markLimitReached'); return; }
           sel.push({ penId: p.id, size: 2 });
         }
         drawPens(); drawSel();
@@ -505,7 +505,7 @@ function openDayDetail(key){
     if(sel.length) S.marks[key] = { items: sel.slice(), updatedAt: Date.now() };
     else delete S.marks[key];
     if(note) S.notes[key] = note; else delete S.notes[key];
-    save(function(){ toast(OLT('已保存')); }); closeSheet();
+    save(function(){ toastCfg('markerSaved'); }); closeSheet();
     if(currentPage === 'pRecords') renderRecords();
     renderToday();
   });
@@ -514,7 +514,7 @@ function openDayDetail(key){
       delete S.marks[key];
       var note = body.querySelector('#ddNote').value.trim();
       if(note) S.notes[key] = note; else delete S.notes[key];
-      save(function(){ toast(OLT('标记擦掉了')); }); closeSheet();
+      save(function(){ toastCfg('markerCleared'); }); closeSheet();
       if(currentPage === 'pRecords') renderRecords();
       renderToday();
     });
@@ -694,14 +694,14 @@ function openWorkout(w, itemId){
     onDelete: isNew ? null : function(){
       confirmBox('删掉这次训练？', '这条记录会消失，统计也会跟着变。', function(){
         S.workouts = S.workouts.filter(function(x){ return x.id !== item.id; });
-        save(function(){ toast(OLT('已删除')); }); closeSheet(); renderProject(); renderGoals(); renderRemind();
+        save(function(){ toastCfg('recordEntryDeleted'); }); closeSheet(); renderProject(); renderGoals(); renderRemind();
       });
     },
     onSave: function(d){
       item.date = d.date; item.start = d.time; item.minutes = d.minutes;
       item.parts = d.tags; item.kcal = d.extra; item.note = d.note;
       if(isNew) S.workouts.push(item);
-      save(function(){ toast(OLT('记下了 ') + d.minutes + ' 分钟'); }); closeSheet();
+      save(function(){ toastCfg('workoutSaved', { minutes: d.minutes }); }); closeSheet();
       if(currentPage === 'pRecords') renderProject();
       renderGoals(); renderRemind(); renderToday();
     }

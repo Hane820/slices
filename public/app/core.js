@@ -196,11 +196,17 @@ function normalizePlugins(list, defs){
 function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 function weekdayCN(d){ return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]; }
 
-function toast(msg, act, cb){
+function toast(msg, act, cb, opts){
   var t = $('toast');
-  /* 原有 toast(msg, '按钮', cb) 保持不变；数组形式用于保存失败的「重试 / 放弃」。 */
+  /* 原有 toast(msg, '按钮', cb) 保持不变；数组形式用于保存失败的「重试 / 放弃」。
+     第 4 参 opts = { type:'success'|'info'|'warning'|'error', duration:毫秒 }，
+     由 toastCfg() 从 toast-text.js 的配置下发；不传时行为与旧版完全一致。 */
   var actions = Array.isArray(act) ? act : (act ? [{ label:act, cb:cb }] : []);
-  t.innerHTML = esc(msg) + (actions.length
+  var ty = opts && opts.type;
+  var ico = ty === 'success' ? '✓' : ty === 'warning' ? '⚠' : ty === 'error' ? '✕' : '';
+  t.classList.remove('t-success', 't-warning', 't-error');
+  if(ty === 'success' || ty === 'warning' || ty === 'error') t.classList.add('t-' + ty);
+  t.innerHTML = (ico ? '<span class="t-ico">' + ico + '</span>' : '') + esc(msg) + (actions.length
     ? ' ' + actions.map(function(a, i){
         return '<button class="t-act" id="tAct' + i + '">' + esc((a && a.label) || '') + '</button>';
       }).join('')
@@ -219,7 +225,17 @@ function toast(msg, act, cb){
   }
   t.classList.add('on');
   clearTimeout(window.__tt);
-  window.__tt = setTimeout(function(){ t.classList.remove('on'); }, actions.length ? 5000 : 1700);
+  var dur = (opts && typeof opts.duration === 'number' && opts.duration > 0) ? opts.duration
+    : (actions.length ? 5000 : 1700);
+  window.__tt = setTimeout(function(){ t.classList.remove('on'); }, dur);
+}
+/* 按 toast-text.js 的英文 key 弹提示：配置关闭(enabled:false)则静默跳过；
+   vars 为 {占位符:值}；act/cb 与原 toast 相同（按钮文字或动作数组）。 */
+function toastCfg(key, vars, act, cb){
+  var cfgLib = window.OLToastConfig;
+  var r = cfgLib && typeof cfgLib.resolve === 'function' ? cfgLib.resolve(key, vars) : null;
+  if(!r) return;
+  toast(r.text, act, cb, r);
 }
 function floatText(txt, x, y){
   var f = el('div','float',txt);
@@ -240,7 +256,7 @@ function defaultTags(){
 }
 function defaultSuggestions(){
   return cloneSeed(PRESETS.SUGGESTIONS || []).map(function(s){
-    s.scenes = DEFAULT_SCENES[s.id] || [];
+    s.scenes = cloneSeed(DEFAULT_SCENES[s.id] || []);   /* 深拷贝：防止运行时改动污染 OLPresets */
     return s;
   });
 }
@@ -445,7 +461,7 @@ function bizWriteBlockedNotice(){
   var now = Date.now();
   if(now - bizWriteNoticeAt < 3000) return;
   bizWriteNoticeAt = now;
-  toast(OLT('保存不可用：写入还没准备好，这次改动不会保存'));
+  toastCfg('saveUnavailable');
 }
 var bizSaveFailAt = 0;
 var bizSaveFailSig = '';
@@ -473,7 +489,7 @@ function bizSaveFailed(code, actions, jobId, force){
      用户点过重试 / 恢复后 force=true，保证再次失败一定重新提示。 */
   if(!force && sig === bizSaveFailSig && now - bizSaveFailAt < 1200) return;
   bizSaveFailSig = sig; bizSaveFailAt = now;
-  toast(OLT('没保存成功') + (code ? '（' + saveFailText(code) + '）' : '') + '，改动还在内存里', actions || []);
+  toastCfg('saveFailed', { message: code ? '（' + saveFailText(code) + '）' : '' }, actions || []);
 }
 function saveResultFailed(r, fallback){
   bizSaveFailed((r && r.code) || fallback, [], null, true);
@@ -1262,7 +1278,7 @@ function openLogSheet(cfg){
   if(cfg.onDelete) body.querySelector('#lgDel').addEventListener('click', cfg.onDelete);
   body.querySelector('#lgOk').addEventListener('click', function(){
     var m = minEl ? (parseFloat(minEl.value) || 0) : 0;
-    if(cfg.needMinutes && m <= 0){ toast(cfg.needMsg || '填一下时长'); if(minEl) minEl.focus(); return; }
+    if(cfg.needMinutes && m <= 0){ cfg.needMsg ? toast(cfg.needMsg) : toastCfg('minutesRequired'); if(minEl) minEl.focus(); return; }
     var extraEl = body.querySelector('#lgExtra');
     var freeEl = body.querySelector('#lgTagFree');
     cfg.onSave({
@@ -1338,7 +1354,7 @@ function writeBackupFile(data){
   a.download = 'earthonline-' + todayReal() + '.json';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
-  toast(OLT('已导出备份'));
+  toastCfg('backupExported');
 }
 
 /* idb 模式：导出必须等于 IndexedDB 里已持久化的数据，不能夹带内存中未保存的改动。
@@ -1373,7 +1389,7 @@ function readExportSource(onOk, onFail){
 }
 
 function exportFromIdb(){
-  readExportSource(writeBackupFile, function(msg){ toast(OLT('导出失败：') + msg + '，未生成备份'); });
+  readExportSource(writeBackupFile, function(msg){ toastCfg('backupExportFailed', { message: msg }); });
 }
 
 function exportJSON(){
@@ -1471,10 +1487,10 @@ function importConfig(){
 
 function importConfigStart(fileObj){
   var CIO = window.OLConfigIO;
-  if(!CIO || typeof CIO.parseConfigFile !== 'function'){ toast(OLT('导入失败：配置模块未加载')); return; }
+  if(!CIO || typeof CIO.parseConfigFile !== 'function'){ toastCfg('importModuleMissing'); return; }
   var MAXB = CIO.MAX_IMPORT_CHARS || (2 * 1024 * 1024);
   if(typeof fileObj.size === 'number' && fileObj.size > MAXB){
-    toast(OLT('导入失败：文件太大（上限约 2MB），已拒绝')); return;
+    toastCfg('importTooLarge'); return;
   }
   CI_STATE.reading = true;
   var fr = new FileReader();
@@ -1484,10 +1500,10 @@ function importConfigStart(fileObj){
   };
   fr.onerror = function(){
     CI_STATE.reading = false;
-    toast(OLT('导入失败：文件读不出来'));
+    toastCfg('importFileUnreadable');
   };
   try{ fr.readAsText(fileObj); }
-  catch(e){ CI_STATE.reading = false; toast(OLT('导入失败：文件读不出来')); }
+  catch(e){ CI_STATE.reading = false; toastCfg('importFileUnreadable'); }
 }
 
 function importConfigPreview(text, fileName){
@@ -1496,7 +1512,7 @@ function importConfigPreview(text, fileName){
     pluginIds: defaultPlugins().map(function(p){ return p.id; })
   });
   if(!parsed.ok){
-    toast(OLT('导入失败：') + parsed.message + '，本机没有任何改动');
+    toastCfg('importFailed', { message: parsed.message });
     return;
   }
   CI_STATE.file = parsed.file;
@@ -1505,13 +1521,13 @@ function importConfigPreview(text, fileName){
   if(bizWriteBlocked()){
     /* idb：基线必须来自已持久化数据，不能拿可能含未保存改动的内存 S */
     if(window.OLBoot && typeof OLBoot.hasUnsavedSnapshot === 'function' && OLBoot.hasUnsavedSnapshot()){
-      toast(OLT('导入失败：有一份未处理的恢复副本，先在顶部横幅里处理它')); return;
+      toastCfg('importBlockedBySnapshot'); return;
     }
     readConfigSource(function(data, meta){
       var local = CIO.buildConfigPayload(data);
       ciEnterPreview('idb', local, meta && typeof meta.bizRev === 'number' ? meta.bizRev : null);
     }, function(msg){
-      toast(OLT('导入失败：') + msg + '，本机没有任何改动');
+      toastCfg('importFailed', { message: msg });
     });
   } else {
     ciEnterPreview('legacy', CIO.buildConfigPayload(S), null);
@@ -1528,7 +1544,7 @@ function ciPluginNames(){
 function ciEnterPreview(mode, local, baselineRev){
   var CIO = window.OLConfigIO;
   var preview = CIO.previewConfigImport(local, CI_STATE.file.config, { pluginNames: ciPluginNames() });
-  if(!preview || preview.ok !== true){ toast(OLT('导入失败：预览计算失败，本机没有任何改动')); return; }
+  if(!preview || preview.ok !== true){ toastCfg('importPreviewFailed'); return; }
   CI_STATE.mode = mode;
   CI_STATE.preview = preview;
   CI_STATE.baselineRev = baselineRev;
@@ -1657,24 +1673,24 @@ function confirmConfigImport(){
   for(var i = 0; i < st.preview.conflicts.length; i++){
     var key = st.preview.conflicts[i].key;
     if(st.choices[key] !== 'local' && st.choices[key] !== 'incoming'){
-      toast(OLT('还有冲突没选好，每一条都要选')); return;
+      toastCfg('importConflictsUnresolved'); return;
     }
   }
   /* 无实际变化（全部冲突保留本机且无新增/设置/插件变化）：不提交、不动 bizRev */
   if(!window.OLConfigIO.previewHasEffectiveChange(st.preview, st.choices)){
-    toast(OLT('没有要导入的变更，本机没有任何改动'));
+    toastCfg('importNothingToDo');
     closeSheet();
     st.file = null; st.preview = null; st.choices = {};
     return;
   }
   if(st.mode === 'legacy'){
     var res = OLConfigIO.applyResolutions(st.preview, st.choices);
-    if(!res){ toast(OLT('导入失败：合并结果异常')); return; }
+    if(!res){ toastCfg('importMergeInvalid'); return; }
     applyConfigImport(res.merged);
     closeSheet();
     st.file = null; st.preview = null; st.choices = {};
-    var okL = save(function(){ toast(OLT('配置已导入')); });
-    if(!okL) toast(OLT('导入没存上，再试一次'));
+    var okL = save(function(){ toastCfg('configImported'); });
+    if(!okL) toastCfg('importSaveRetry');
     return;
   }
   /* idb：确认时复核 队列空闲 / writer 仍有效 / bizRev 未变 */
@@ -1682,40 +1698,40 @@ function confirmConfigImport(){
   var qs = (Q && typeof Q.status === 'function') ? Q.status() : null;
   if(!Q || !W || typeof W.readBizRev !== 'function' || !W.wired ||
      !qs || qs.state !== 'idle' || qs.inFlight || qs.pending || qs.recoveringJob){
-    toast(OLT('当前保存还没就绪（队列忙或写入未接线），稍后再确认')); return;
+    toastCfg('saveQueueBusy'); return;
   }
   if(st.reading) return;
   st.reading = true;
   W.readBizRev().then(function(rr){
     st.reading = false;
-    if(!rr || rr.ok !== true){ toast(OLT('导入失败：读不到当前版本号，请重试')); return; }
+    if(!rr || rr.ok !== true){ toastCfg('importRevUnreadable'); return; }
     if(st.baselineRev !== null && rr.rev !== st.baselineRev){
       /* 预览已过期：重读库、重算预览、要求再次确认；绝不用旧预览覆盖新状态 */
       readConfigSource(function(data, meta){
         var local = OLConfigIO.buildConfigPayload(data);
         var p2 = OLConfigIO.previewConfigImport(local, st.file.config, { pluginNames: ciPluginNames() });
-        if(!p2 || p2.ok !== true){ toast(OLT('导入失败：重算预览失败')); return; }
+        if(!p2 || p2.ok !== true){ toastCfg('importRecalcFailed'); return; }
         CI_STATE.preview = p2;
         CI_STATE.baselineRev = (meta && typeof meta.bizRev === 'number') ? meta.bizRev : null;
         renderImportSheetBody();
-        toast(OLT('本机数据在这期间有变化，预览已重算，请再确认一次'));
+        toastCfg('importPreviewStale');
       }, function(msg){
-        toast(OLT('重算预览失败：') + msg);
+        toastCfg('importRecalcFailedMsg', { message: msg });
       });
       return;
     }
     var res2 = OLConfigIO.applyResolutions(st.preview, st.choices);
-    if(!res2){ toast(OLT('导入失败：合并结果异常')); return; }
+    if(!res2){ toastCfg('importMergeInvalid'); return; }
     st.submitting = true;
     /* 同一个 JS 回合内完成：改 S → 入队（快照克隆）→ CAS 提交，中间无等待点 */
     applyConfigImport(res2.merged);
     closeSheet();
     st.file = null; st.preview = null; st.choices = {}; st.submitting = false;
-    var ok = save(function(){ toast(OLT('配置已导入并保存')); });
-    if(!ok) toast(OLT('导入没存上（队列拒绝了这次提交）'));
+    var ok = save(function(){ toastCfg('configImportedSaved'); });
+    if(!ok) toastCfg('importCommitRejected');
   }, function(){
     st.reading = false;
-    toast(OLT('导入失败：读不到当前版本号，请重试'));
+    toastCfg('importRevUnreadable');
   });
 }
 
@@ -1830,7 +1846,7 @@ function buildTableRows(D){
 function writeTableFile(D){
   var rows;
   try{ rows = buildTableRows(D); }
-  catch(e){ toast(OLT('导出失败：整理记录时出错，未生成表格')); return; }
+  catch(e){ toastCfg('tableBuildFailed'); return; }
   var lines = [['日期', '类别', '内容', '补充']].concat(rows).map(function(r){
     return r.map(tableCsvCell).join(',');
   });
@@ -1842,14 +1858,14 @@ function writeTableFile(D){
   a.download = 'earthonline-表格-' + todayReal() + '.csv';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
-  toast(OLT('已导出表格'));
+  toastCfg('tableExported');
 }
 
 function exportTable(){
   /* 与 JSON 备份共用同一个 idb 判据和同一条只读取数路径：
      本地库里已保存的数据才进表格，读失败就报错且不生成文件。 */
   if(bizWriteBlocked()){
-    readExportSource(writeTableFile, function(msg){ toast(OLT('导出失败：') + msg + '，未生成表格'); });
+    readExportSource(writeTableFile, function(msg){ toastCfg('tableExportFailed', { message: msg }); });
     return;
   }
   writeTableFile(S);
@@ -1866,9 +1882,9 @@ function importJSON(){
     var fr = new FileReader();
     fr.onload = function(){
       var parsed = null;
-      try{ parsed = JSON.parse(fr.result); }catch(e){ toast(OLT('这个文件读不出来')); return; }
+      try{ parsed = JSON.parse(fr.result); }catch(e){ toastCfg('backupFileUnreadable'); return; }
       var data = parsed && parsed.data ? parsed.data : parsed;
-      if(!data || typeof data !== 'object' || !Array.isArray(data.tasks)){ toast(OLT('不像是备份文件')); return; }
+      if(!data || typeof data !== 'object' || !Array.isArray(data.tasks)){ toastCfg('notBackupFile'); return; }
       var n = 0;
       ['tasks','marks','tagLogs','workouts','studyLogs','decisionLog'].forEach(function(k){
         if(Array.isArray(data[k])) n += data[k].length;
@@ -1883,7 +1899,7 @@ function importJSON(){
           S = defaults();
           deepMerge(S, data);
           normalize();
-          save(); renderAll(); toast(OLT('已恢复'));
+          save(); renderAll(); toastCfg('backupRestored');
         }
       });
     };
@@ -2136,7 +2152,7 @@ function openPdfPanel(){
   body.querySelector('#pdfMake').addEventListener('click', function(){
     var from = body.querySelector('#pdfFrom').value || addDays(TODAY(), -30);
     var to = body.querySelector('#pdfTo').value || TODAY();
-    if(from > to){ toast(OLT('开始日期要在结束日期前面')); return; }
+    if(from > to){ toastCfg('dateRangeInvalid'); return; }
     closeSheet();
     setTimeout(function(){
       buildPdfReport(from, to, {

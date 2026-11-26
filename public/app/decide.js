@@ -238,7 +238,7 @@ function addAsTask(c, btnEl){
     btnEl.disabled = true;
     setTimeout(function(){ if(btnEl){ btnEl.textContent = '加入待办'; btnEl.disabled = false; } }, 1400);
   }
-  toast(OLT('已加入今日待办'));
+  toastCfg('taskAddedToday');
 }
 
 /* 飞点：一个小点从起点飞到终点（底部任务栏） */
@@ -347,7 +347,7 @@ function pomoNotifyDone(name){
       return;
     }catch(e){}
   }
-  toast(OLT('时间到 · ') + name);
+  toastCfg('pomoTimeUp', { name: name });
   pomoTitleFlash();                      /* 被拒 / 不支持 API 时的页面内兜底 */
 }
 /* 专注统计：按实际走过的秒数写回本次决策记录，不用预计值 */
@@ -387,7 +387,7 @@ function pomoBigOn(){
   box.classList.add('big');
   var ex = document.getElementById('pomoExit');
   if(ex) ex.textContent = '收起';
-  toast(OLT('全屏用不了，已换成大窗口'));
+  toastCfg('fullscreenFallback');
 }
 function pomoLeaveBig(){
   if(pomoFsEl()){ pomoFsExit(); return; }
@@ -476,7 +476,7 @@ function pomoDestPoint(target){
 /* 动画收尾才写状态：打钩 + 高亮脉冲 */
 function pomoMarkDone(target){
   var task = target && target.task;
-  if(!task){ toast(OLT('这一段做完了')); return; }
+  if(!task){ toastCfg('pomoSegmentDone'); return; }
   var t0 = TODAY();
   if(!isDone(task, t0)){
     task.done = task.done || {};
@@ -493,14 +493,14 @@ function pomoMarkDone(target){
     syncGroupHead(row.closest('.tcard'));
     row.classList.add('pomo-hit');
     setTimeout(function(){ if(row.isConnected) row.classList.remove('pomo-hit'); }, 260);
-    toast('「' + task.title + '」已打钩');
+    toastCfg('taskCheckedHere', { name: task.title });
   }else{
     var navBtn = document.querySelector('.nav button[data-page="pToday"]');
     if(navBtn){
       navBtn.classList.add('pulse');
       setTimeout(function(){ navBtn.classList.remove('pulse'); }, 620);
     }
-    toast('「' + task.title + '」已打钩，回今日能看到');
+    toastCfg('taskCheckedBack', { name: task.title });
   }
   renderRemind();
 }
@@ -576,7 +576,7 @@ function cancelPomo(){
   var wasFs = !!pomoFsEl();
   if(wasFs) pomoFsExit();
   confirmBox('取消本次专注？', '本次时长不会计入统计。', function(){
-    var notify = function(){ toast(OLT('已取消，这次不计入')); };
+    var notify = function(){ toastCfg('pomoCancelled'); };
     if(logId){
       S.decisionLog = S.decisionLog.filter(function(x){ return x.id !== logId; });
       save(notify);
@@ -650,7 +650,7 @@ function startPomo(c, btnEl){
     barEl.style.width = (pomo.left / pomo.total * 100).toFixed(1) + '%';
   }, 1000);
 
-  toast(OLT('开始计时 ') + fmtPomo(total));
+  toastCfg('pomoStarted', { time: fmtPomo(total) });
   pomoAskNotification();                /* 首次点「现在开始」时请求权限，用户手势内 */
   if(btnEl){ btnEl.textContent = '计时中'; }
 }
@@ -688,7 +688,7 @@ function renderDecisionResult(){
 
 function runRandom(){
   var p = randomPick(S.settings.randFilter);
-  if(!p){ toast(OLT('清单里没有可抽的，先加几条待办')); return; }
+  if(!p){ toastCfg('todoPoolEmpty'); return; }
   decState.mode = 'random';
   decState.list = [p]; decState.idx = 0;
   decState.filter = S.settings.randFilter;
@@ -848,13 +848,13 @@ function openSuggEdit(sg){
     body.querySelector('#sgDel').addEventListener('click', function(){
       confirmBox('删掉这条建议？', '它不会再出现在情境和随机里。', function(){
         S.suggestions = S.suggestions.filter(function(x){ return x.id !== item.id; });
-        save(function(){ toast(OLT('已删除')); }); closeSheet(); renderLib();
+        save(function(){ toastCfg('suggestionDeleted'); }); closeSheet(); renderLib();
       });
     });
   }
   body.querySelector('#sgOk').addEventListener('click', function(){
     var n = body.querySelector('#sgN').value.trim();
-    if(!n){ toast(OLT('写一下做什么')); return; }
+    if(!n){ toastCfg('suggestionNameRequired'); return; }
     item.name = n;
     item.cat = body.querySelector('#sgC').value.trim() || '其它';
     item.duration = durFromInputs(body.querySelector('#sgM'), body.querySelector('#sgS'));
@@ -864,7 +864,7 @@ function openSuggEdit(sg){
     item.scenes = scenes;
     item.random = body.querySelector('#sgR').classList.contains('on');
     if(isNew){ item.enabled = true; item.priority = 2; item.tags = []; S.suggestions.push(item); }
-    save(function(){ toast(OLT('已保存')); }); closeSheet(); renderLib();
+    save(function(){ toastCfg('suggestionSaved'); }); closeSheet(); renderLib();
     if(decState.scene && decState.mode === 'scene' && currentPage === 'pDecide') renderSceneResult(decState.scene);
   });
 }
@@ -939,7 +939,7 @@ function renderDecideShell(){
   if(eating) renderEat();
 }
 function switchDecideTab(k){
-  if(k === 'eat' && !pluginOn('food')){ toast(OLT('「吃什么」还关着，去设置里打开')); return; }
+  if(k === 'eat' && !pluginOn('food')){ toastCfg('foodPluginDisabled'); return; }
   eatState.tab = k === 'eat' ? 'eat' : 'do';
   renderDecideShell();
   if(eatState.tab === 'eat') window.scrollTo(0, 0);
@@ -1017,11 +1017,11 @@ function renderEatResult(){
 }
 
 function runEatPick(){
-  if(!pluginOn('food')){ toast(OLT('「吃什么」还关着，去设置里打开')); return; }
+  if(!pluginOn('food')){ toastCfg('foodPluginDisabled'); return; }
   if(!eatState.slot) eatState.slot = foodSlotNow();
-  if(!foodList().length){ toast(OLT('菜单还是空的，先加两道')); return; }
+  if(!foodList().length){ toastCfg('foodMenuEmpty'); return; }
   var r = pickFood(eatState.slot);
-  if(!r){ toast(OLT('这个饭点没有能抽的，去菜单加两道')); return; }
+  if(!r){ toastCfg('foodSlotNoItem'); return; }
   eatState.pick = r;
   renderEatResult();
   var b = $('eatResult');
@@ -1036,10 +1036,10 @@ function logEat(item, btnEl){
     if(!Array.isArray(S.settings.foodLog)) S.settings.foodLog = [];
     S.settings.foodLog.push({ id:uid('fl'), date:d, ts:Date.now(), name:item.name, slot:eatState.slot });
     if(S.settings.foodLog.length > 200) S.settings.foodLog = S.settings.foodLog.slice(-200);
-    save(function(){ toast('记下了：' + item.name); });
+    save(function(){ toastCfg('foodEaten', { name: item.name }); });
   }
   renderEatToday();
-  if(dup) toast(OLT('今天就记过「') + item.name + '」了');
+  if(dup) toastCfg('foodDuplicate', { name: item.name });
   if(btnEl){
     btnEl.textContent = dup ? '已记过' : '已记下';
     btnEl.disabled = true;
@@ -1086,7 +1086,7 @@ function renderEatLib(){
     sw.addEventListener('click', function(ev){
       ev.stopPropagation();
       it.enabled = it.enabled === false;
-      save(function(){ toast(it.enabled ? ('「' + it.name + '」参与随机了') : ('「' + it.name + '」不参与随机了')); });
+      save(function(){ toastCfg(it.enabled ? 'foodRandomOn' : 'foodRandomOff', { name: it.name }); });
       renderEatLib();
       if(eatState.pick && eatState.pick.item.id === it.id) eatState.pick = null;
       renderEatResult();
@@ -1155,13 +1155,13 @@ function openFoodEdit(it){
       confirmBox('删掉「' + item.name + '」？', '它不会再出现在抽取里，吃过的记录还留着。', function(){
         S.settings.foodItems = foodList().filter(function(x){ return x.id !== item.id; });
         if(eatState.pick && eatState.pick.item.id === item.id) eatState.pick = null;
-        save(function(){ toast(OLT('已删除')); }); closeSheet(); renderEat();
+        save(function(){ toastCfg('foodItemDeleted'); }); closeSheet(); renderEat();
       });
     });
   }
   body.querySelector('#fdOk').addEventListener('click', function(){
     var n = body.querySelector('#fdN').value.trim();
-    if(!n){ toast(OLT('写一下吃什么')); return; }
+    if(!n){ toastCfg('foodNameRequired'); return; }
     var data = {
       id: item.id || uid('fd'),
       name: n.slice(0, 20),
@@ -1173,7 +1173,7 @@ function openFoodEdit(it){
     if(isNew) S.settings.foodItems = foodList().concat([data]);
     else S.settings.foodItems = foodList().map(function(x){ return x.id === item.id ? data : x; });
     if(eatState.pick && eatState.pick.item.id === data.id) eatState.pick = null;
-    save(function(){ toast(OLT('已保存')); }); closeSheet(); renderEat();
+    save(function(){ toastCfg('foodItemSaved'); }); closeSheet(); renderEat();
   });
 }
 
