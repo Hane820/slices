@@ -1,25 +1,35 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)]
   [string]$MarkdownPath,
-  [switch]$NoBrowser
+  [switch]$NoBrowser,
+  # 仅用于隔离测试；生产调用不要传。
+  [string]$PidRoot = [IO.Path]::GetTempPath(),
+  [int]$Port = 0
 )
 
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-$contentDir = Join-Path $root 'src\content\writing'
-$tempRoot = [IO.Path]::GetTempPath()
+$contentDir = [IO.Path]::GetFullPath((Join-Path $root 'src\content\writing')).TrimEnd('\')
+$tempRoot = [IO.Path]::GetFullPath($PidRoot)
+if (-not (Test-Path -LiteralPath $tempRoot -PathType Container)) {
+  throw "Pid root not found: $tempRoot"
+}
 
 function Fail([string]$message) { throw $message }
 
 # Resolve and validate the file location.
 if (-not (Test-Path -LiteralPath $MarkdownPath -PathType Leaf)) { Fail "File not found: $MarkdownPath" }
-$full = [IO.Path]::GetFullPath($MarkdownPath)
-$prefix = $contentDir.TrimEnd('\') + '\'
+$resolved = Resolve-Path -LiteralPath $MarkdownPath -ErrorAction Stop
+$full = [IO.Path]::GetFullPath($resolved.ProviderPath)
+$prefix = $contentDir + '\'
 if (-not $full.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
   Fail "File is not under writing content directory: $contentDir"
 }
 $relative = $full.Substring($prefix.Length)
+if ($relative -match '(^|[\\/])\.[^\\/]+([\\/]|$)') {
+  Fail "Hidden paths cannot be previewed as articles: $relative"
+}
 if ($relative -notmatch '\.(md|mdx)$') { Fail "Not a Markdown file: $full" }
 $id = ($relative -replace '\\','/') -replace '\.(md|mdx)$',''
 if ($id -match '[\\/]\.\.') { Fail "Invalid content id: $id" }
@@ -71,7 +81,8 @@ function Stop-PreviewProcess([int]$processId, [string]$pidFile, [int]$port) {
 
 # Reuse an existing service only when it was started by this script for the same article.
 $port = 0
-foreach ($candidate in 4321..4330) {
+$candidates = if ($Port -gt 0) { @($Port) } else { 4321..4330 }
+foreach ($candidate in $candidates) {
   $pidFile = Join-Path $tempRoot "ol-writing-preview-$candidate.pid"
   $listening = Test-LocalPort $candidate
   $owned = $false
@@ -95,7 +106,10 @@ foreach ($candidate in 4321..4330) {
   }
   if (-not $listening) { $port = $candidate; $reused = $false; break }
 }
-if ($port -eq 0) { Fail 'All preview ports 4321-4330 are occupied. Please stop the conflicting service.' }
+if ($port -eq 0) {
+  if ($Port -gt 0) { Fail "Preview port $Port is occupied by another service." }
+  Fail 'All preview ports 4321-4330 are occupied. Please stop the conflicting service.'
+}
 
 if (-not $reused) {
   $env:OL_PREVIEW_WRITING_ID = $id

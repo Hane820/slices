@@ -9,3 +9,5 @@ dist/
 .wrangler/
 # 云端备份测试运行生成的结果快照（非源码）
 cloudflare-worker/test/*-result.json
+# Obsidian Vault（src/content/writing）本地配置，不进入 Git
+src/content/writing/.obsidian/
