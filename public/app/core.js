@@ -620,6 +620,8 @@ function normalize(){
     };
   }).filter(function(it){ return !!it; });
   if(!Array.isArray(S.settings.foodLog)) S.settings.foodLog = [];
+  /* 不按数量截断：foodLog 是用户历史数据，旧数据认领 / normalize / 首次保存
+     都不得静默丢弃有效记录；只清理缺 date 或缺 name 的真正非法项。 */
   S.settings.foodLog = S.settings.foodLog.filter(function(l){
     return l && typeof l.date === 'string' && typeof l.name === 'string' && l.name;
   }).map(function(l){
@@ -630,7 +632,7 @@ function normalize(){
       name: l.name,
       slot: FOOD_SLOTS.indexOf(l.slot) >= 0 ? l.slot : ''
     };
-  }).slice(-200);
+  });
   /* 饮食记录（插件）：业务数据，存顶层 meals（dayEntries type=meal）。
      结构非法项就地丢弃；时间戳非法的记录保留但置 0——界面与统计按「无效」
      明确标识，不静默纳入统计。每条记录的 id/date/ts 原样保留，不重生成。 */

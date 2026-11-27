@@ -1054,7 +1054,7 @@ function logEat(item, btnEl){
   if(!dup){
     if(!Array.isArray(S.settings.foodLog)) S.settings.foodLog = [];
     S.settings.foodLog.push({ id:uid('fl'), date:d, ts:Date.now(), name:item.name, slot:eatState.slot });
-    if(S.settings.foodLog.length > 200) S.settings.foodLog = S.settings.foodLog.slice(-200);
+    /* 不截断：历史记录是用户数据，不得因条数上限静默丢失 */
     save(function(){ toastCfg('foodEaten', { name: item.name }); });
   }
   renderEatToday();
