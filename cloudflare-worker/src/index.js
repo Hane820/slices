@@ -21,6 +21,10 @@
  *   BACKUP_BUCKET    R2 桶绑定（私有，不配置任何公开访问）
  */
 
+/* 应用自有认证模块。用动态 import 是为了让本文件保持"不静态 import 应用模块"
+   的既有约束；模块只处理 /api/auth/*，不影响下面任何 /api/backup* 逻辑。 */
+const AUTH = await import('./auth/index.js');
+
 const APP_NAME = 'earthonline';
 const SUPPORTED_VERSION = 4;
 const DEFAULT_MAX_BYTES = 20 * 1024 * 1024;
@@ -30,6 +34,10 @@ const V2_PROTOCOL = 2;
 const V2_PROTOCOL_HEADER = 'X-Earthonline-Protocol';
 const V2_POINTER_KEY = 'earthonline/backups/v2/pointer.json';
 const V2_OBJECT_PREFIX = 'earthonline/backups/';
+/* 应用 Session 用户的备份前缀。Access-only 兼容模式（仅测试可开）保持旧路径。 */
+function userPrefix(ctx) { return (ctx && ctx.userId) ? ('users/' + ctx.userId + '/') : ''; }
+function backupKeyOf(ctx) { return userPrefix(ctx) + BACKUP_KEY; }
+function v2PointerKeyOf(ctx) { return userPrefix(ctx) + V2_POINTER_KEY; }
 const JWKS_TTL_MS = 10 * 60 * 1000;
 const EXP_LEEWAY_SEC = 60;
 
@@ -60,7 +68,7 @@ function corsHeaders(env, origin) {
     'Access-Control-Allow-Credentials': 'true',  /* Access 会话 cookie 跨站 fetch 需要 */
     'Vary': 'Origin',
     'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Cf-Access-Jwt-Assertion, X-Earthonline-Protocol',
+    'Access-Control-Allow-Headers': 'Content-Type, Cf-Access-Jwt-Assertion, X-Earthonline-Protocol, X-Earthonline-Auth',
     'Access-Control-Max-Age': '86400'
   };
 }
@@ -225,12 +233,19 @@ function assertExactKeys(obj, keys, label) {
   for (var key of keys) if (!Object.prototype.hasOwnProperty.call(obj, key)) throw new Error(label + '-missing-key');
 }
 
-function v2ObjectKeyOf(writeId) {
+function v2ObjectKeyOf(writeId, ctx) {
   if (typeof writeId !== 'string' || !/^[A-Za-z0-9._-]+$/.test(writeId)) throw new Error('write-id-invalid');
-  return V2_OBJECT_PREFIX + writeId + '.json';
+  return userPrefix(ctx) + V2_OBJECT_PREFIX + writeId + '.json';
 }
 
-function parseV2Immutable(im, requireHash) {
+/* ctx 缺省（canonical 内部调用）只校验键的形状；有 ctx 时必须落在用户命名空间内 */
+function assertObjectKey(key, writeId, ctx, label) {
+  if (typeof writeId !== 'string' || !/^[A-Za-z0-9._-]+$/.test(writeId)) throw new Error('write-id-invalid');
+  if (typeof key !== 'string' || !key) throw new Error(label + '-object-key-invalid');
+  if (ctx && key !== v2ObjectKeyOf(writeId, ctx)) throw new Error(label + '-object-key-invalid');
+}
+
+function parseV2Immutable(im, requireHash, ctx) {
   if (!isPlainObject(im)) throw new Error('immutable-shape-invalid');
   assertExactKeys(im, V2_IMMUTABLE_KEYS, 'immutable');
   if (im.protocolVersion !== V2_PROTOCOL) throw new Error('immutable-protocol-invalid');
@@ -239,7 +254,7 @@ function parseV2Immutable(im, requireHash) {
   if (typeof im.clientId !== 'string' || !im.clientId) throw new Error('immutable-client-id-invalid');
   if (!Number.isInteger(im.clientRevision) || im.clientRevision < 0) throw new Error('immutable-client-revision-invalid');
   if (!Number.isInteger(im.baseRev) || im.baseRev < 0) throw new Error('immutable-base-rev-invalid');
-  if (im.objectKey !== v2ObjectKeyOf(im.writeId)) throw new Error('immutable-object-key-invalid');
+  assertObjectKey(im.objectKey, im.writeId, ctx, 'immutable');
   if (typeof im.payloadHash !== 'string' || im.payloadHash.indexOf('sha256-') !== 0) throw new Error('immutable-payload-hash-invalid');
   if (!Number.isInteger(im.payloadBytes) || im.payloadBytes < 0) throw new Error('immutable-payload-bytes-invalid');
   if (!Number.isInteger(im.createdAt)) throw new Error('immutable-created-at-invalid');
@@ -295,13 +310,13 @@ async function immutableHashOf(im) {
   return sha256Tag(new TextEncoder().encode(canonicalV2Immutable(im)));
 }
 
-function parseV2Pointer(p) {
+function parseV2Pointer(p, ctx) {
   if (!isPlainObject(p)) throw new Error('pointer-shape-invalid');
   assertExactKeys(p, V2_POINTER_KEYS, 'pointer');
   if (p.protocolVersion !== V2_PROTOCOL) throw new Error('pointer-protocol-invalid');
   if (!Number.isInteger(p.revision) || p.revision < 1) throw new Error('pointer-revision-invalid');
   if (typeof p.writeId !== 'string' || !/^[A-Za-z0-9._-]+$/.test(p.writeId)) throw new Error('pointer-write-id-invalid');
-  if (p.objectKey !== v2ObjectKeyOf(p.writeId)) throw new Error('pointer-object-key-invalid');
+  assertObjectKey(p.objectKey, p.writeId, ctx, 'pointer');
   if (typeof p.payloadHash !== 'string' || p.payloadHash.indexOf('sha256-') !== 0) throw new Error('pointer-payload-hash-invalid');
   if (!Number.isInteger(p.payloadBytes) || p.payloadBytes < 0) throw new Error('pointer-payload-bytes-invalid');
   if (typeof p.immutableHash !== 'string' || p.immutableHash.indexOf('sha256-') !== 0) throw new Error('pointer-immutable-hash-invalid');
@@ -400,11 +415,11 @@ function v2Fail(env, request, origin, status, error, message, extra) {
 }
 
 /* ==================== 路由处理 ==================== */
-async function handleStatus(request, env, origin) {
+async function handleStatus(request, env, origin, ctx) {
   var head;
   try {
     var bucket = requireBucket(env);
-    head = await bucket.head(BACKUP_KEY);
+    head = await bucket.head(backupKeyOf(ctx));
   } catch (e) {
     return jsonResp(env, request, { ok: false, error: 'storage-error', message: 'R2 查询失败，状态未知' }, 500, null, origin);
   }
@@ -415,7 +430,7 @@ async function handleStatus(request, env, origin) {
   return jsonResp(env, request, {
     ok: true,
     hasBackup: true,
-    key: BACKUP_KEY,
+    key: backupKeyOf(ctx),
     size: head.size,
     uploadedAt: meta.uploadedAt || (head.uploaded ? new Date(head.uploaded).toISOString() : null),
     version: meta.version ? parseInt(meta.version, 10) : null,
@@ -423,7 +438,7 @@ async function handleStatus(request, env, origin) {
   }, 200, null, origin);
 }
 
-async function handlePut(request, env, origin) {
+async function handlePut(request, env, origin, ctx) {
   var ct = request.headers.get('Content-Type') || '';
   if (ct.indexOf('application/json') < 0) {
     return jsonResp(env, request, { ok: false, error: 'bad-content-type', message: 'Content-Type 必须是 application/json' }, 415, null, origin);
@@ -455,7 +470,7 @@ async function handlePut(request, env, origin) {
   var putResult;
   try {
     var bucket = requireBucket(env);
-    putResult = await bucket.put(BACKUP_KEY, text, {
+    putResult = await bucket.put(backupKeyOf(ctx), text, {
       customMetadata: {
         app: APP_NAME,
         version: String(SUPPORTED_VERSION),
@@ -473,15 +488,15 @@ async function handlePut(request, env, origin) {
   }
   return jsonResp(env, request, {
     ok: true,
-    stored: { key: BACKUP_KEY, size: bytes, uploadedAt: uploadedAt }
+    stored: { key: backupKeyOf(ctx), size: bytes, uploadedAt: uploadedAt }
   }, 200, null, origin);
 }
 
-async function handleGet(request, env, origin) {
+async function handleGet(request, env, origin, ctx) {
   var obj;
   try {
     var bucket = requireBucket(env);
-    obj = await bucket.get(BACKUP_KEY);
+    obj = await bucket.get(backupKeyOf(ctx));
   } catch (e) {
     return jsonResp(env, request, { ok: false, error: 'storage-error', message: 'R2 读取失败' }, 500, null, origin);
   }
@@ -528,7 +543,7 @@ async function readV2JsonBody(request, env, origin) {
 }
 
 /* 写入不可变对象。成功只代表对象已落盘，不代表 pointer 已提交。 */
-async function handleV2ObjectPut(request, env, origin) {
+async function handleV2ObjectPut(request, env, origin, ctx) {
   var parsed = await readV2JsonBody(request, env, origin);
   if (parsed.error) return parsed.error;
   var body = parsed.obj;
@@ -536,7 +551,7 @@ async function handleV2ObjectPut(request, env, origin) {
     return v2Fail(env, request, origin, 400, 'bad-protocol', 'protocolVersion 必须为 2');
   }
   var im;
-  try { im = parseV2Immutable(body.immutable, true); }
+  try { im = parseV2Immutable(body.immutable, true, ctx); }
   catch (e) { return v2Fail(env, request, origin, 400, 'bad-immutable', e.message); }
 
   try {
@@ -625,7 +640,7 @@ async function handleV2ObjectPut(request, env, origin) {
 }
 
 /* pointer 条件更新：expected.etag === null 表示只允许首次初始化。 */
-async function handleV2PointerPut(request, env, origin) {
+async function handleV2PointerPut(request, env, origin, ctx) {
   var parsed = await readV2JsonBody(request, env, origin);
   if (parsed.error) return parsed.error;
   var body = parsed.obj;
@@ -633,7 +648,7 @@ async function handleV2PointerPut(request, env, origin) {
     return v2Fail(env, request, origin, 400, 'bad-protocol', 'protocolVersion 必须为 2');
   }
   var pointer;
-  try { pointer = parseV2Pointer(body.pointer); }
+  try { pointer = parseV2Pointer(body.pointer, ctx); }
   catch (e) { return v2Fail(env, request, origin, 400, 'bad-pointer', e.message); }
 
   var expected = body.expected;
@@ -648,7 +663,7 @@ async function handleV2PointerPut(request, env, origin) {
 
   var bucket = requireBucket(env);
   var currentObj;
-  try { currentObj = await bucket.get(V2_POINTER_KEY); }
+  try { currentObj = await bucket.get(v2PointerKeyOf(ctx)); }
   catch (e) { return v2Fail(env, request, origin, 502, 'storage-error', 'R2 读取失败'); }
 
   var currentPointer = null;
@@ -656,7 +671,7 @@ async function handleV2PointerPut(request, env, origin) {
   if (currentObj) {
     var currentText = await readR2Object(currentObj);
     currentEtag = etagOf(currentObj);
-    try { currentPointer = parseV2Pointer(JSON.parse(currentText)); }
+    try { currentPointer = parseV2Pointer(JSON.parse(currentText), ctx); }
     catch (e) { return v2Fail(env, request, origin, 409, 'pointer-corrupt', '现有 pointer 无法解析'); }
     if (canonicalV2Pointer(currentPointer) === canonicalV2Pointer(pointer) && currentPointer.revision === pointer.revision) {
       if (!currentEtag) {
@@ -696,7 +711,7 @@ async function handleV2PointerPut(request, env, origin) {
   var storedImmutable;
   try {
     if (typeof meta.immutableJson !== 'string') throw new Error('immutable-metadata-missing');
-    storedImmutable = parseV2Immutable(JSON.parse(meta.immutableJson), true);
+    storedImmutable = parseV2Immutable(JSON.parse(meta.immutableJson), true, ctx);
   } catch (e) {
     return v2Fail(env, request, origin, 409, 'immutable-metadata-invalid', e.message);
   }
@@ -715,7 +730,7 @@ async function handleV2PointerPut(request, env, origin) {
   }
   var putResult;
   try {
-    putResult = await bucket.put(V2_POINTER_KEY, JSON.stringify(pointer), {
+    putResult = await bucket.put(v2PointerKeyOf(ctx), JSON.stringify(pointer), {
       onlyIf: onlyIf,
       customMetadata: {
         app: APP_NAME,
@@ -744,15 +759,15 @@ async function handleV2PointerPut(request, env, origin) {
   }, 200, null, origin);
 }
 
-async function handleV2Status(request, env, origin) {
+async function handleV2Status(request, env, origin, ctx) {
   var bucket = requireBucket(env);
   var obj;
-  try { obj = await bucket.get(V2_POINTER_KEY); }
+  try { obj = await bucket.get(v2PointerKeyOf(ctx)); }
   catch (e) { return v2Fail(env, request, origin, 502, 'storage-error', 'R2 读取失败'); }
   if (!obj) return jsonResp(env, request, { ok: true, hasPointer: false }, 200, null, origin);
   var text = await readR2Object(obj);
   var pointer;
-  try { pointer = parseV2Pointer(JSON.parse(text)); }
+  try { pointer = parseV2Pointer(JSON.parse(text), ctx); }
   catch (e) { return v2Fail(env, request, origin, 409, 'pointer-corrupt', '现有 pointer 无法解析'); }
   var statusEtag = etagOf(obj);
   if (!statusEtag) {
@@ -762,6 +777,50 @@ async function handleV2Status(request, env, origin) {
     ok: true, hasPointer: true, pointer: pointer,
     revision: pointer.revision, etag: statusEtag
   }, 200, null, origin);
+}
+
+/* 备份授权：应用 Session 是唯一用户身份依据。
+   - 正常模式：必须 OLAuth Session；Access JWT 单独不能获得用户备份权限。
+   - BACKUP_REQUIRE_ACCESS_JWT=true：Session + Access JWT 双校验（过渡加固）。
+   - ALLOW_LEGACY_ACCESS_BACKUP=true：仅供旧协议回归测试使用，生产严禁开启；
+     此模式保持旧单租户路径且不产生 userId。 */
+async function authorizeBackup(request, env, origin) {
+  /* 认证错误分类：只有「应用 Session 明确缺失/过期/撤销」才算会话失效。
+     - sessionValid=false + reason='no-valid-session' 是唯一的会话失效信号；
+     - Access JWT 缺失/校验失败（含 BACKUP_REQUIRE_ACCESS_JWT 过渡模式）不是会话失效；
+     - D1/验签服务故障返回 serviceUnavailable → 502，绝不伪装成会话失效。 */
+  var sessionCtx = null;
+  var authServiceError = false;
+  if (AUTH && typeof AUTH.requireSession === 'function') {
+    try {
+      var s = await AUTH.requireSession(request, env);
+      if (s && s.user && s.user.id) sessionCtx = { userId: s.user.id, source: 'session', user: s.user };
+    } catch (e) { authServiceError = true; /* D1 未绑定 / 查询失败：服务不可用，不是会话失效 */ }
+  }
+  var requireAccess = !!(env && env.BACKUP_REQUIRE_ACCESS_JWT === 'true');
+  if (requireAccess) {
+    var t = extractToken(request);
+    /* 即使 Session 有效，Access 校验失败也只是运维边界拒绝，不能据此降级用户身份 */
+    if (!t) return { denied: true, reason: 'access-token-required', sessionValid: !!sessionCtx };
+    var a;
+    try { a = await verifyAccessJwt(t, env); } catch (e) {
+      return { denied: true, reason: 'auth-unavailable', sessionValid: !!sessionCtx };
+    }
+    if (!a || !a.ok) return { denied: true, reason: (a && a.reason) || 'access-invalid', sessionValid: !!sessionCtx };
+  }
+  if (sessionCtx) return sessionCtx;
+  if (env && env.ALLOW_LEGACY_ACCESS_BACKUP === 'true') {
+    var lt = extractToken(request);
+    if (!lt) return { denied: true, reason: 'no-token', sessionValid: false };
+    var la;
+    try { la = await verifyAccessJwt(lt, env); } catch (e) { return { denied: true, reason: 'auth-unavailable', sessionValid: false }; }
+    if (la && la.ok) return { userId: null, source: 'access-legacy' };
+    return { denied: true, reason: (la && la.reason) || 'invalid', sessionValid: false };
+  }
+  /* 服务端身份基础设施故障（D1 未绑定/查询异常）：502，不降级身份 */
+  if (authServiceError) return { serviceUnavailable: true };
+  /* 正常模式：requireSession 返回 null = 应用 Session 明确缺失/过期/撤销 */
+  return { denied: true, reason: 'no-valid-session', sessionValid: false };
 }
 
 /* ==================== 入口 ==================== */
@@ -776,6 +835,18 @@ async function handleRequest(request, env) {
     }
     logLine(request, 204);
     return new Response(null, { status: 204, headers: corsHeaders(env, origin) });
+  }
+
+  /* 应用自有认证：/api/auth/* 使用服务端 Session（应用自己的邮箱验证码），
+     与下面的 Cloudflare Access JWT 备份校验完全隔离。认证路由不改变备份安全边界。 */
+  if (url.pathname.indexOf('/api/auth/') === 0) {
+    var authRes = await AUTH.handleAuthRequest(request, env, origin);
+    if (authRes) {
+      if (authRes.status === 204) {
+        return new Response(null, { status: 204, headers: Object.assign({}, corsHeaders(env, origin) || {}, authRes.headers || {}) });
+      }
+      return jsonResp(env, request, authRes.body, authRes.status, authRes.headers, origin);
+    }
   }
 
   var V2_PATHS = {
@@ -793,18 +864,30 @@ async function handleRequest(request, env) {
     return jsonResp(env, request, { ok: false, error: 'origin-forbidden', message: '来源不在允许列表' }, 403, null, origin);
   }
 
-  var token = extractToken(request);
-  if (!token) {
-    return jsonResp(env, request, { ok: false, error: 'unauthorized', reason: 'no-token' }, 401, null, origin);
-  }
-  var auth;
-  try { auth = await verifyAccessJwt(token, env); }
+  /* 用户身份只来自已验证的应用 Session（或测试专用兼容模式）。 */
+  var backupCtx;
+  try { backupCtx = await authorizeBackup(request, env, origin); }
   catch (e) {
-    /* JWKS 拉取失败等服务侧问题：502，不当作未登录 */
     return jsonResp(env, request, { ok: false, error: 'auth-unavailable', message: '身份服务暂不可用，请重试' }, 502, null, origin);
   }
-  if (!auth || !auth.ok) {
-    return jsonResp(env, request, { ok: false, error: 'unauthorized', reason: (auth && auth.reason) || 'invalid' }, 401, null, origin);
+  if (backupCtx && backupCtx.serviceUnavailable) {
+    return jsonResp(env, request, {
+      ok: false, error: 'auth-unavailable', code: 'auth-unavailable',
+      message: '身份服务暂不可用，请重试'
+    }, 502, null, origin);
+  }
+  if (!backupCtx || backupCtx.denied) {
+    /* code 是给前端生命周期用的机器可读分类：
+       - session-invalid：仅应用 Session 明确失效，前端才允许 demote guest；
+       - access-denied：Access JWT / Origin / 权限不足，前端必须保留 user。
+       保留 error/reason 原字段以兼容旧客户端与既有测试。 */
+    var sessionInvalid = !!(backupCtx && backupCtx.denied && backupCtx.sessionValid === false &&
+      backupCtx.reason === 'no-valid-session');
+    return jsonResp(env, request, {
+      ok: false, error: 'unauthorized',
+      code: sessionInvalid ? 'session-invalid' : 'access-denied',
+      reason: (backupCtx && backupCtx.denied && backupCtx.reason) || 'no-valid-session'
+    }, 401, null, origin);
   }
 
   if (isV2Path) {
@@ -816,29 +899,29 @@ async function handleRequest(request, env) {
       if (request.method !== 'GET') {
         return jsonResp(env, request, { ok: false, error: 'method-not-allowed' }, 405, { 'Allow': 'GET' }, origin);
       }
-      return handleV2Status(request, env, origin);
+      return handleV2Status(request, env, origin, backupCtx);
     }
     if (url.pathname === '/api/backup/v2/object') {
       if (request.method !== 'PUT') {
         return jsonResp(env, request, { ok: false, error: 'method-not-allowed' }, 405, { 'Allow': 'PUT' }, origin);
       }
-      return handleV2ObjectPut(request, env, origin);
+      return handleV2ObjectPut(request, env, origin, backupCtx);
     }
     if (request.method !== 'PUT') {
       return jsonResp(env, request, { ok: false, error: 'method-not-allowed' }, 405, { 'Allow': 'PUT' }, origin);
     }
-    return handleV2PointerPut(request, env, origin);
+    return handleV2PointerPut(request, env, origin, backupCtx);
   }
 
   if (url.pathname === '/api/backup/status') {
     if (request.method !== 'GET') {
       return jsonResp(env, request, { ok: false, error: 'method-not-allowed' }, 405, { 'Allow': 'GET' }, origin);
     }
-    return handleStatus(request, env, origin);
+    return handleStatus(request, env, origin, backupCtx);
   }
   if (url.pathname === '/api/backup') {
-    if (request.method === 'PUT') return handlePut(request, env, origin);
-    if (request.method === 'GET') return handleGet(request, env, origin);
+    if (request.method === 'PUT') return handlePut(request, env, origin, backupCtx);
+    if (request.method === 'GET') return handleGet(request, env, origin, backupCtx);
     return jsonResp(env, request, { ok: false, error: 'method-not-allowed' }, 405, { 'Allow': 'GET, PUT' }, origin);
   }
   return jsonResp(env, request, { ok: false, error: 'not-found' }, 404, null, origin);

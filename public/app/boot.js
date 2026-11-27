@@ -267,6 +267,11 @@ function finishBoot(){
     setTimeout(function(){ toastCfg('firstUseHint'); }, 1000);
   }
   OLBoot.booted = true;
+  /* 启动完成 = 身份与业务数据都已确认。云端备份在这里按当前身份启动：
+     guest 是 no-op（不排程、不请求）；只有 local（= 将来的 user）才启动自动备份。 */
+  if(window.OLCloudBackup && typeof OLCloudBackup.syncIdentity === 'function'){
+    try { OLCloudBackup.syncIdentity(); } catch(e){}
+  }
 }
 
 /* 旧路径：未迁移 / 无 IndexedDB / 全新用户。localStorage 仍是唯一真相 */
@@ -989,7 +994,9 @@ function bootGuest(){
     return;
   }
   OLDB.open().then(function(){
-    return OLGuest.prepare();
+    /* 认领旧库：只补基础设施行，绝不灌种子、绝不覆盖业务数据；
+       新建游客库：按既有逻辑灌种子。两条路径都要求明确成功才继续。 */
+    return OLGuest.isAdopted() ? OLGuest.adopt() : OLGuest.prepare();
   }).then(function(r){
     if(OLBoot.blocked || OLBoot.booted) return;
     if(!r || !r.ok){ bootBlocked('游客空间初始化失败', (r && (r.reason + (r.message ? '：' + r.message : ''))) || 'unknown'); return; }
@@ -999,14 +1006,9 @@ function bootGuest(){
   });
 }
 
-function startBoot(){
-  /* 身份只有一个权威来源：identity.js。游客空间走独立分支，与正式路径零交叉。 */
-  if(window.OLIdentity && OLIdentity.isGuest()){ bootGuest(); return; }
-  /* 连 IndexedDB 都没有的旧浏览器：没有迁移目标，旧路径继续可用 */
-  if(!window.OLDB || !OLDB.isSupported || !OLDB.isSupported()){
-    bootLegacy();
-    return;
-  }
+/* 正式空间（当前仓库里的 local，将来两态模型里的 user）原有启动链路。
+   只在身份记录明确指向正式库时才进入；默认游客不会再走到这里。 */
+function bootFormal(){
   OLDB.open().then(function(){
     return OLMigrate.status();
   }).then(function(st){
@@ -1016,15 +1018,106 @@ function startBoot(){
     if(st.mode === 'in_progress'){ waitMigration(); return; }
     if(st.mode === 'failed'){ tryMigrate(); return; }   /* attempts<5 自动重试 */
     if(st.mode === 'unavailable'){ bootBlocked('数据库状态不可读', st.error || st.mode); return; }
-    /* ls / unmigrated / unknown：库里没数据也没有旧数据 = 全新用户 */
     var markerDone = !!(st.marker && st.marker.state === 'done');
     var hasOld = false;
     try { hasOld = !!localStorage.getItem(KEY); } catch (e) {}
     if(!markerDone && !hasOld){ bootLegacy(); return; }
     tryMigrate();
   }, function(e){
-    /* 打开失败：高版本占用 / 结构异常 / 被阻塞 —— 停止启动，不动任何数据 */
     bootBlocked('数据库无法打开', ((e && e.code) || '') + ((e && e.message) ? '：' + e.message : ''));
+  });
+}
+
+/* 默认游客启动：
+   1. 已有合法身份  → 不探测，绑定记录的库；先证明库存在，再按空间的原分支启动。
+   2. 无身份记录    → 跑旧数据探测：has-data 认领旧库，empty 新建游客库，unknown 阻断。
+   3. 任何分支都不写旧身份、不猜库名、不在探测完成前打开数据库。 */
+function startBoot(){
+  var id = window.OLIdentity;
+  var hasId = !!(id && typeof id.hasRecord === 'function' && id.hasRecord());
+
+  /* 本地记录显示 user（local）时，服务端 Session 是唯一权威。
+     OLAuth 未加载的隔离测试仍走旧路径；生产页面必定加载 auth.js。 */
+  function userLooksSignedIn(continuation){
+    if(!window.OLAuth || typeof OLAuth.session !== 'function'){ continuation(); return; }
+    OLAuth.session().then(function(res){
+      if(OLBoot.blocked || OLBoot.booted) return;
+      if(res && res.ok){ continuation(); return; }
+      var reason = (res && res.error) || 'no-session';
+      /* 认证失败分类：只有明确会话失效才 demote。403 / CSRF / Access 拦截 /
+         服务故障 / 状态不明一律阻断启动或保留 user，绝不误判为已退出。 */
+      var cls = (window.OLAuth && typeof OLAuth.classifyAuthFailure === 'function')
+        ? OLAuth.classifyAuthFailure({ status:res && res.status, body:res && res.body, error:reason })
+        : 'unknown';
+      if(cls === 'session-invalid'){
+        id.demoteToGuest(reason === 'code-expired' ? 'session-expired' : 'session-invalid');
+        continuation();
+        return;
+      }
+      if(cls === 'transient'){
+        bootBlocked('会话验证失败', '网络或服务端异常，无法确认登录状态；已停止启动，避免误判身份。');
+        return;
+      }
+      bootBlocked('会话状态无法确认',
+        '服务端未明确确认会话失效（' + reason + '）；为避免误判身份，已停止启动。');
+    });
+  }
+
+  if(!window.OLDB || !OLDB.isSupported || !OLDB.isSupported()){
+    /* 只有显式指向正式库的合法身份才允许旧路径；游客必须有 IndexedDB */
+    if(hasId && id.mode() === 'local'){
+      userLooksSignedIn(bootLegacy);
+      return;
+    }
+    bootBlocked('这台浏览器不支持本地数据库',
+      '游客空间需要 IndexedDB。为了不碰你自己的数据，这里不会退回到旧的存储方式。');
+    return;
+  }
+
+  if(hasId){
+    function continueAfterIdentity(){
+      var rec = id.record();
+      var bound = OLDB.bindFromIdentity();
+      if(!bound.ok){ bootBlocked('身份与数据库绑定失败', bound.reason); return; }
+      /* P0-3：记录合法但库被删时，open() 会凭空建一个空库 —— 必须先在只读层面证明库存在。 */
+      OLDB.exists().then(function(ex){
+        if(OLBoot.blocked || OLBoot.booted) return;
+        if(ex !== 'yes'){
+          bootBlocked('身份指向的数据库不存在',
+            '记录指向 ' + rec.dbName + '，但本机找不到这个库；为避免覆盖原身份，已停止启动。');
+          return;
+        }
+        if(rec.space === 'guest'){ bootGuest(); return; }
+        bootFormal();
+      }, function(e){
+        bootBlocked('数据库完整性检查失败', (e && e.message) || String(e));
+      });
+    }
+    if(id.mode() === 'local'){ userLooksSignedIn(continueAfterIdentity); return; }
+    continueAfterIdentity();
+    return;
+  }
+
+  if(!window.OLStartup || typeof OLStartup.detectOldData !== 'function'){
+    bootBlocked('启动探测模块缺失', 'identity 尚未落定，且缺少旧数据探测模块');
+    return;
+  }
+  OLStartup.detectOldData().then(function(d){
+    if(OLBoot.blocked || OLBoot.booted) return;
+    if(!d || d.verdict === 'unknown'){
+      bootBlocked('旧数据探测结果不确定', (d && d.reason) || 'unknown');
+      return;
+    }
+    var next = d.verdict === 'has-data'
+      ? { space: 'guest', dbName: id.FORMAL_DB, adoptedOldData: true, source: 'detect-has-data' }
+      : { space: 'guest', dbName: id.GUEST_DB, adoptedOldData: false, source: 'detect-empty' };
+    var settled = id.settle(next);
+    if(!settled.ok){ bootBlocked('默认游客身份写入失败', settled.reason); return; }
+    var bound = OLDB.bindFromIdentity();
+    if(!bound.ok){ bootBlocked('身份与数据库绑定失败', bound.reason); return; }
+    bootGuest();
+  }, function(e){
+    bootBlocked('旧数据探测失败', (e && e.message) || String(e));
   });
 }
 

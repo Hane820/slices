@@ -82,7 +82,7 @@ $env:R2_TEST_WORKER_PORT = "8789"     # 被占用时自动尝试后续 9 个端�
 | `R2_TEST_BUCKET` | 是 | 测试桶名，必须与白名单完全一致 |
 | `R2_TEST_ALLOWED_BUCKETS` | 是 | 逗号分隔白名单；防止误填生产桶 |
 | `R2_TEST_CONFIRM` | 是 | 必须为 `YES` |
-| `R2_TEST_CLEANUP` | 否 | 默认 `success`：仅全部通过时清理；`always` 总是清理；`never` 保留 |
+| `R2_TEST_CLEANUP` | 否 | 默认 `success`：仅全部通过且非 fatal 时清理；`always` 在非 fatal 的测试失败时也清理（fatal 例外）；`never` 保留。fatal（含隔离/启动失败）固定 `never`，一律保留现场 |
 | `R2_TEST_WORKER_PORT` | 否 | 本地 dev 起始端口，默认 8789 |
 
 脚本不会读取或输出任何 Token/Secret/JWT；日志中的邮箱、账号 ID、JWT 会被脱敏。

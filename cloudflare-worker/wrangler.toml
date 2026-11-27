@@ -22,6 +22,35 @@ AUD_TAG = "7aff656c944431a8c78434defd7875f695e4bad64eb44a1e2602992a70e80e88"
 # 本地测试用 JWKS 覆盖（线上必须删掉这一行，走团队域官方证书地址）
 # JWKS_URL = "http://127.0.0.1:8787/cdn-cgi/access/certs"
 
+# ---- 应用自有认证（Phase Auth）----
+# 同源部署才安全：站点与 API 同域时把 /api/* 路由到本 Worker，
+# 并保持 AUTH_COOKIE_MODE="same-site"（__Host-eo_sess; SameSite=Lax）。
+# 当前 workers.dev 跨站部署需要显式开启 cross-site 并承担第三方 Cookie 失效风险，
+# 详见 docs/space-auth/PHASE_AUTH_IMPLEMENT.md。
+AUTH_COOKIE_MODE = "same-site"
+# 生产建议保持 false：应用 Session 才是用户身份依据；设 true 时额外要求 Access JWT
+BACKUP_REQUIRE_ACCESS_JWT = "false"
+# ALLOW_LEGACY_ACCESS_BACKUP 仅用于旧协议回归测试，生产严禁设置
+# 同源路由：需用户在 Dashboard 配置（zone_id 为真实值后取消注释）：
+# routes = [ { pattern = "slices0flife.me/api/*", zone_id = "REPLACE-ME-ZONE-ID" } ]
+# 静态页面与 /app/* 必须由静态托管返回，不能被 API 路由或 SPA fallback 接管。
+# 未配置真实邮件服务时生产接口明确失败，不假装发送成功
+EMAIL_DRIVER = "none"
+MAIL_FROM = "noreply@slices0flife.me"
+# 所需 Secrets（用 wrangler secret put 设置，不写进本文件）：
+#   AUTH_CODE_PEPPER   验证码摘要 pepper（至少 32 字节随机值）
+#   AUTH_IP_PEPPER     IP/UA 哈希 pepper
+#   MAIL_API_KEY       邮件服务 API Key（EMAIL_DRIVER=http 时必需）
+# MAIL_API_URL 为非敏感变量，设为真实 HTTPS 端点后才会启用 http 邮件驱动。
+
+# 应用自有认证数据库。部署前必须把 database_id 换成真实 D1 数据库 ID，
+# 并执行：wrangler d1 migrations apply AUTH_DB --remote
+[[d1_databases]]
+binding = "AUTH_DB"
+database_name = "earthonline-auth"
+database_id = "REPLACE-ME-D1-DATABASE-ID"
+migrations_dir = "migrations"
+
 # 私有 R2 桶：只在 Cloudflare 控制台创建，不绑公开域名、不开公开访问。
 # wrangler dev 本地模式会自动模拟这个桶，不需要真的先建好。
 [[r2_buckets]]

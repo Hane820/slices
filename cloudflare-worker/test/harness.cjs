@@ -263,6 +263,8 @@ function makeJwksServer(keysRef) {
 
 const envBase = (r2, jwksUrl) => ({
   BACKUP_BUCKET: r2,
+  /* 仅旧协议回归测试：Access-only 兼容路径。生产配置严禁开启。 */
+  ALLOW_LEGACY_ACCESS_BACKUP: 'true',
   APP_ORIGIN: 'https://liyuk.github.io',
   ACCESS_TEAM: 'test-team.cloudflareaccess.com',
   AUD_TAG: 'test-aud-tag',
@@ -470,7 +472,7 @@ async function main() {
       eq('H4 预检：白名单 204 且允许 PUT 与 JWT 头',
         [r.res.status, r.res.headers.get('Access-Control-Allow-Methods'), r.res.headers.get('Access-Control-Allow-Headers'),
          r.res.headers.get('Access-Control-Allow-Credentials')],
-        [204, 'GET, PUT, OPTIONS', 'Content-Type, Cf-Access-Jwt-Assertion, X-Earthonline-Protocol', 'true']);
+        [204, 'GET, PUT, OPTIONS', 'Content-Type, Cf-Access-Jwt-Assertion, X-Earthonline-Protocol, X-Earthonline-Auth', 'true']);
       r = await call('/api/backup', { method: 'DELETE', headers: { 'Cf-Access-Jwt-Assertion': goodToken } });
       eq('H5 DELETE 405', r.res.status, 405);
       r = await call('/api/other', { method: 'GET', headers: { 'Cf-Access-Jwt-Assertion': goodToken } });

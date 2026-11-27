@@ -17,13 +17,15 @@
 (function (global) {
   'use strict';
 
-  /* 库名来自身份模块（identity.js，必须先于本文件加载）：
-       local → earthonline（默认，行为与以前完全一致）
-       guest → earthonline-guest（游客独立库）
-     只认这两个名字，其余一律回落到正式库名——身份模块自己已经做了
-     「读不懂就 fail-closed 到 guest」的判断，这里不再二次猜测。 */
+  /* 库名来自身份模块（identity.js，必须先于本文件加载）。
+     关键修复（P0-2）：库名不能在脚本加载时就固化 —— 首次启动要先做异步旧数据探测，
+     探测结论决定认领 earthonline 还是新建 earthonline-guest，这必然晚于本文件求值。
+     因此这里只保留"待绑定"状态，由启动层调用 bindFromIdentity() 后才会确定；
+     任何在绑定前试图打开数据库的行为都明确失败，绝不回落到正式库。 */
   var FORMAL_DB = 'earthonline';
   var GUEST_DB  = 'earthonline-guest';
+  var DB_NAME = null;
+
   function resolveDbName() {
     var want = '';
     try {
@@ -31,9 +33,21 @@
         want = String(global.OLIdentity.dbName() || '');
       }
     } catch (e) { want = ''; }
-    return want === GUEST_DB ? GUEST_DB : FORMAL_DB;
+    /* 不再把未知名字回落成正式库：回落等于用猜出来的身份打开别人的库 */
+    if (want !== FORMAL_DB && want !== GUEST_DB) return null;
+    return want;
   }
-  var DB_NAME = resolveDbName();
+
+  /* 启动层在探测 + identity.settle() 之后调用。返回明确结果，不抛异常。 */
+  function bindFromIdentity() {
+    if (db) return { ok: false, reason: 'db-already-created' };
+    var want = resolveDbName();
+    if (!want) return { ok: false, reason: 'identity-not-settled' };
+    DB_NAME = want;
+    return { ok: true, name: DB_NAME };
+  }
+
+  function currentDbName() { return DB_NAME || resolveDbName() || null; }
   var DB_VERSION = 1;          /* Dexie 声明版本；原生 IDBDatabase.version 会显示 10（Dexie 内部 ×10 编码） */
   var OPEN_TIMEOUT = 12000;    /* open() 的兜底超时，防「既不成功也不失败」把调用方吊死 */
 
@@ -170,6 +184,9 @@
 
   /* 只建实例、不打开。Dexie 在构造时不触碰 IndexedDB，不会产生任何副作用。 */
   function instance() {
+    if (!currentDbName()) {
+      throw makeError('IdentityNotSettled', '身份尚未落定，拒绝打开数据库', 'identity-not-settled');
+    }
     if (!isSupported()) return null;
     if (db) return db;
     if (!hasDexie()) return null;
@@ -177,7 +194,7 @@
     var factory = makeGuardedFactory();
     if (!factory) return null;
 
-    db = new global.Dexie(DB_NAME, { indexedDB: factory, IDBKeyRange: global.IDBKeyRange });
+    db = new global.Dexie(currentDbName(), { indexedDB: factory, IDBKeyRange: global.IDBKeyRange });
     db.version(DB_VERSION).stores(STORES);
 
     /* 别的标签页要升级结构：本页主动让路，并让调用方知道连接被动断开 */
@@ -217,7 +234,7 @@
 
   function status() {
     return {
-      name: DB_NAME,
+      name: currentDbName(),
       version: DB_VERSION,
       dexieVersion: db ? safeVerno() : null,
       nativeVersion: state.nativeVersion,
@@ -253,7 +270,7 @@
       if (ex !== 'yes') return null;
       return new Promise(function (resolve) {
         var req;
-        try { req = global.indexedDB.open(DB_NAME); }
+        try { req = global.indexedDB.open(currentDbName()); }
         catch (e) { resolve(null); return; }
 
         var aborted = false;
@@ -442,7 +459,7 @@
       if (typeof global.indexedDB.databases !== 'function') return Promise.resolve('unknown');
       return global.indexedDB.databases().then(function (list) {
         var arr = list || [];
-        for (var i = 0; i < arr.length; i++) if (arr[i] && arr[i].name === DB_NAME) return 'yes';
+        for (var i = 0; i < arr.length; i++) if (arr[i] && arr[i].name === currentDbName()) return 'yes';
         return 'no';
       }, function () { return 'unknown'; });
     } catch (e) { return Promise.resolve('unknown'); }
@@ -458,7 +475,7 @@
   function openNativeReadonly() {
     return new Promise(function (resolve, reject) {
       var req;
-      try { req = global.indexedDB.open(DB_NAME); }
+      try { req = global.indexedDB.open(currentDbName()); }
       catch (e) { reject(makeError('OpenFailedError', '打开原生连接失败', 'open-failed', e)); return; }
 
       var aborted = false;
@@ -534,7 +551,7 @@
     }
     return nativeReadable().then(function (ex) {
       var base = {
-        name: DB_NAME,
+        name: currentDbName(),
         declaredVersion: DB_VERSION,
         queriedAt: Date.now(),
         readOnly: true,
@@ -663,8 +680,8 @@
       return Promise.reject(makeError('UnsupportedError', '浏览器不支持 IndexedDB', 'unsupported'));
     }
     return nativeReadable().then(function (ex) {
-      if (ex === 'no') return { exists: false, existence: 'not-exists', name: DB_NAME, stores: {}, reason: '数据库尚未创建' };
-      if (ex === 'unknown') return { exists: null, existence: 'unknown', name: DB_NAME, stores: {}, reason: '无法在不创建库的前提下判定存在性（不视为不存在）' };
+      if (ex === 'no') return { exists: false, existence: 'not-exists', name: currentDbName(), stores: {}, reason: '数据库尚未创建' };
+      if (ex === 'unknown') return { exists: null, existence: 'unknown', name: currentDbName(), stores: {}, reason: '无法在不创建库的前提下判定存在性（不视为不存在）' };
 
       return openNativeReadonly().then(function (raw) {
         var names = Array.prototype.slice.call(raw.objectStoreNames);
@@ -692,7 +709,7 @@
   }
 
   var api = {
-    NAME: DB_NAME,
+    get NAME() { return currentDbName(); },
     VERSION: DB_VERSION,
     STORES: STORES,
     STORE_NAMES: STORE_NAMES.slice(),
@@ -704,6 +721,7 @@
     PAYLOAD_KEYS: PAYLOAD_KEYS.slice(),
     OPEN_TIMEOUT: OPEN_TIMEOUT,
     isSupported: isSupported,
+    bindFromIdentity: bindFromIdentity,
     status: status,
     open: open,
     close: close,

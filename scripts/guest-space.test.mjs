@@ -1,8 +1,8 @@
 /* guest-space.test.mjs — 空间隔离与游客种子初始化的单元/静态验证（不需要浏览器）
  *
  * 覆盖：
- *   1. identity.js：默认 local、进入/退出游客、库名切换、记录损坏时 fail-closed 到 guest、
- *      且绝不读写 localStorage（用会抛错的 getter 证明）。
+ *   1. identity.js：默认 guest（默认游客）、显式 local 记录保持正式库、进入/退出游客、
+ *      记录损坏时 fail-closed 到 guest、且绝不读写 localStorage（用会抛错的 getter 证明）。
  *   2. guest.js 守卫：库名不是 earthonline-guest 时 prepare/clear 一律拒绝，且不会删库。
  *   3. guest.js 种子：首次初始化、幂等、结构异常/写入失败/半初始化状态的处理，
  *      以及 OLMigrate.buildRows 返回 { rows, issues } 这一形状（seed-failed 回归用例）。
@@ -46,21 +46,31 @@ function loadIdentity(opts) {
   return win;
 }
 
-test('identity: 没有记录时默认 local，库名是正式库', () => {
+test('identity: 没有记录时默认 guest（默认游客），库名是游客库', () => {
   const win = loadIdentity();
-  assert.equal(win.OLIdentity.mode(), 'local');
-  assert.equal(win.OLIdentity.isGuest(), false);
-  assert.equal(win.OLIdentity.dbName(), 'earthonline');
+  assert.equal(win.OLIdentity.mode(), 'guest');
+  assert.equal(win.OLIdentity.isGuest(), true);
+  assert.equal(win.OLIdentity.dbName(), 'earthonline-guest');
+  assert.equal(win.OLIdentity.hasRecord(), false);
 });
 
-test('identity: 进入游客后切到独立库，退出后回到正式库', () => {
+test('identity: 显式 local 记录保持正式库；settle 不得覆盖已有身份', () => {
+  const win = loadIdentity({ session: { 'earthonline-space': 'local' } });
+  assert.equal(win.OLIdentity.mode(), 'local');
+  assert.equal(win.OLIdentity.dbName(), 'earthonline');
+  assert.equal(win.OLIdentity.settle({ space: 'guest', dbName: 'earthonline-guest' }).ok, false);
+  assert.equal(win.OLIdentity.mode(), 'local');
+});
+
+test('identity: enterGuest 落定游客；leaveGuest 回到默认游客而非正式库', () => {
   const win = loadIdentity();
   assert.equal(win.OLIdentity.enterGuest(), true);
   assert.equal(win.OLIdentity.mode(), 'guest');
   assert.equal(win.OLIdentity.dbName(), 'earthonline-guest');
   assert.notEqual(win.OLIdentity.dbName(), win.OLIdentity.FORMAL_DB);
   assert.equal(win.OLIdentity.leaveGuest(), true);
-  assert.equal(win.OLIdentity.mode(), 'local');
+  assert.equal(win.OLIdentity.hasRecord(), false);
+  assert.equal(win.OLIdentity.mode(), 'guest');
 });
 
 test('identity: 记录损坏时 fail-closed 到 guest，不打开正式库', () => {
@@ -74,9 +84,9 @@ test('identity: 显式写成 local 时仍是正式库', () => {
   assert.equal(win.OLIdentity.mode(), 'local');
 });
 
-test('identity: sessionStorage 被禁用时不抛错，也不会误进游客空间', () => {
+test('identity: sessionStorage 被禁用时不抛错，fail-safe 到游客而非正式库', () => {
   const win = loadIdentity({ sessionBroken: true });
-  assert.equal(win.OLIdentity.mode(), 'local');
+  assert.equal(win.OLIdentity.mode(), 'guest');
   assert.equal(win.OLIdentity.enterGuest(), false);
 });
 
@@ -317,7 +327,7 @@ test('静态：cloud-backup 的四个真实出口都挂了游客门禁', () => {
 
 test('静态：boot.js 游客分支不回退 legacy，也不调用迁移', () => {
   const boot = read('boot.js');
-  const guestFn = boot.slice(boot.indexOf('function bootGuest()'), boot.indexOf('function startBoot()'));
+  const guestFn = boot.slice(boot.indexOf('function bootGuest()'), boot.indexOf('function bootFormal('));
   assert.ok(guestFn.length > 0);
   assert.equal(/bootLegacy\(\)/.test(guestFn), false);
   assert.equal(/OLMigrate\.(run|status)\(/.test(guestFn), false);

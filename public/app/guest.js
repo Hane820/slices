@@ -19,8 +19,23 @@
   var TABLES = ['meta', 'definitions', 'tasks', 'schedule', 'dayEntries', 'dayMaps'];
   var SNAPSHOT_PREFIX = GUEST_DB + '-backup-';   /* 游客自己的导入回滚快照前缀 */
 
+  /* 默认游客有两种落点：
+       1) 全新安装 → earthonline-guest（独立游客库）
+       2) 旧数据认领 → earthonline（旧库原地接入 guest，零复制）
+     第二种不是"游客能操作正式库"，而是身份已明确为 guest 且记录里带
+     adoptedOldData:true；没有这个标记一律拒绝，防止误写用户数据。 */
+  function isAdopted() {
+    try {
+      if (!global.OLIdentity || typeof global.OLIdentity.record !== 'function') return false;
+      var r = global.OLIdentity.record();
+      return !!(r && r.space === 'guest' && r.adoptedOldData === true && r.dbName === 'earthonline');
+    } catch (e) { return false; }
+  }
+
   function isGuestDb() {
-    return !!(global.OLDB && global.OLDB.NAME === GUEST_DB);
+    if (!global.OLDB) return false;
+    if (global.OLDB.NAME === GUEST_DB) return true;
+    return global.OLDB.NAME === 'earthonline' && isAdopted();
   }
 
   function instance() {
@@ -100,6 +115,48 @@
     });
   }
 
+  /* 旧数据认领：库里已经有用户数据，绝不灌种子、绝不覆盖业务行。
+     只补上写入闸门要求的基础设施行（schemaVersion / migration=done）。
+     已有 migration 且 status!=='done' 时原样保留并阻断 —— 不替未完成的迁移签字。
+     全部写在一个事务里，失败整体回滚。 */
+  function adopt() {
+    if (!isAdopted()) return Promise.resolve({ ok: false, reason: 'not-adopted' });
+    var db = instance();
+    if (!db) return Promise.resolve({ ok: false, reason: 'db-not-open' });
+
+    var stores = TABLES.map(function (n) { return db[n]; });
+    return db.transaction('rw', stores[0], stores[1], stores[2], stores[3], stores[4], stores[5], function () {
+      return db.meta.get('migration').then(function (m) {
+        if (m) {
+          if (m.status === 'done') return { ok: true, adopted: false };
+          return { ok: false, reason: 'migration-not-done', status: m.status };
+        }
+        return db.meta.get('schemaVersion').then(function (sv) {
+          var chain = Promise.resolve();
+          if (!sv) {
+            chain = chain.then(function () {
+              return db.meta.put({ key: 'schemaVersion', value: global.OLMigrate.SCHEMA_VERSION });
+            });
+          }
+          return chain.then(function () {
+            var now = Date.now();
+            return db.meta.put({
+              key: 'migration',
+              value: { seeded: false, adoptedOldData: true, at: now, issues: 0 },
+              status: 'done', phase: 'adopted-old',
+              schemaVersion: global.OLMigrate.SCHEMA_VERSION,
+              finishedAt: now, leaseExpiresAt: 0, ownerId: null,
+              writeCounts: { meta: 0, definitions: 0, tasks: 0, schedule: 0, dayEntries: 0, dayMaps: 0 }
+            });
+          }).then(function () { return { ok: true, adopted: true }; });
+        });
+      });
+    }).catch(function (e) {
+      return { ok: false, reason: 'adopt-failed',
+               message: ((e && e.name) || 'Error') + ': ' + ((e && e.message) || String(e)) };
+    });
+  }
+
   /* 启动前调用：打开游客库 → 必要则灌种子。返回 { ok, seeded, reason?, message? }
      失败一律给明确 reason（不含任何用户数据），并把原始错误留在控制台便于定位。 */
   function prepare() {
@@ -174,6 +231,8 @@
     NAME: GUEST_DB,
     SNAPSHOT_PREFIX: SNAPSHOT_PREFIX,
     isGuestDb: isGuestDb,
+    isAdopted: isAdopted,
+    adopt: adopt,
     prepare: prepare,
     clear: clear
   };

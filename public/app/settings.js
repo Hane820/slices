@@ -224,42 +224,146 @@ function renderSettings(){
   renderGuestSet();
 }
 
-/* 空间区：游客空间的入口 / 状态 / 重置。
-   产品前提：应用没有账号体系，本轮不提供登录、注册、也不做「登录后切换」；
-   游客身份只活在当前标签页（sessionStorage），关掉标签页就回到本机数据，
-   所以这里不需要、也不该出现任何假的登录状态。 */
+/* 认证错误码 → 界面文案（沿用文案中心；Toast 配置中心不改动） */
+function authErrorText(code){
+  var map = {
+    'bad-email':'邮箱格式不对', 'bad-input':'输入格式不对', 'rate-limited':'发送过于频繁，请稍后再试',
+    'code-invalid':'验证码不对，请再试一次', 'code-expired':'验证码过期了，请重新发送',
+    'code-consumed':'验证码已使用，请重新发送', 'too-many-attempts':'尝试次数过多，请重新发送验证码',
+    'email-unconfigured':'邮件服务尚未配置，暂时无法登录', 'email-send-failed':'验证码发送失败，请稍后重试',
+    'network-error':'网络中断，请重试', 'offline':'网络中断，请重试',
+    'auth-unavailable':'认证服务暂不可用', 'no-session':'登录状态已失效，请重新登录',
+    'account-disabled':'账号不可用'
+  };
+  return OLT(map[code] || '登录失败，请稍后重试');
+}
+
+/* 真实邮箱验证码登录：发送成功 ≠ 登录成功；只有服务端 Session 验证成功后才切身份 */
+function openLoginSheet(){
+  if(!window.OLAuth){
+    openModal({ title:OLT('登录暂不可用'), message:OLT('认证模块未加载，请稍后重试。'), okText:OLT('知道了') });
+    return;
+  }
+  var body = openSheet(
+    '<div class="shd"><div class="shd-t">登录 / 开启云端备份</div>' +
+    '<div class="shd-s">用邮箱验证码登录。验证成功后才会进入用户空间；游客数据不会被自动上传或合并。</div></div>' +
+    '<div class="pv-sec">邮箱</div>' +
+    '<input class="inp" id="authEmail" type="email" maxlength="254" placeholder="you@example.com">' +
+    '<button class="btn p" id="authSend" style="margin-top:10px">发送验证码</button>' +
+    '<div id="authStep2" style="display:none">' +
+      '<div class="pv-sec">验证码</div>' +
+      '<input class="inp" id="authCode" inputmode="numeric" maxlength="6" placeholder="6 位数字">' +
+      '<button class="btn p" id="authVerify" style="margin-top:10px">登录</button>' +
+    '</div>' +
+    '<div class="row-s" id="authMsg" style="margin-top:10px"></div>' +
+    '<button class="btn g" id="authCancel" style="margin-top:10px">取消</button>'
+  );
+  function q(id){ return body.querySelector('#' + id); }
+  function say(t){ var m = q('authMsg'); if(m) m.textContent = t || ''; }
+
+  q('authCancel').addEventListener('click', closeSheet);
+
+  var sendBtn = q('authSend');
+  sendBtn.addEventListener('click', function(){
+    var email = q('authEmail').value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ say(authErrorText('bad-email')); return; }
+    sendBtn.disabled = true; say(OLT('正在发送验证码…'));
+    OLAuth.requestCode(email).then(function(r){
+      sendBtn.disabled = false;
+      if(!r.ok){ say(authErrorText(r.error)); return; }
+      /* 只进入第二步，绝不提前切换身份 */
+      q('authStep2').style.display = 'block';
+      say(OLT('验证码已发送，10 分钟内有效。'));
+    });
+  });
+
+  var verifyBtn = q('authVerify');
+  verifyBtn.addEventListener('click', function(){
+    var email = q('authEmail').value.trim();
+    var code = q('authCode').value.trim();
+    if(!/^\d{6}$/.test(code)){ say(authErrorText('code-invalid')); return; }
+    verifyBtn.disabled = true; say(OLT('正在验证…'));
+    OLAuth.verifyCode(email, code).then(function(r){
+      verifyBtn.disabled = false;
+      if(!r.ok){ say(authErrorText(r.error)); return; }
+      /* 再读一次服务端身份；失败仍保留 guest */
+      return OLAuth.session().then(function(sr){
+        var su = sr && sr.body && sr.body.user;
+        if(!sr.ok || !su || !su.id){ say(authErrorText(sr && sr.error ? sr.error : 'no-session')); return; }
+        var entered = OLIdentity.enterUser({
+          userId: su.id,
+          email: su.emailMasked || '',
+          source: 'auth-session'
+        });
+        if(!entered.ok){ say(OLT('本机身份写入失败，请重试')); return; }
+        if(window.OLCloudBackup && typeof OLCloudBackup.syncIdentity === 'function') OLCloudBackup.syncIdentity();
+        closeSheet();
+        location.reload();
+      });
+    });
+  });
+}
+
+/* 退出登录：服务端撤销成功后才切回 guest；失败 / 超时保持 user 状态 */
+function logoutUser(){
+  if(!window.OLAuth){
+    openModal({ title:OLT('退出失败'), message:OLT('认证模块未加载，仍保持当前登录状态。'), okText:OLT('知道了') });
+    return;
+  }
+  OLAuth.logout().then(function(r){
+    if(!r.ok){
+      openModal({
+        title: OLT('退出失败'),
+        message: OLT('服务端会话尚未撤销，仍保持当前登录状态。请检查网络后重试。'),
+        okText: OLT('知道了')
+      });
+      return;
+    }
+    OLIdentity.demoteToGuest('logout');
+    if(window.OLCloudBackup && typeof OLCloudBackup.syncIdentity === 'function') OLCloudBackup.syncIdentity();
+    location.reload();
+  });
+}
+
+/* 空间区：显示当前真实身份（guest / user=local），按身份给出对应说明。
+   当前版本尚未接入账号系统：登录入口如实标注「未开放」，不伪造登录态，
+   也不因为展示这个入口而读写任何账号或云端数据。 */
 function renderGuestSet(){
   var box = $('guestSet');
   if(!box || !window.OLIdentity) return;
   box.innerHTML = '';
 
-  var guest = OLIdentity.isGuest();
+  var rec = typeof OLIdentity.record === 'function' ? OLIdentity.record() : null;
+  var guest = !rec || rec.space === 'guest';
 
-  function infoRow(title, sub, tail){
+  function infoRow(title, sub, tail, onClick){
     var row = el('div','row');
     var main = el('div','row-main');
     main.appendChild(el('div','row-t', title));
-    main.appendChild(el('div','row-s', sub));
+    if(sub) main.appendChild(el('div','row-s', sub));
     row.appendChild(main);
     if(tail) row.appendChild(el('div','row-a', tail));
+    if(typeof onClick === 'function') row.addEventListener('click', onClick);
     box.appendChild(row);
     return row;
   }
 
   if(guest){
-    infoRow(OLT('当前空间'), OLT('游客体验中：这份数据单独存放，不会和你自己的数据混在一起。'), '●');
-    infoRow(OLT('数据存在哪里'), OLT('只在这台设备的浏览器里；关掉标签页就回到你自己的数据，游客数据仍会留着。'));
-    infoRow(OLT('登录 / 注册'), OLT('尚未开放：应用目前没有账号体系。游客数据不会上传，也不会合并到你自己的数据里。'), OLT('未开放'));
+    infoRow(OLT('当前空间：游客空间'), OLT('数据只保存在这台设备；不需要注册或登录，也不会上传云端。'), '●');
+    infoRow(OLT('游客数据'), OLT('关掉页面后仍然留在本机；换设备、清缓存或删浏览器数据可能丢失。'));
+    infoRow(OLT('登录 / 开启云端备份'),
+      OLT('用应用自己的邮箱验证码登录；验证成功后才进入用户空间。游客数据不会自动上传或合并。'),
+      OLT('登录'), openLoginSheet);
 
     var reset = el('div','row');
     var rm = el('div','row-main');
     rm.appendChild(el('div','row-t', OLT('重置游客数据')));
-    rm.appendChild(el('div','row-s', OLT('只删游客空间里的记录，并重新灌入演示数据；不影响你自己的数据。')));
+    rm.appendChild(el('div','row-s', OLT('只删游客空间里的记录并恢复初始演示内容；不影响任何登录用户的数据。')));
     reset.appendChild(rm);
     reset.appendChild(el('div','row-a','›'));
     reset.addEventListener('click', function(){
       confirmBox('重置游客数据？',
-        '游客空间里的增删改都会消失，然后恢复成初始演示数据。你自己的数据完全不受影响。',
+        '游客空间里的增删改都会消失，然后恢复成初始演示内容。登录用户的数据完全不受影响。',
         function(){
           if(!window.OLGuest){ toastCfg('guestSpaceUnavailable'); return; }
           OLGuest.clear().then(function(r){
@@ -272,49 +376,59 @@ function renderGuestSet(){
     return;
   }
 
-  var enter = el('div','row');
-  var em = el('div','row-main');
-  em.appendChild(el('div','row-t', OLT('游客体验')));
-  em.appendChild(el('div','row-s', OLT('用一份独立的演示数据试用，随便增删改都不会碰到你自己的数据；关掉标签页就回来。')));
-  enter.appendChild(em);
-  enter.appendChild(el('div','row-a','›'));
-  enter.addEventListener('click', function(){
-    confirmBox('进入游客体验？',
-      '当前标签页会切换到一个独立的演示空间。你自己的数据不会被读取、也不会被修改；关掉这个标签页就回到原来的数据。',
-      function(){
-        if(!OLIdentity.enterGuest()){ toastCfg('guestSpaceUnavailable'); return; }
-        location.reload();
-      });
-  });
-  box.appendChild(enter);
+  /* local = 将来的 user 空间。当前没有登录入口能创建它，只有历史记录会走到这里；
+     账号信息尚未接入，不显示、不编造任何账号。 */
+  var rec = OLIdentity.record() || {};
+  infoRow(OLT('当前空间：用户空间'), OLT('数据保存在本机，并自动备份到云端。'), '●');
+  infoRow(OLT('登录账号'), rec.email || OLT('账号信息暂不可用'));
+  infoRow(OLT('云端备份'), OLT('已启用（自动）。'), OLT('已启用'));
+  infoRow(OLT('退出登录'), OLT('撤销服务端会话后回到游客空间；本机用户数据保留，不清空、不自动合并。'), OLT('退出'), logoutUser);
 }
 
-/* 云端备份状态区：只读展示 + 立即备份入口，与自动备份共用同一上传队列 */
+/* 云端备份区：按身份区分展示。
+   guest：只有一句状态说明，没有状态数字、没有失败信息、没有「立即备份」按钮；
+   user ：自动备份已启用 + 状态 + 最近成功时间 +（确有失败时）失败信息 + 刷新入口。
+   真正的权限门禁在 cloud-backup 的调用层，这里只是如实呈现。 */
 function renderCloudSet(){
   var box = $('cloudSet');
   if(!box || !window.OLCloudBackup) return;
-  /* 游客空间不参与云端备份。这里只给一句说明；真正的门禁在 cloud-backup 的调用层
-     （init / markDirty / backupNow / refreshStatus 全部短路），不依赖这行 UI。 */
-  if(window.OLIdentity && OLIdentity.isGuest()){
-    box.innerHTML = '';
-    var gr = el('div','row');
-    var gm = el('div','row-main');
-    gm.appendChild(el('div','row-t', OLT('游客空间不参与云端备份')));
-    gm.appendChild(el('div','row-s', OLT('备份只针对你自己的数据；游客空间里的任何改动都不会上传。')));
-    gr.appendChild(gm);
-    box.appendChild(gr);
+  box.innerHTML = '';
+
+  function line(title, sub){
+    var row = el('div','row');
+    var main = el('div','row-main');
+    main.appendChild(el('div','row-t', title));
+    if(sub) main.appendChild(el('div','row-s', sub));
+    row.appendChild(main);
+    box.appendChild(row);
+    return row;
+  }
+
+  var guest = !window.OLIdentity || OLIdentity.isGuest();
+  if(guest){
+    line(OLT('当前为游客空间，云端备份尚未启用。'),
+         OLT('登录后可开启自动云端备份。游客数据不会上传，也不会产生备份失败状态。'));
     return;
   }
+
   var st = OLCloudBackup.snapshot();
+  if(!st.enabled){
+    /* 身份在渲染瞬间变化（例如刚切回游客）：按未启用处理，不显示任何上传状态 */
+    line(OLT('当前为游客空间，云端备份尚未启用。'),
+         OLT('登录后可开启自动云端备份。游客数据不会上传，也不会产生备份失败状态。'));
+    return;
+  }
+
   var labels = {
     uploading:'正在上传', pending:'待备份', synced:'已同步备份',
-    'server-only':'云端已有备份（本机未确认）', none:'未备份'
+    'server-only':'云端已有备份（本机未确认）', none:'未备份', disabled:'未启用'
   };
-  box.innerHTML = '';
+
+  line(OLT('自动云端备份'), OLT('已启用：本地保存成功后自动合并上传，不需要手动点击。'));
 
   var row = el('div','row');
   var main = el('div','row-main');
-  main.appendChild(el('div','row-t',OLT('云端备份状态')));
+  main.appendChild(el('div','row-t',OLT('当前备份状态')));
   main.appendChild(el('div','row-s',labels[st.status] || st.status));
   row.appendChild(main);
   row.appendChild(el('div','row-a',st.uploading ? '…' : '›'));
@@ -329,6 +443,7 @@ function renderCloudSet(){
   time.appendChild(tm);
   box.appendChild(time);
 
+  /* 失败信息只在确实发生过失败时出现；游客分支永远不会走到这里 */
   if(st.lastError){
     var er = el('div','row');
     var em = el('div','row-main');
@@ -339,20 +454,20 @@ function renderCloudSet(){
   }
 
   var acts = el('div','row');
+  var refresh = el('button','btn g sm',OLT('刷新云端状态'));
+  refresh.type = 'button';
+  refresh.addEventListener('click', function(){ OLCloudBackup.refreshStatus(); });
   var now = el('button','btn p sm',OLT('立即备份'));
   now.type = 'button';
   now.disabled = !!st.uploading;
   now.addEventListener('click', function(){
     if(!OLCloudBackup.backupNow()) toastCfg('backupUploadBusy');
   });
-  var refresh = el('button','btn g sm',OLT('刷新云端状态'));
-  refresh.type = 'button';
-  refresh.addEventListener('click', function(){ OLCloudBackup.refreshStatus(); });
-  acts.appendChild(now);
   acts.appendChild(refresh);
+  acts.appendChild(now);
   box.appendChild(acts);
 
-  var note = el('div','row-s',OLT('只保存最新一份备份，覆盖旧备份；不做云端恢复和多设备同步。'));
+  var note = el('div','row-s',OLT('云端备份用于数据保护和跨设备恢复，不提供实时双向同步；只保存最新一份备份。'));
   note.style.marginTop = '10px';
   box.appendChild(note);
 }

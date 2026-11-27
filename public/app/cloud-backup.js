@@ -5,7 +5,13 @@
    - 触发来自 save() 的成功出口；本模块不调用 save()、不改业务队列。
    - 生产构建与本地页面使用同一个 Worker URL；不存任何 JWT / Cookie / AUD。 */
 (function(){
-  var DEFAULT_ENDPOINT = 'https://earthonline-backup.1317746169.workers.dev';
+  var DEV_ENDPOINT = 'https://earthonline-backup.1317746169.workers.dev';
+  function defaultEndpoint(){
+    try {
+      if(typeof location !== 'undefined' && /^https?:$/.test(location.protocol) && location.origin) return location.origin;
+    } catch(e){}
+    return DEV_ENDPOINT;
+  }
   var STATE_KEY = 'earthonline-cloud-backup-v1';
   var LEASE_KEY = 'earthonline-cloud-backup-lease';
   var ENDPOINT_KEY = 'earthonline-cloud-backup-endpoint';
@@ -16,12 +22,29 @@
   var TAB_ID = 'tab-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
   var listeners = [];
-  /* 游客空间不参与云端备份：门禁放在这里（真实调用层），而不是靠设置页隐藏按钮。
-     命中后 init / markDirty / backupNow / refreshStatus 全部短路，
-     不读也不写 STATE_KEY / LEASE_KEY，不发任何请求、不碰 R2 与正式备份 pointer。 */
+  var listenersAttached = false;
+  /* 空间门禁：只认身份模块的已落定记录，明确 space==='local'（= 将来的 user 空间）
+     且绑定正式库时才允许云端备份。游客（含认领旧库的 guest）一律视为禁止，
+     判定异常也 fail-closed。这是行为层门禁，不依赖任何 UI 文案或按钮状态。 */
   function guestBlocked(){
-    try { return !!(window.OLIdentity && typeof OLIdentity.isGuest === 'function' && OLIdentity.isGuest()); }
-    catch (e) { return true; }        /* 判定不了就按游客处理：宁可不备份，也不误传 */
+    try {
+      if(!window.OLIdentity || typeof OLIdentity.record !== 'function') return true;
+      var r = OLIdentity.record();
+      if(!r) return true;                          /* 无记录 = 默认游客 */
+      if(r.space !== 'local') return true;
+      return r.dbName !== 'earthonline';
+    } catch (e) { return true; }
+  }
+  /* 身份指纹：用于识别一次异步上传期间身份是否被切换（guest↔user / 换库） */
+  function identityKey(){
+    try {
+      if(!window.OLIdentity || typeof OLIdentity.record !== 'function') return 'none';
+      var r = OLIdentity.record();
+      return r ? (r.space + '|' + r.dbName) : 'none';
+    } catch (e) { return 'none'; }
+  }
+  function sameIdentity(owner){
+    return identityKey() === owner && !guestBlocked();
   }
   var state = {
     pending: false, seq: 0, dirtyAt: 0,
@@ -36,7 +59,7 @@
   function endpoint(){
     try { var v = localStorage.getItem(ENDPOINT_KEY); if(v && /^https?:\/\//.test(v)) return v.replace(/\/$/, ''); }
     catch(e){}
-    return DEFAULT_ENDPOINT;
+    return defaultEndpoint();
   }
   function readState(){
     try {
@@ -66,8 +89,19 @@
     try { window.dispatchEvent(new CustomEvent('earthonline-cloud-backup', { detail:snap })); } catch(e){}
   }
   function snapshot(){
+    /* 游客：对外快照里不存在待备份 / 失败 / 上传中。即使 localStorage 里
+       残留过旧身份的状态，也不让任何 UI 把它当成游客的备份状态展示。 */
+    if(guestBlocked()){
+      return {
+        status:'disabled', enabled:false,
+        pending:false, uploading:false,
+        lastSuccessAt:null, lastError:'', statusError:'',
+        serverHasBackup:null, serverUploadedAt:null
+      };
+    }
     return {
       status: uploading ? 'uploading' : (state.pending ? 'pending' : (state.lastSuccessAt ? 'synced' : (state.serverHasBackup ? 'server-only' : 'none'))),
+      enabled:true,
       pending:state.pending, uploading:uploading,
       lastSuccessAt:state.lastSuccessAt,
       lastError:state.lastError, statusError:state.statusError,
@@ -121,13 +155,21 @@
   }
 
   function run(reason){
+    /* 身份级门禁：旧身份排下的定时任务、切换后遗留的重试，都在这里作废。
+       不能只靠 markDirty/backupNow 入口判断——timer 可能在切换之后才触发。 */
+    if(guestBlocked()) return false;
     if(uploading) return false;               /* 单飞：同一页面绝不并发上传 */
     if(!state.pending && reason !== 'manual') return false;
     if(!acquireLease()) { schedule(RETRY_MS); return false; }
+    var ownerAtStart = identityKey();
     uploading = true;
     var seqAtStart = state.seq;
     emit();
     committedData(function(data, err){
+      if(!sameIdentity(ownerAtStart)){
+        /* 读取数据期间身份已切换：丢弃这一轮，不改任何状态、不排下一轮 */
+        uploading = false; releaseLease(); emit(); return;
+      }
       if(!data || typeof data !== 'object'){
         uploading = false; releaseLease(); fail(err || '读取本地数据失败'); emit(); return;
       }
@@ -144,9 +186,17 @@
       fetch(endpoint() + '/api/backup', init)
         .then(parseResponse)
         .then(function(r){
+          /* 上传期间切回游客 / 换库：响应结果不属于当前身份，不得写状态或再排队。
+             请求本身已发出无法撤回，但不会污染新身份的状态机。 */
+          if(!sameIdentity(ownerAtStart)){ uploading = false; releaseLease(); emit(); return; }
           if(!r.ok){
             var msg = (r.body && (r.body.message || r.body.error)) || ('HTTP ' + r.res.status);
-            throw new Error(msg);
+            var err = new Error(msg);
+            /* 按服务端机器可读码分类：只有明确 Session 失效才降级；
+               403 / CSRF / Access 拦截 / 网络 / 5xx 都保留 user + pending。 */
+            err.authResult = { status:r.res.status, body:r.body || {}, error:(r.body && r.body.error) || '' };
+            err.authClass = classifyAuthFailure(err.authResult);
+            throw err;
           }
           var at = (r.body && r.body.stored && r.body.stored.uploadedAt) || new Date().toISOString();
           state.lastSuccessAt = at;
@@ -156,14 +206,43 @@
           if(state.seq === seqAtStart) state.pending = false;
           persist();
           uploading = false; releaseLease(); emit();
-          if(state.pending) schedule(DEBOUNCE_MS);
+          if(state.pending && !guestBlocked()) schedule(DEBOUNCE_MS);
         })
         .catch(function(e){
+          if(!sameIdentity(ownerAtStart)){ uploading = false; releaseLease(); emit(); return; }
           uploading = false; releaseLease(); fail((e && e.message) || '上传失败'); emit();
-          if(retries < 1){ retries++; schedule(RETRY_MS); }   /* 只延迟重试一次，避免无限快速重试 */
+          var cls = e && e.authClass;
+          if(cls === 'session-invalid') handleAuthFailure(e.authResult);
+          /* 认证/授权类失败（401/403 无论分类）都不快速重试，避免反复撞 Access/验签；
+             只有网络/5xx 等可恢复故障延迟重试一次。是否降级与是否重试是两个独立判断。 */
+          var authStatus = e && e.authResult && e.authResult.status;
+          var noRetry = cls === 'session-invalid' || cls === 'auth-denied' ||
+            authStatus === 401 || authStatus === 403;
+          if(retries < 1 && !noRetry){ retries++; schedule(RETRY_MS); }
         });
     });
     return true;
+  }
+
+  /* 认证失败分类统一走 auth.js；auth.js 未加载的隔离环境里只认机器码
+     code='session-invalid' / reason='no-valid-session'，其余一律保留 user。 */
+  function classifyAuthFailure(r){
+    if(window.OLAuth && typeof OLAuth.classifyAuthFailure === 'function'){
+      return OLAuth.classifyAuthFailure(r);
+    }
+    var body = (r && r.body) || {};
+    if(body.code === 'session-invalid') return 'session-invalid';
+    if(body.error === 'no-session' || (body.error === 'unauthorized' && body.reason === 'no-valid-session')) return 'session-invalid';
+    if((r && r.status) === 0) return 'transient';
+    if(r && r.status >= 500) return 'transient';
+    return 'auth-denied';
+  }
+
+  /* 仅当确认应用 Session 失效才降级；把响应交给 auth.js 再核对一次，双重保险 */
+  function handleAuthFailure(result){
+    if(window.OLAuth && typeof OLAuth.markSessionInvalid === 'function'){
+      try { OLAuth.markSessionInvalid(result); } catch(e){}
+    }
   }
 
   function fail(message){
@@ -175,10 +254,17 @@
 
   function refreshStatus(){
     if(guestBlocked()) return Promise.resolve(null);   /* 游客：连状态都不查 */
+    var owner = identityKey();
     return fetch(endpoint() + '/api/backup/status', { method:'GET', credentials:'include' })
       .then(parseResponse)
       .then(function(r){
-        if(!r.ok) throw new Error((r.body && (r.body.message || r.body.error)) || ('HTTP ' + r.res.status));
+        if(!sameIdentity(owner)) return snapshot();     /* 期间切换身份：不写状态 */
+        if(!r.ok){
+          var statusErr = new Error((r.body && (r.body.message || r.body.error)) || ('HTTP ' + r.res.status));
+          statusErr.authResult = { status:r.res.status, body:r.body || {}, error:(r.body && r.body.error) || '' };
+          statusErr.authClass = classifyAuthFailure(statusErr.authResult);
+          throw statusErr;
+        }
         state.serverHasBackup = !!r.body.hasBackup;
         state.serverUploadedAt = r.body.uploadedAt || null;
         state.statusError = '';
@@ -186,6 +272,8 @@
         return snapshot();
       })
       .catch(function(e){
+        if(!sameIdentity(owner)) return snapshot();
+        if(e && e.authClass === 'session-invalid') handleAuthFailure(e.authResult);
         state.statusError = (e && e.message) || '云端状态读取失败';
         emit();
         return snapshot();
@@ -211,25 +299,58 @@
     return run('manual');
   }
 
-  function init(){
-    /* 游客：不读数、不挂心跳、不监听 online/storage —— 连"待备份"状态都不存在 */
-    if(guestBlocked()){ emit(); return; }
+  function stopTimers(){
+    clearTimer();
+    if(heartbeat){ clearInterval(heartbeat); heartbeat = null; }
+  }
+
+  /* user（local）空间的自动备份启动：只有身份已落定且绑定正式库才进来。
+     启动补传依赖 localStorage 里持久化的 pending/seq，刷新页面不会丢任务。 */
+  function startUser(){
+    if(guestBlocked()) return false;
     readState();
     refreshStatus();
-    if(state.pending) schedule(1500);         /* 启动补传：不因刷新误判已备份 */
-    clearInterval(heartbeat);
-    heartbeat = setInterval(function(){ if(state.pending && !uploading) run('retry'); }, HEARTBEAT_MS);
-    window.addEventListener('online', function(){ if(state.pending) schedule(1000); });
+    if(state.pending) schedule(1500);
+    if(heartbeat) clearInterval(heartbeat);
+    heartbeat = setInterval(function(){
+      if(!guestBlocked() && state.pending && !uploading) run('retry');
+    }, HEARTBEAT_MS);
+    emit();
+    return true;
+  }
+
+  function attachListeners(){
+    if(listenersAttached) return;
+    listenersAttached = true;
+    window.addEventListener('online', function(){ if(!guestBlocked() && state.pending) schedule(1000); });
     window.addEventListener('storage', function(e){
+      if(guestBlocked()) return;                /* 游客标签页不因别的标签页写状态而启动上传 */
       if(!e || e.key === STATE_KEY){ readState(); emit(); }
       if(state.pending && !uploading && !timer) schedule(RETRY_MS);
     });
+  }
+
+  /* 身份切换的唯一入口：先停旧身份的定时任务，再按当前已确认身份决定是否启动。
+     guest → user：这里才启动 user 备份；user → guest：定时器全停，in-flight 结果
+     由 run() 的 identityKey 校验丢弃，不会把游客数据写成待上传。 */
+  function syncIdentity(){
+    stopTimers();
+    retries = 0;
+    if(guestBlocked()){ emit(); return false; }
+    return startUser();
+  }
+
+  function init(){
+    /* 只挂监听、广播一次当前快照；不在这里直接启动上传。
+       启动层（boot.js finishBoot）确认身份与业务数据初始化完成后调用 syncIdentity()：
+       guest 是 no-op，user 才真正启动自动备份。 */
+    attachListeners();
     emit();
   }
 
   window.OLCloudBackup = {
     init:init, markDirty:markDirty, backupNow:backupNow, refreshStatus:refreshStatus,
-    snapshot:snapshot, subscribe:function(fn){
+    syncIdentity:syncIdentity, snapshot:snapshot, subscribe:function(fn){
       if(typeof fn === 'function') listeners.push(fn);
       return function(){ var i = listeners.indexOf(fn); if(i >= 0) listeners.splice(i, 1); };
     }

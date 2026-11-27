@@ -80,11 +80,13 @@
     });
   }
 
-  function objectKeyOf(writeId) {
+  function objectKeyOf(writeId, userId) {
     if (typeof writeId !== 'string' || !writeId || !/^[A-Za-z0-9._-]+$/.test(writeId)) {
       throw new Error('write-id-invalid');
     }
-    return 'earthonline/backups/' + writeId + '.json';
+    /* 服务端按已验证 Session 的 userId 校验命名空间；前端传入仅用于构造匹配的键 */
+    var prefix = (typeof userId === 'string' && userId) ? ('users/' + userId + '/') : '';
+    return prefix + 'earthonline/backups/' + writeId + '.json';
   }
 
   function assertNoExtraKeys(o, keys, label) {
