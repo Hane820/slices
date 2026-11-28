@@ -14,7 +14,7 @@
 | 静态托管关系 | `slices0flife.me/api/auth/session` 现返回 404（静态托管无此路径）；Route 生效后返回 JSON |
 | 附带项 | `workers_dev = true`（wrangler.toml:9）：同源验证通过后建议改 `false` 关闭 workers.dev 入口，减少暴露面 |
 
-**核对方法**：Route 添加后（无需重新部署静态站），无痕窗口请求 `https://slices0flife.me/api/auth/session`（带 `X-Earthonline-Auth: 1` 头），预期 JSON `{"authenticated":false,...}` 而非 404。
+**核对方法**：Route 添加后（无需重新部署静态站），无痕窗口 GET `https://slices0flife.me/api/auth/session`（该端点不要求 CSRF 头），预期 `401 {"ok":false,"error":"no-session",...}` 的 JSON，而非 404 或 Access HTML；带有效 Session Cookie 的同一请求应返回 `200 {"ok":true,"user":{...},"expiresAt":...}`。与 Runbook §8 的期望一致。
 
 ## 2. Access 双 AUD（⚠️ 两个不同应用，不得混淆）
 

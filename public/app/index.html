@@ -106,11 +106,13 @@
 
       <div class="hr"></div>
 
-      <div class="sec"><span class="sec-t" data-i18n="decide.section.menu">我的菜单</span><span class="sec-line"></span><span class="sec-a" id="eatAdd" data-i18n="common.action.new">+ 新建</span></div>
-      <div class="chips" id="eatFilter" style="margin-bottom:4px"></div>
-      <div class="card plain" id="eatWrap" style="margin-top:9px;padding:2px 14px"></div>
-      <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0" data-i18n="decide.hint.menu">
-        每道菜可以勾几个饭点，抽的时候只从对得上的里出。今天已经记过的先跳过，都吃过了才会重复。
+      <div class="sec"><span class="sec-t" data-i18n="decide.section.menu">我的菜单</span><span class="sec-line"></span><span class="sec-a" id="eatAdd" data-i18n="common.action.new">+ 新建</span><span class="sec-a" id="menuFold" data-action="menu-fold" data-i18n="common.action.expand">展开 ▾</span></div>
+      <div id="menuBody" style="display:none">
+        <div class="chips" id="eatFilter" style="margin-bottom:4px"></div>
+        <div class="card plain" id="eatWrap" style="margin-top:9px;padding:2px 14px"></div>
+        <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0" data-i18n="decide.hint.menu">
+          每道菜可以勾几个饭点，抽的时候只从对得上的里出。今天已经记过的先跳过，都吃过了才会重复。
+        </div>
       </div>
       <div style="height:26px"></div>
     </div>

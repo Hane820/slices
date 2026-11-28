@@ -16,6 +16,25 @@ const AUTH_SRC = read('auth.js');
 const SETTINGS_SRC = read('settings.js');
 const BOOT_SRC = read('boot.js');
 
+/* settings.js 的 Auth 文案已迁入文案中心（U()）；测试桩从真实配置加载 U，
+   不手写中文映射——断言仍对准实际显示值，文案改动也不需要改测试桩。 */
+function loadTextU() {
+  const win = {
+    document: { readyState: 'complete', querySelectorAll: () => [], addEventListener() {} },
+    location: { search: '' },
+    console: { warn() {}, log() {} }
+  };
+  win.window = win;
+  const ctx = vm.createContext(win);
+  const cfg = path.join(APP, 'config');
+  vm.runInContext(fs.readFileSync(path.join(cfg, 'index.js'), 'utf8'), ctx, { filename: 'config/index.js' });
+  for (const name of ['common.js', 'settings.js']) {
+    vm.runInContext(fs.readFileSync(path.join(cfg, name), 'utf8'), ctx, { filename: 'config/' + name });
+  }
+  return win.U;
+}
+const U = loadTextU();
+
 function storage(init) {
   const map = new Map(Object.entries(init || {}));
   return {
@@ -247,7 +266,7 @@ function renderGuest(identity, stub) {
     OLCloudBackup: { snapshot: () => ({ enabled: false, status: 'disabled' }) },
     $: () => box,
     el: (tag, cls, text) => makeNode(cls, text),
-    OLT: (s) => s,
+    U,
     toastCfg() {}, confirmBox() {},
     openLoginSheet: () => { stub.opened = (stub.opened || 0) + 1; }
   };
@@ -298,7 +317,7 @@ test('登录 Sheet：发码只进入第二步；服务端 Session 成功后才�
     OLAuth: win.OLAuth, OLIdentity: win.OLIdentity,
     OLCloudBackup: { syncIdentity: () => { overrides.synced++; } },
     location: { reload: () => { overrides.reloads++; } },
-    OLT: (s) => s,
+    U,
     setTimeout, clearTimeout, AbortController, console
   };
   vm.createContext(ctx);
@@ -332,7 +351,7 @@ test('登录 Sheet：验码失败仍保留 guest，不启动备份调度', async
     window: win, openSheet: () => sheet, closeSheet() {}, openModal() {},
     OLAuth: win.OLAuth, OLIdentity: win.OLIdentity, OLCloudBackup: { syncIdentity: () => { ctx.synced = (ctx.synced || 0) + 1; } },
     location: { reload() { ctx.reloaded = true; } },
-    OLT: (s) => s, setTimeout, clearTimeout, AbortController, console
+    U, setTimeout, clearTimeout, AbortController, console
   };
   vm.createContext(ctx);
   ctx.OLAuth = win.OLAuth;
@@ -360,7 +379,7 @@ test('退出：失败保持 user 状态；成功后才 demote 并停备份', asy
     window: win, OLAuth: win.OLAuth, OLIdentity: win.OLIdentity,
     OLCloudBackup: { syncIdentity() { ctx.synced = (ctx.synced || 0) + 1; } },
     location: { reload() { ctx.reloaded = true; } },
-    openModal: (cfg) => modal.push(cfg), OLT: (s) => s
+    openModal: (cfg) => modal.push(cfg), U
   };
   vm.createContext(ctx);
   ctx.window.OLCloudBackup = ctx.OLCloudBackup;
@@ -377,7 +396,7 @@ test('退出：失败保持 user 状态；成功后才 demote 并停备份', asy
     window: win, OLAuth: win.OLAuth, OLIdentity: win.OLIdentity,
     OLCloudBackup: { syncIdentity() { okCtx.synced = (okCtx.synced || 0) + 1; } },
     location: { reload() { okCtx.reloaded = true; } },
-    openModal() {}, OLT: (s) => s
+    openModal() {}, U
   };
   /* 用直接返回成功的 auth 客户端替换第二个回复 */
   win.OLAuth.logout = async () => ({ ok: true, status: 204, body: {}, error: '' });

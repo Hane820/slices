@@ -79,4 +79,67 @@
     'settings.focus.empty': '还没有条目，点右上角加一条。',
 
   });
+
+  /* ===== 英文语义 key · 设置页（第三批迁移：Auth 登录/空间/云端备份 JS 文案） =====
+     Auth 区域原文此前未注册中文 legacy key，OLT 查不到即原样返回；
+     迁移为语义 key 后显示文字不变，业务行为不变。 */
+  T.register('settings', {
+    'settings.auth.error.badEmail': '邮箱格式不对',
+    'settings.auth.error.badInput': '输入格式不对',
+    'settings.auth.error.rateLimited': '发送过于频繁，请稍后再试',
+    'settings.auth.error.codeInvalid': '验证码不对，请再试一次',
+    'settings.auth.error.codeExpired': '验证码过期了，请重新发送',
+    'settings.auth.error.codeConsumed': '验证码已使用，请重新发送',
+    'settings.auth.error.tooManyAttempts': '尝试次数过多，请重新发送验证码',
+    'settings.auth.error.emailUnconfigured': '邮件服务尚未配置，暂时无法登录',
+    'settings.auth.error.emailSendFailed': '验证码发送失败，请稍后重试',
+    'settings.auth.error.network': '网络中断，请重试',
+    'settings.auth.error.unavailable': '认证服务暂不可用',
+    'settings.auth.error.noSession': '登录状态已失效，请重新登录',
+    'settings.auth.error.accountDisabled': '账号不可用',
+    'settings.auth.error.default': '登录失败，请稍后重试',
+
+    'settings.auth.login.moduleUnavailable': '登录暂不可用',
+    'settings.auth.login.moduleNotLoaded': '认证模块未加载，请稍后重试。',
+    'settings.auth.login.sending': '正在发送验证码…',
+    'settings.auth.login.codeSent': '验证码已发送，10 分钟内有效。',
+    'settings.auth.login.verifying': '正在验证…',
+    'settings.auth.login.identityWriteFailed': '本机身份写入失败，请重试',
+
+    'settings.auth.logout.failed': '退出失败',
+    'settings.auth.logout.moduleNotLoaded': '认证模块未加载，仍保持当前登录状态。',
+    'settings.auth.logout.sessionNotRevoked': '服务端会话尚未撤销，仍保持当前登录状态。请检查网络后重试。',
+
+    'settings.space.guest.current': '当前空间：游客空间',
+    'settings.space.guest.subtitle': '数据只保存在这台设备；不需要注册或登录，也不会上传云端。',
+    'settings.space.guest.data': '游客数据',
+    'settings.space.guest.dataSubtitle': '关掉页面后仍然留在本机；换设备、清缓存或删浏览器数据可能丢失。',
+    'settings.space.login.title': '登录 / 开启云端备份',
+    'settings.space.login.subtitle': '用应用自己的邮箱验证码登录；验证成功后才进入用户空间。游客数据不会自动上传或合并。',
+    'settings.space.login.action': '登录',
+    'settings.space.guest.reset': '重置游客数据',
+    'settings.space.guest.resetSubtitle': '只删游客空间里的记录并恢复初始演示内容；不影响任何登录用户的数据。',
+
+    'settings.space.user.current': '当前空间：用户空间',
+    'settings.space.user.subtitle': '数据保存在本机，并自动备份到云端。',
+    'settings.space.user.account': '登录账号',
+    'settings.space.user.accountUnavailable': '账号信息暂不可用',
+    'settings.space.user.cloudBackup': '云端备份',
+    'settings.space.user.cloudEnabled': '已启用（自动）。',
+    'settings.space.user.cloudEnabledTag': '已启用',
+    'settings.space.user.logout': '退出登录',
+    'settings.space.user.logoutSubtitle': '撤销服务端会话后回到游客空间；本机用户数据保留，不清空、不自动合并。',
+    'settings.space.user.logoutAction': '退出',
+
+    'settings.cloud.guest.title': '当前为游客空间，云端备份尚未启用。',
+    'settings.cloud.guest.subtitle': '登录后可开启自动云端备份。游客数据不会上传，也不会产生备份失败状态。',
+    'settings.cloud.user.autoTitle': '自动云端备份',
+    'settings.cloud.user.autoSubtitle': '已启用：本地保存成功后自动合并上传，不需要手动点击。',
+    'settings.cloud.user.statusTitle': '当前备份状态',
+    'settings.cloud.user.lastSuccessTitle': '最近成功备份时间',
+    'settings.cloud.user.lastErrorTitle': '最近一次上传失败',
+    'settings.cloud.user.refresh': '刷新云端状态',
+    'settings.cloud.user.backupNow': '立即备份',
+    'settings.cloud.user.note': '云端备份用于数据保护和跨设备恢复，不提供实时双向同步；只保存最新一份备份。',
+  });
 })();

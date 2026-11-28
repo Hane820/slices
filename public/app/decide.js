@@ -73,6 +73,14 @@ function toggleLibFold(node){
   var btn = node || document.getElementById('libFold');
   if(btn) btn.textContent = libFoldOpen ? U('common.action.collapse') : U('common.action.expand');
 }
+var menuFoldOpen = false;  /* 我的菜单整块默认折叠；展开后筛选/开关全部保留 */
+function toggleMenuFold(node){
+  menuFoldOpen = !menuFoldOpen;
+  var body = document.getElementById('menuBody');
+  if(body) body.style.display = menuFoldOpen ? '' : 'none';
+  var btn = node || document.getElementById('menuFold');
+  if(btn) btn.textContent = menuFoldOpen ? U('common.action.collapse') : U('common.action.expand');
+}
 var sceneEditMode = false;      /* 情景管理：在决策页原地切换，默认关闭 */
 
 function renderScenes(){

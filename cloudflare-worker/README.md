@@ -1,20 +1,24 @@
 # 地球online — Cloudflare 云端备份 Worker
 
-一个独立的 Cloudflare Worker：把「完整业务备份 JSON」存进**私有 R2 桶**，
-用 **Cloudflare Access** 做备份 API 的身份认证。本地 IndexedDB 仍是唯一业务数据源；
-这里只保存最新一份备份（单对象 `earthonline/backup-latest.json`），
-不做多设备实时同步。
+一个独立的 Cloudflare Worker：把「完整业务备份 JSON」存进**私有 R2 桶**。
+本地 IndexedDB 仍是唯一业务数据源；这里只保存最新一份备份
+（单对象 `users/<userId>/earthonline/backup-latest.json`），不做多设备实时同步。
 
-**应用自有认证（Phase Auth）**：同一 Worker 还挂载 `/api/auth/*`，用 D1 + 邮箱验证码 +
-HttpOnly Session Cookie 认证地球online用户。它与 Cloudflare Access JWT **互不替代**：
-备份 API 仍要求 Access JWT；认证 API 只认应用自己的 Session；R2 保持私有。
-详见 `docs/space-auth/PHASE_AUTH_IMPLEMENT.md`（含 D1 / Secrets / 同源路由阻塞项）。
+**当前生产授权方式（Phase Auth）**：同一 Worker 挂载 `/api/auth/*`（D1 + 邮箱验证码 +
+HttpOnly Session Cookie）与 `/api/backup*`。备份身份**只来自应用 Session**，
+`BACKUP_REQUIRE_ACCESS_JWT="false"`；Cloudflare Access JWT 不是备份的必要条件。
+Access JWT 验签代码保留，仅用于可选的过渡加固模式（`BACKUP_REQUIRE_ACCESS_JWT="true"`
+需 AUD 与实际拦截应用一致）与旧协议回归（`ALLOW_LEGACY_ACCESS_BACKUP`，生产禁止）。
+R2 桶始终私有。部署权威文档是 `docs/space-auth/AUTH3_DEPLOY_RUNBOOK.md`；
+设计为 `docs/space-auth/PHASE_AUTH_IMPLEMENT.md`。
 
 ## API
 
-所有备份接口都要求 Cloudflare Access JWT（请求头 `Cf-Access-Jwt-Assertion`，
-或浏览器 Access 会话的 `CF_Authorization` Cookie）。Worker 会用 Access 团队域的
-JWKS 公钥**真实验签**（WebCrypto），并校验 `iss` / `aud` / `exp`，绝不只解码就放行。
+备份接口要求**应用 Session Cookie**（由 `/api/auth/verify` 签发的 `__Host-eo_sess`），
+用户身份只从 Session 查表得到，前端传入的 userId 一律忽略。可选过渡模式下会额外要求
+Cloudflare Access JWT（`Cf-Access-Jwt-Assertion` 头或 Access 会话 Cookie），此时 Worker
+用团队域 JWKS 公钥**真实验签**（WebCrypto）并校验 `iss` / `aud` / `exp`，绝不只解码就放行。
+未登录请求统一返回 401 JSON（`code=session-invalid` 时前端才允许降级为 guest）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -59,19 +63,29 @@ curl -H "Cf-Access-Jwt-Assertion: <JWT>" http://127.0.0.1:8787/api/backup/status
 JWKS 传输层（Worker 的 fetch + WebCrypto 验签代码路径不变），见
 `E:/wb-5b5-test/cf-wrangler-local.cjs`。
 
-## 部署前：Cloudflare 控制台配置清单
+## 部署前：Cloudflare 控制台配置清单（当前生产架构）
+
+> 顺序与 `docs/space-auth/AUTH3_DEPLOY_RUNBOOK.md` 一致；完整操作与回滚以 Runbook 为准。
 
 1. **R2**：创建桶（建议名 `earthonline-backups`）。保持**私有**——不绑自定义域、
-   不开公开访问、不生成公开链接（r2.dev 链接保持关闭）。
-2. **Zero Trust → Access → Applications**：新建 Self-hosted 应用，
-   域名填 Worker 的 `*.workers.dev` 地址（或自定义域）；策略按需（Allow 你的邮箱）。
-   记下应用的 **AUD** 值。
-3. 把 `wrangler.toml` 里三个 `REPLACE-ME` 换成真实值：
-   `ACCESS_TEAM`（团队域）、`AUD_TAG`（应用 AUD）、确认 `APP_ORIGIN` 与站点一致；
-   `[[r2_buckets]]` 的 `bucket_name` 换成第 1 步的桶名。
-4. `wrangler login && wrangler deploy`。
-5. 验证：浏览器登录 Access 后打开 `GET /api/backup/status` 应返回
-   `{"ok":true,"hasBackup":false}`；未登录应被 Access 拦截或返回 401。
+   不开公开访问、不生成公开链接（r2.dev 链接保持关闭）。`wrangler.toml` 已声明
+   `binding="BACKUP_BUCKET"`、`bucket_name="earthonline-backups"`。
+2. **D1**：创建数据库（建议名 `earthonline-auth`），把 database_id 填进
+   `wrangler.toml` 的 `[[d1_databases]]`（当前为 `REPLACE-ME-D1-DATABASE-ID`），
+   binding 必须为 `AUTH_DB`。远程建表：
+   `npx wrangler d1 migrations apply AUTH_DB --remote`（幂等）。
+3. **Secrets**：`wrangler secret put AUTH_CODE_PEPPER`、`AUTH_IP_PEPPER`；
+   启用 http 邮件驱动后再 put `MAIL_API_KEY`。仓库内不保存明文。
+4. **邮件**：服务商需满足 HTTPS POST + Bearer + `{to,from,subject,text}` + 同步 2xx；
+   配置 `EMAIL_DRIVER="http"` 与 `MAIL_API_URL`，并完成发信域名 SPF/DKIM 验证。
+5. **同源 Route**：`slices0flife.me/api/*` → `earthonline-backup`（Dashboard 添加，
+   或取消 `wrangler.toml` 的 `routes` 注释并填真实 `zone_id`）。`/`、`/app/*`
+   继续由静态托管返回，不受影响。
+6. **Access 边界**：确认没有 Access 应用拦截 `/api/auth/*` 或 `/app/*`；
+   站点域若仍拦截 `/api/backup*`，按 Runbook §2-B 收窄。Worker 域名应用保持不动。
+7. `npx wrangler deploy`，随后按 Runbook §8-§11 验证。
+8. 验证：匿名 `GET /api/auth/session` 返回 401 `no-session` JSON；
+   登录后 `GET /api/backup/status` 返回 `{"ok":true,"hasBackup":false}`。
 
 ### 默认游客模式下的 Access 边界（必须遵守）
 
@@ -86,8 +100,9 @@ JWKS 传输层（Worker 的 fetch + WebCrypto 验签代码路径不变），见
 - 如果打开应用网址看到邮箱验证码页，来源一定是 **Cloudflare Zero Trust Dashboard 里另一个
   Access 应用**（Self-hosted 应用保护了站点域名或整个 `*.slices0flife.me`）。仓库内改不了，
   必须在 Dashboard 处理，步骤见下方。
-- **不得**为了让游客访问而取消备份 API 的 JWT 验签：游客根本不发 `/api/*` 请求，
-  两者不冲突。R2 桶保持私有，不绑公开域。
+- **不得**为了让游客访问而放宽整个 Worker 的 Access 策略：游客根本不发 `/api/*` 请求，
+  站点可访问性与备份 API 的应用 Session 授权互不冲突。当前生产用 Session 保护备份，
+  不依赖 Access JWT；R2 桶保持私有，不绑公开域。
 
 Dashboard 操作步骤（由项目所有者执行）：
 
@@ -106,7 +121,7 @@ Dashboard 操作步骤（由项目所有者执行）：
 | 资源 | 要求 | 说明 |
 |---|---|---|
 | `https://slices0flife.me/app/`（含全部静态资源、PWA 文件） | **匿名可访问** | 游客直接进本地空间；静态页面、JS/CSS、图标、manifest 一律不得有登录墙 |
-| `https://earthonline-backup.*.workers.dev/api/backup*`（v1 与 v2 全部路径） | **保持认证** | Access JWT 验签 + CORS 白名单都不许取消；游客不发这些请求 |
+| `https://slices0flife.me/api/backup*`（v1 与 v2 全部路径） | **应用 Session 保护** | 未登录返回 401 JSON；CORS 只许 `APP_ORIGIN`；可选 Access JWT 加固须 AUD 一致 |
 
 **为什么不能直接删除一个「覆盖范围不明」的 Access 应用**：仓库证据只能证明
 `wrangler.toml` 里登记了 `ACCESS_TEAM`（`still-silence-4b58.cloudflareaccess.com`）与一个
@@ -126,4 +141,5 @@ Dashboard 操作步骤（由项目所有者执行）：
 - 只保存**最新一份**备份（覆盖式），不做历史版本；需要历史可在 R2 控制台手动复制对象。
 - 备份内容不做深度 schema 校验（只验信封 `app/version/data/exportedAt`）——
   恢复时的完整校验由应用端导入流程负责。
-- 未实现前端备份 UI（按任务边界，后续任务处理）。
+- 前端自动备份调度已实现（`public/app/cloud-backup.js`）：登录后会合并上传、
+  pending 持久化与刷新恢复、guest 五层 fail-closed；v2 pointer 调度接入属后续阶段。

@@ -472,6 +472,7 @@ function onAppClick(e){
       if(t) tapFocusItem(t, hit);
       return;
     case 'lib-fold':      toggleLibFold(hit); return;
+    case 'menu-fold':     toggleMenuFold(hit); return;
   }
 }
 /* 打字只改 state，不重渲染，光标不跳 */

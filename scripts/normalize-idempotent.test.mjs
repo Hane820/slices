@@ -61,9 +61,11 @@ const defaults = () => ({
 /* normalize 依赖的其它 core 内部函数/常量：byId 抽真源码，其余给行为等价的最小桩 */
 const BYID_SRC = extractFn2('byId');
 
-function runNormalize(state) {
+function runNormalize(state, seedSuggestions = null) {
+  const seededDefaults = seedSuggestions === null ? defaults
+    : () => ({ ...defaults(), suggestions: JSON.parse(JSON.stringify(seedSuggestions)) });
   const win = {
-    S: state, defaults,
+    S: state, defaults: seededDefaults,
     THEME_KEYS, PRESETS: { FILTER_ALL, FOCUS_ITEMS: [{ id: 'fi-study', text: '学习', mode: 'count', unit: '分钟' }] },
     FOOD_SLOTS, uid, UNIT_DEFAULT, PARTS,
     CAT_MUST: 'must', CAT_WANT: 'want', CAT_ROUTINE: 'routine',
@@ -185,6 +187,37 @@ test('normalize：超 200 条 foodLog 连续两次运行零改动（幂等）', 
   const snap2 = JSON.stringify(twice);
   assert.equal(snap2, snap1, '第二次 normalize 不得再改动数据（幂等）');
   assert.equal(twice.settings.foodLog.length, 260, '两次运行后 260 条仍然全部保留');
+});
+
+test('normalize：空 suggestions 回灌预设种子（建议库预设消失修复），且保持幂等', () => {
+  const seed = [
+    { id: 's1', name: '出去散步', cat: '身体', duration: 1200, tags: [], times: [], scenes: [], enabled: true },
+    { id: 's2', name: '复习', cat: '学习', duration: 1200, tags: [], times: [], scenes: [], enabled: true },
+  ];
+  const old = defaults();
+  old.suggestions = [];                              /* 历史数据被清空：截图里只剩「全部」 */
+  const after = runNormalize(old, seed);
+  assert.equal(after.suggestions.length, 2, '空数组回灌默认种子');
+  assert.equal(after.suggestions[0].name, '出去散步');
+  const twice = runNormalize(after, seed);
+  assert.equal(JSON.stringify(twice), JSON.stringify(after), '回灌后第二次 normalize 零改动（幂等）');
+});
+
+test('normalize：非空 suggestions 不被种子覆盖（用户自建建议保留）', () => {
+  const seed = [{ id: 's1', name: '预设', cat: '身体', tags: [], times: [], scenes: [], enabled: true }];
+  const old = defaults();
+  old.suggestions = [{ id: 'my1', name: '我自己的建议', cat: '生活', tags: [], times: [], scenes: [], enabled: true }];
+  const after = runNormalize(old, seed);
+  assert.equal(after.suggestions.length, 1, '非空清单不被覆盖');
+  assert.equal(after.suggestions[0].id, 'my1', '用户数据原样保留');
+});
+
+test('normalize：非数组 suggestions 回退默认种子', () => {
+  const seed = [{ id: 's1', name: '预设', cat: '身体', tags: [], times: [], scenes: [], enabled: true }];
+  const old = defaults();
+  old.suggestions = null;
+  const after = runNormalize(old, seed);
+  assert.equal(after.suggestions.length, 1, '非数组回退默认');
 });
 
 test('normalize：空清单回退默认，用户删光的菜单不会被种子塞回', () => {

@@ -128,5 +128,6 @@
     'common.noun.tag': '标签',
     'common.action.newTag': '+ 新标签',
     'common.action.newMarker': '+ 新标记',
+    'common.action.gotIt': '知道了',
   });
 })();

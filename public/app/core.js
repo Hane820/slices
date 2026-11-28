@@ -584,9 +584,14 @@ function save(onSuccess, opts){
 }
 function normalize(){
   var d = defaults();
-  ['tasks','schedule','plans','pens','tags','tagLogs','suggestions','workouts','studyLogs','decisionLog','restDays','flashes','itemLogs','meals'].forEach(function(k){
+  ['tasks','schedule','plans','pens','tags','tagLogs','workouts','studyLogs','decisionLog','restDays','flashes','itemLogs','meals'].forEach(function(k){
     if(!Array.isArray(S[k])) S[k] = d[k];
   });
+  /* 建议库预设：空数组（而非仅"非数组"）也要回灌默认种子。
+     历史数据/异常把 suggestions 清空后，展开建议库会只剩「全部」且提示"还没有建议"，
+     看起来像预设丢失。这里回灌 16 条种子；回灌后非空，第二次 normalize 不再改动，
+     保持幂等。用户如确实想清空，可在本次会话内删掉（刷新后会再回来）。 */
+  if(!Array.isArray(S.suggestions) || !S.suggestions.length) S.suggestions = d.suggestions;
   ['notes','marks','doneSugg'].forEach(function(k){
     if(!S[k] || typeof S[k] !== 'object' || Array.isArray(S[k])) S[k] = d[k];
   });

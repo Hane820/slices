@@ -21,6 +21,25 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const APP = path.join(ROOT, 'public', 'app');
 const SRC = fs.readFileSync(path.join(APP, 'cloud-backup.js'), 'utf8');
 
+/* settings.js 的 Auth 文案已迁入文案中心（U()）；测试桩从真实配置加载 U，
+   断言继续对准实际显示值，不手写中文映射。 */
+function loadTextU() {
+  const win = {
+    document: { readyState: 'complete', querySelectorAll: () => [], addEventListener() {} },
+    location: { search: '' },
+    console: { warn() {}, log() {} }
+  };
+  win.window = win;
+  const ctx = vm.createContext(win);
+  const cfg = path.join(APP, 'config');
+  vm.runInContext(fs.readFileSync(path.join(cfg, 'index.js'), 'utf8'), ctx, { filename: 'config/index.js' });
+  for (const name of ['common.js', 'settings.js']) {
+    vm.runInContext(fs.readFileSync(path.join(cfg, name), 'utf8'), ctx, { filename: 'config/' + name });
+  }
+  return win.U;
+}
+const U = loadTextU();
+
 const STATE_KEY = 'earthonline-cloud-backup-v1';
 const LEASE_KEY = 'earthonline-cloud-backup-lease';
 
@@ -437,7 +456,7 @@ function renderSettingsFn(fnName, identityRecord, snapshot) {
     logoutUser: () => opened.push({ logout: true }),
     $: () => box,
     el: (tag, cls, text) => makeNode(tag, cls, text),
-    OLT: (s) => s,
+    U,
     toastCfg() {}
   };
   win.window = win;

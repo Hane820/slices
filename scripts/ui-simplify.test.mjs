@@ -187,6 +187,40 @@ test('建议库：默认折叠容器与切换函数存在，展开文案为静�
   assert.ok(!js.includes("U(libFoldOpen ?"), '禁止动态 key');
 });
 
+test('我的菜单：默认折叠容器与切换函数存在，展开文案为静态 key', () => {
+  const html = fs.readFileSync(path.join(APP, 'index.html'), 'utf8');
+  assert.ok(html.includes('id="menuBody" style="display:none"'));
+  assert.ok(html.includes('data-action="menu-fold"'));
+  const js = fs.readFileSync(path.join(APP, 'decide.js'), 'utf8');
+  assert.ok(js.includes('var menuFoldOpen = false;'));
+  assert.ok(!js.includes("U(menuFoldOpen ?"), '禁止动态 key');
+  const today = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
+  assert.ok(today.includes("case 'menu-fold':"), '事件分发必须接上菜单折叠');
+});
+
+test('我的菜单：toggleMenuFold 正确切换 menuBody 显示与静态文案', () => {
+  const src = fs.readFileSync(path.join(APP, 'decide.js'), 'utf8');
+  const start = src.indexOf('var menuFoldOpen = false;');
+  const end = src.indexOf('var sceneEditMode', start);
+  assert.ok(start >= 0 && end > start, '找不到 menuFold 代码块');
+  const body = makeEl();
+  const btn = makeEl();
+  const ctx = {
+    document: { getElementById: (id) => (id === 'menuBody' ? body : id === 'menuFold' ? btn : null) },
+    U: (k) => (FALLBACK[k] || k),
+  };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(src.slice(start, end) + '\nwindow.toggleMenuFold = toggleMenuFold;', ctx);
+  assert.equal(body.style.display, undefined, '初始未设置 display（由 HTML 默认 none）');
+  ctx.toggleMenuFold(btn);
+  assert.equal(body.style.display, '', '第一次展开');
+  assert.equal(btn.textContent, FALLBACK['common.action.collapse']);
+  ctx.toggleMenuFold(btn);
+  assert.equal(body.style.display, 'none', '第二次收起');
+  assert.equal(btn.textContent, FALLBACK['common.action.expand']);
+});
+
 test('主题：固定橘子汽水，旧主题设置不再影响显示', () => {
   const core = fs.readFileSync(path.join(APP, 'core.js'), 'utf8');
   const css = fs.readFileSync(path.join(APP, 'base.css'), 'utf8');

@@ -44,6 +44,18 @@ Cloudflare Zone（slices0flife.me）
 - **路径匹配注意**：`/api/*` 会同时接管 `/api/auth/*` 与 `/api/backup*`，
   静态资源不受影响（它们不在 /api/ 前缀下）。
 
+## 2-A. R2 bucket 与 binding 准备
+
+- 位置：Dashboard → Storage & Databases → R2 → Create bucket。
+- 操作：桶名 `earthonline-backups`（与 `wrangler.toml` 的 `bucket_name` 一致），
+  保持**私有**：不绑自定义域、不开公开访问、r2.dev 链接关闭。
+- 绑定：`wrangler.toml` 已声明 `binding = "BACKUP_BUCKET"`；Worker 代码硬依赖
+  `env.BACKUP_BUCKET`，未绑定时备份 API 返回 502 `bucket-not-bound`（fail closed）。
+- 验证：`wrangler r2 object list earthonline-backups`（只读，需 wrangler 登录态）；
+  部署后匿名 `/api/backup/status` 返回 401 JSON，登录后返回 `hasBackup:false`。
+- 回滚：桶本身无需删除；停用只需解绑或删除 Route，已有对象保留。
+- 停止条件：桶名与 binding 不一致 → 修 `wrangler.toml`，不要在生产写入真实用户数据。
+
 ## 3. 创建 D1 并绑定
 
 - 位置：Dashboard → Storage & Databases → D1 → Create。
@@ -173,6 +185,30 @@ Cloudflare Zone（slices0flife.me）
 | 已发出 Session | 不需要单独处理：删除 Route 后 Cookie 无法到达 Worker；如需强制失效，`UPDATE sessions SET revoked_at=<now>` 全量撤销 | ✅ 可逆 |
 | R2 备份对象 | 备份写入在 `users/<userId>/` 前缀下，回滚 Worker 不影响已有对象；回滚到 Access-only 旧协议**不会**读到用户命名空间对象（旧路径无数据） | ✅ 数据保留 |
 | Secrets | 删除 Secret 会使对应功能明确失败（fail closed），不影响其它功能 | ✅ 可逆 |
+
+## 12. 部署后端到端验收顺序（15 步，须在生产部署完成后执行）
+
+> 前置：第 2-7 步全部完成、`npm run auth:preflight` 0 BLOCKED、准备两个可收信测试邮箱。
+> 本节只给执行顺序；逐场景判定与证据模板见 `AUTH4_ACCEPTANCE_PLAN.md`。
+> **本清单当前为「待执行」**：本轮只做部署准备，未在生产运行任何步骤。
+
+| # | 操作 | 预期证据 | 失败即停 |
+|---|---|---|---|
+| 1 | 无痕打开 `/` 与 `/app/` | 均 200；应用直接进入游客空间 | 出现 Access 登录页 → §2-B |
+| 2 | 匿名 GET `/api/auth/session` | 401 `no-session` JSON | 404 → Route 未生效；HTML → Access 拦截 |
+| 3 | 设置页输入本人邮箱发送验证码 | 202 + 收到邮件；服务端只存摘要 | 503 → 查 Secrets / 邮件配置 |
+| 4 | 输入验证码登录 | 200 + `__Host-eo_sess`（Secure/HttpOnly/SameSite=Lax，无 Domain） | Cookie 带 Domain 或 JS 可读 → 停 |
+| 5 | 再次 GET `/api/auth/session` | 200 `{"ok":true,"user":{...}}` | 仍 401 → Cookie 未随同源请求携带 |
+| 6 | 设置页确认身份为 user | 显示脱敏邮箱；云端备份区为已启用 | 仍显示游客 → 前端身份未切换 |
+| 7 | 改动一条本地业务数据 | Network 见 `PUT /api/backup`（约 3s 防抖） | 0 请求 → 调度器未接通 |
+| 8 | 只读列出 R2 对象 | `users/<userId>/earthonline/backup-latest.json` 存在 | 落在 `users/` 之外 → 隔离失败 |
+| 9 | GET `/api/backup/status` | `{ok:true,hasBackup:true,size:...}` | 401/500 → 授权或 R2 异常 |
+| 10 | 点击退出登录 | 204 + Cookie 清除；前端回到 guest | 仍为 user → 停 |
+| 11 | 再次 GET `/api/auth/session` | 401 `no-session`（服务端已写 `revoked_at`） | 仍 200 → 撤销失败 |
+| 12 | 检查 IndexedDB 业务数据 | 退出前后记录条数一致，未被清空 | 数据消失 → 停 |
+| 13 | 重新登录同一邮箱 | 200 + user 态恢复 | 失败 → Session / 验证码链路问题 |
+| 14 | 下载 R2 备份并走应用内导入恢复 | 恢复后数据完整、无损坏 | 导入报错 → 备份格式不兼容 |
+| 15 | 新无痕窗口不登录，正常使用 | Network 全程 0 个 `/api/backup*` | 有请求 → guest 门禁失效 |
 
 ## 与本文相关的核查产物
 

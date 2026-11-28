@@ -180,24 +180,33 @@ function renderSettings(){
   renderGuestSet();
 }
 
-/* 认证错误码 → 界面文案（沿用文案中心；Toast 配置中心不改动） */
+/* 认证错误码 → 界面文案（沿用文案中心；Toast 配置中心不改动）
+   文案中心禁止动态 key，所以错误码逐一落到静态 U(key)：分支与错误码一一对应，
+   未知 code 仍落到原来的默认文案，返回值的文本与迁移前完全一致。 */
 function authErrorText(code){
-  var map = {
-    'bad-email':'邮箱格式不对', 'bad-input':'输入格式不对', 'rate-limited':'发送过于频繁，请稍后再试',
-    'code-invalid':'验证码不对，请再试一次', 'code-expired':'验证码过期了，请重新发送',
-    'code-consumed':'验证码已使用，请重新发送', 'too-many-attempts':'尝试次数过多，请重新发送验证码',
-    'email-unconfigured':'邮件服务尚未配置，暂时无法登录', 'email-send-failed':'验证码发送失败，请稍后重试',
-    'network-error':'网络中断，请重试', 'offline':'网络中断，请重试',
-    'auth-unavailable':'认证服务暂不可用', 'no-session':'登录状态已失效，请重新登录',
-    'account-disabled':'账号不可用'
-  };
-  return OLT(map[code] || '登录失败，请稍后重试');
+  switch(code){
+    case 'bad-email': return U('settings.auth.error.badEmail');
+    case 'bad-input': return U('settings.auth.error.badInput');
+    case 'rate-limited': return U('settings.auth.error.rateLimited');
+    case 'code-invalid': return U('settings.auth.error.codeInvalid');
+    case 'code-expired': return U('settings.auth.error.codeExpired');
+    case 'code-consumed': return U('settings.auth.error.codeConsumed');
+    case 'too-many-attempts': return U('settings.auth.error.tooManyAttempts');
+    case 'email-unconfigured': return U('settings.auth.error.emailUnconfigured');
+    case 'email-send-failed': return U('settings.auth.error.emailSendFailed');
+    case 'network-error':
+    case 'offline': return U('settings.auth.error.network');
+    case 'auth-unavailable': return U('settings.auth.error.unavailable');
+    case 'no-session': return U('settings.auth.error.noSession');
+    case 'account-disabled': return U('settings.auth.error.accountDisabled');
+    default: return U('settings.auth.error.default');
+  }
 }
 
 /* 真实邮箱验证码登录：发送成功 ≠ 登录成功；只有服务端 Session 验证成功后才切身份 */
 function openLoginSheet(){
   if(!window.OLAuth){
-    openModal({ title:OLT('登录暂不可用'), message:OLT('认证模块未加载，请稍后重试。'), okText:OLT('知道了') });
+    openModal({ title:U('settings.auth.login.moduleUnavailable'), message:U('settings.auth.login.moduleNotLoaded'), okText:U('common.action.gotIt') });
     return;
   }
   var body = openSheet(
@@ -223,13 +232,13 @@ function openLoginSheet(){
   sendBtn.addEventListener('click', function(){
     var email = q('authEmail').value.trim();
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ say(authErrorText('bad-email')); return; }
-    sendBtn.disabled = true; say(OLT('正在发送验证码…'));
+    sendBtn.disabled = true; say(U('settings.auth.login.sending'));
     OLAuth.requestCode(email).then(function(r){
       sendBtn.disabled = false;
       if(!r.ok){ say(authErrorText(r.error)); return; }
       /* 只进入第二步，绝不提前切换身份 */
       q('authStep2').style.display = 'block';
-      say(OLT('验证码已发送，10 分钟内有效。'));
+      say(U('settings.auth.login.codeSent'));
     });
   });
 
@@ -238,7 +247,7 @@ function openLoginSheet(){
     var email = q('authEmail').value.trim();
     var code = q('authCode').value.trim();
     if(!/^\d{6}$/.test(code)){ say(authErrorText('code-invalid')); return; }
-    verifyBtn.disabled = true; say(OLT('正在验证…'));
+    verifyBtn.disabled = true; say(U('settings.auth.login.verifying'));
     OLAuth.verifyCode(email, code).then(function(r){
       verifyBtn.disabled = false;
       if(!r.ok){ say(authErrorText(r.error)); return; }
@@ -251,7 +260,7 @@ function openLoginSheet(){
           email: su.emailMasked || '',
           source: 'auth-session'
         });
-        if(!entered.ok){ say(OLT('本机身份写入失败，请重试')); return; }
+        if(!entered.ok){ say(U('settings.auth.login.identityWriteFailed')); return; }
         if(window.OLCloudBackup && typeof OLCloudBackup.syncIdentity === 'function') OLCloudBackup.syncIdentity();
         closeSheet();
         location.reload();
@@ -263,15 +272,15 @@ function openLoginSheet(){
 /* 退出登录：服务端撤销成功后才切回 guest；失败 / 超时保持 user 状态 */
 function logoutUser(){
   if(!window.OLAuth){
-    openModal({ title:OLT('退出失败'), message:OLT('认证模块未加载，仍保持当前登录状态。'), okText:OLT('知道了') });
+    openModal({ title:U('settings.auth.logout.failed'), message:U('settings.auth.logout.moduleNotLoaded'), okText:U('common.action.gotIt') });
     return;
   }
   OLAuth.logout().then(function(r){
     if(!r.ok){
       openModal({
-        title: OLT('退出失败'),
-        message: OLT('服务端会话尚未撤销，仍保持当前登录状态。请检查网络后重试。'),
-        okText: OLT('知道了')
+        title: U('settings.auth.logout.failed'),
+        message: U('settings.auth.logout.sessionNotRevoked'),
+        okText: U('common.action.gotIt')
       });
       return;
     }
@@ -305,16 +314,16 @@ function renderGuestSet(){
   }
 
   if(guest){
-    infoRow(OLT('当前空间：游客空间'), OLT('数据只保存在这台设备；不需要注册或登录，也不会上传云端。'), '●');
-    infoRow(OLT('游客数据'), OLT('关掉页面后仍然留在本机；换设备、清缓存或删浏览器数据可能丢失。'));
-    infoRow(OLT('登录 / 开启云端备份'),
-      OLT('用应用自己的邮箱验证码登录；验证成功后才进入用户空间。游客数据不会自动上传或合并。'),
-      OLT('登录'), openLoginSheet);
+    infoRow(U('settings.space.guest.current'), U('settings.space.guest.subtitle'), '●');
+    infoRow(U('settings.space.guest.data'), U('settings.space.guest.dataSubtitle'));
+    infoRow(U('settings.space.login.title'),
+      U('settings.space.login.subtitle'),
+      U('settings.space.login.action'), openLoginSheet);
 
     var reset = el('div','row');
     var rm = el('div','row-main');
-    rm.appendChild(el('div','row-t', OLT('重置游客数据')));
-    rm.appendChild(el('div','row-s', OLT('只删游客空间里的记录并恢复初始演示内容；不影响任何登录用户的数据。')));
+    rm.appendChild(el('div','row-t', U('settings.space.guest.reset')));
+    rm.appendChild(el('div','row-s', U('settings.space.guest.resetSubtitle')));
     reset.appendChild(rm);
     reset.appendChild(el('div','row-a','›'));
     reset.addEventListener('click', function(){
@@ -335,10 +344,10 @@ function renderGuestSet(){
   /* local = 将来的 user 空间。当前没有登录入口能创建它，只有历史记录会走到这里；
      账号信息尚未接入，不显示、不编造任何账号。 */
   var rec = OLIdentity.record() || {};
-  infoRow(OLT('当前空间：用户空间'), OLT('数据保存在本机，并自动备份到云端。'), '●');
-  infoRow(OLT('登录账号'), rec.email || OLT('账号信息暂不可用'));
-  infoRow(OLT('云端备份'), OLT('已启用（自动）。'), OLT('已启用'));
-  infoRow(OLT('退出登录'), OLT('撤销服务端会话后回到游客空间；本机用户数据保留，不清空、不自动合并。'), OLT('退出'), logoutUser);
+  infoRow(U('settings.space.user.current'), U('settings.space.user.subtitle'), '●');
+  infoRow(U('settings.space.user.account'), rec.email || U('settings.space.user.accountUnavailable'));
+  infoRow(U('settings.space.user.cloudBackup'), U('settings.space.user.cloudEnabled'), U('settings.space.user.cloudEnabledTag'));
+  infoRow(U('settings.space.user.logout'), U('settings.space.user.logoutSubtitle'), U('settings.space.user.logoutAction'), logoutUser);
 }
 
 /* 云端备份区：按身份区分展示。
@@ -362,16 +371,16 @@ function renderCloudSet(){
 
   var guest = !window.OLIdentity || OLIdentity.isGuest();
   if(guest){
-    line(OLT('当前为游客空间，云端备份尚未启用。'),
-         OLT('登录后可开启自动云端备份。游客数据不会上传，也不会产生备份失败状态。'));
+    line(U('settings.cloud.guest.title'),
+         U('settings.cloud.guest.subtitle'));
     return;
   }
 
   var st = OLCloudBackup.snapshot();
   if(!st.enabled){
     /* 身份在渲染瞬间变化（例如刚切回游客）：按未启用处理，不显示任何上传状态 */
-    line(OLT('当前为游客空间，云端备份尚未启用。'),
-         OLT('登录后可开启自动云端备份。游客数据不会上传，也不会产生备份失败状态。'));
+    line(U('settings.cloud.guest.title'),
+         U('settings.cloud.guest.subtitle'));
     return;
   }
 
@@ -380,11 +389,11 @@ function renderCloudSet(){
     'server-only':'云端已有备份（本机未确认）', none:'未备份', disabled:'未启用'
   };
 
-  line(OLT('自动云端备份'), OLT('已启用：本地保存成功后自动合并上传，不需要手动点击。'));
+  line(U('settings.cloud.user.autoTitle'), U('settings.cloud.user.autoSubtitle'));
 
   var row = el('div','row');
   var main = el('div','row-main');
-  main.appendChild(el('div','row-t',OLT('当前备份状态')));
+  main.appendChild(el('div','row-t',U('settings.cloud.user.statusTitle')));
   main.appendChild(el('div','row-s',labels[st.status] || st.status));
   row.appendChild(main);
   row.appendChild(el('div','row-a',st.uploading ? '…' : '›'));
@@ -392,7 +401,7 @@ function renderCloudSet(){
 
   var time = el('div','row');
   var tm = el('div','row-main');
-  tm.appendChild(el('div','row-t',OLT('最近成功备份时间')));
+  tm.appendChild(el('div','row-t',U('settings.cloud.user.lastSuccessTitle')));
   tm.appendChild(el('div','row-s',st.lastSuccessAt
     ? new Date(st.lastSuccessAt).toLocaleString('zh-CN')
     : (st.serverUploadedAt ? '云端有备份，但本机还没确认上传成功' : '还没有成功上传过')));
@@ -403,17 +412,17 @@ function renderCloudSet(){
   if(st.lastError){
     var er = el('div','row');
     var em = el('div','row-main');
-    em.appendChild(el('div','row-t',OLT('最近一次上传失败')));
+    em.appendChild(el('div','row-t',U('settings.cloud.user.lastErrorTitle')));
     em.appendChild(el('div','row-s',st.lastError + '；待备份数据已保留'));
     er.appendChild(em);
     box.appendChild(er);
   }
 
   var acts = el('div','row');
-  var refresh = el('button','btn g sm',OLT('刷新云端状态'));
+  var refresh = el('button','btn g sm',U('settings.cloud.user.refresh'));
   refresh.type = 'button';
   refresh.addEventListener('click', function(){ OLCloudBackup.refreshStatus(); });
-  var now = el('button','btn p sm',OLT('立即备份'));
+  var now = el('button','btn p sm',U('settings.cloud.user.backupNow'));
   now.type = 'button';
   now.disabled = !!st.uploading;
   now.addEventListener('click', function(){
@@ -423,7 +432,7 @@ function renderCloudSet(){
   acts.appendChild(now);
   box.appendChild(acts);
 
-  var note = el('div','row-s',OLT('云端备份用于数据保护和跨设备恢复，不提供实时双向同步；只保存最新一份备份。'));
+  var note = el('div','row-s',U('settings.cloud.user.note'));
   note.style.marginTop = '10px';
   box.appendChild(note);
 }
