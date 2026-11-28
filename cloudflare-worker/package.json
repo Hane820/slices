@@ -6,6 +6,8 @@
     "test": "node test/harness.cjs",
     "test:r2": "node test/r2-integration.cjs",
     "test:r2:self": "node test/r2-integration.cjs --self-check",
+    "test:r2:s3": "node test/r2-s3-integration.cjs",
+    "test:r2:s3:self": "node test/r2-s3-integration.cjs --self-check",
     "dev": "wrangler dev"
   }
 }
