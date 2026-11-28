@@ -9,8 +9,9 @@
     "dev": "astro dev",
     "start": "astro dev",
     "check": "npm test && npm run validate:content && astro check",
-    "test": "node scripts/ui-text-check.mjs && node --test scripts/validate-content.test.mjs scripts/backup-v2-core.test.cjs scripts/guest-space.test.mjs scripts/ui-text-runtime.test.mjs scripts/default-guest.test.mjs scripts/adopt-first-save.test.mjs scripts/normalize-idempotent.test.mjs scripts/cloud-backup-space.test.mjs scripts/auth-flow.test.mjs scripts/auth-lifecycle.test.mjs cloudflare-worker/test/auth.test.cjs cloudflare-worker/test/backup-isolation.test.cjs",
+    "test": "node scripts/ui-text-check.mjs && node --test scripts/validate-content.test.mjs scripts/backup-v2-core.test.cjs scripts/guest-space.test.mjs scripts/ui-text-runtime.test.mjs scripts/default-guest.test.mjs scripts/adopt-first-save.test.mjs scripts/normalize-idempotent.test.mjs scripts/cloud-backup-space.test.mjs scripts/auth-flow.test.mjs scripts/auth-lifecycle.test.mjs scripts/auth-preflight.test.mjs cloudflare-worker/test/auth.test.cjs cloudflare-worker/test/backup-isolation.test.cjs",
     "validate:content": "node scripts/validate-content.mjs",
+    "auth:preflight": "node scripts/auth-preflight.mjs",
     "build": "npm run validate:content && astro check && astro build",
     "preview": "astro preview"
   },
