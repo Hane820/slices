@@ -20,11 +20,22 @@ const FALLBACK = {
   'common.action.expand': '展开 ▾',
 };
 
+const allElements = [];
 function makeEl(tag = 'DIV', text = '') {
   const e = {
     tagName: tag, children: [], childNodes: [], dataset: {}, style: {},
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    appendChild(c) { this.children.push(c); return c; },
+    _classes: new Set(),
+    setAttribute() {},
+    attrs: {},
+    appendChild(c) {
+      // 真实 DOM：appendChild 会把节点从原父节点移走
+      for (const parent of allElements) {
+        const i = parent.children.indexOf(c);
+        if (i >= 0) parent.children.splice(i, 1);
+      }
+      this.children.push(c);
+      return c;
+    },
     querySelector() { return null; },
     querySelectorAll() { return []; },
     addEventListener() {},
@@ -35,7 +46,14 @@ function makeEl(tag = 'DIV', text = '') {
     get innerHTML() { return this._html || ''; },
     set innerHTML(v) { this._html = String(v); this.children = []; this.childNodes = []; },
   };
+  e.classList = {
+    add: (...cs) => cs.forEach((c) => e._classes.add(c)),
+    remove: (...cs) => cs.forEach((c) => e._classes.delete(c)),
+    toggle: (c, on) => { if (on === undefined) e._classes.has(c) ? e._classes.delete(c) : e._classes.add(c); else on ? e._classes.add(c) : e._classes.delete(c); },
+    contains: (c) => e._classes.has(c),
+  };
   if (text) e.textContent = text;
+  allElements.push(e);
   return e;
 }
 
@@ -60,7 +78,7 @@ function loadToday(stateOverrides = {}) {
     TODAY: () => T0,
     addDays: (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); },
     U: (k) => FALLBACK[k] || k,
-    el: (tag, cls, txt) => makeEl(tag, txt || ''),
+    el: (tag, cls, txt) => { const e = makeEl(tag, txt || ''); if (cls) String(cls).split(/\s+/).forEach((c) => e.classList.add(c)); return e; },
     $: (id) => els[id] || null,
     isDone: (t, d) => !!(t.done && t.done[d]),
     isSkipped: (t, d) => !!(t.done && t.done[d] === 2),
@@ -147,7 +165,9 @@ test('待办合并：旧三分类数据全部保留、ID/完成状态不变，�
   const ids = run("tasksOf('today', TODAY()).map(t => t.id).join(',')");
   assert.equal(ids, 't1,t2,t3');
   run('renderTasks()');
-  const cards = els.taskWrap.children.filter((c) => c.dataset && c.dataset.cat === 'today');
+  const walk = (nodes) => nodes.flatMap((n) => [n, ...walk(n.children || [])]);
+  const cards = walk(els.taskWrap.children).filter((c) =>
+    c.classList.contains('card') && c.dataset && c.dataset.cat === 'today');
   assert.equal(cards.length, 1, '只有一个合并待办卡');
   assert.equal(plain(S.tasks).length, 3, '没有重复插入');
   assert.equal(S.tasks.find((t) => t.id === 't2').done[T0], 1, '完成状态保留');
@@ -240,41 +260,120 @@ test('卡片堆叠：Z 轴参数与 CSS 层定义一致（12/24px、.96/.92、.7
   const css = fs.readFileSync(path.join(APP, 'today.css'), 'utf8');
   assert.ok(js.includes('var DECK_MS = 400;'), '动画时长统一 400ms');
   assert.ok(js.includes('cubic-bezier(.22,1,.36,1)'), '缓动曲线与参考一致');
-  assert.ok(js.includes('{ y: -12, s: .96, o: .7  }'), '第二层参数');
-  assert.ok(js.includes('{ y: -24, s: .92, o: .4  }'), '第三层参数');
-  assert.ok(css.includes('transform:translateY(-12px) scale(.96);opacity:.7'), 'CSS 第二层需匹配 JS');
-  assert.ok(css.includes('transform:translateY(-24px) scale(.92);opacity:.4'), 'CSS 第三层需匹配 JS');
+  assert.ok(css.includes('transform:translateY(-12px) scale(.96);opacity:.7'), 'CSS 第二层');
+  assert.ok(css.includes('transform:translateY(-24px) scale(.92);opacity:.4'), 'CSS 第三层');
   assert.ok(css.includes('cubic-bezier(.22,1,.36,1)'), 'CSS 缓动曲线需匹配 JS');
 });
 
-test('卡片堆叠：不再有硬编码 setTimeout 或跨参照系 getBoundingClientRect 换算', () => {
+test('卡片堆叠：收拢/展开同一入口，不重建 DOM、无硬编码延时', () => {
   const js = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
-  const block = js.slice(js.indexOf('function toggleTasksFold()'), js.indexOf('/* ==================== 单一事件委托'));
-  assert.ok(!block.includes('setTimeout(renderTasks'), '禁止用固定延时重建 DOM');
-  const animBlock = block.slice(0, block.indexOf('var sec ='));
-  assert.ok(!animBlock.includes('getBoundingClientRect'), '收拢动画不得依赖跨参照系换算');
-  const unfold = js.slice(js.indexOf('// 刚从牌堆展开'), js.indexOf('/* 一个分类 = 一张卡 */'));
-  assert.ok(!unfold.includes('getBoundingClientRect'), '展开动画不得依赖跨参照系换算');
-  assert.ok(block.includes('.finished.then(settle, settle)'), '重建须由动画完成事件驱动');
+  const fold = js.slice(js.indexOf('function toggleTasksFold()'), js.indexOf('/* ==================== 单一事件委托'));
+  assert.ok(fold.includes('setDeckFold(!S.settings.tasksFold)'), '收拢/展开必须共用状态机');
+  assert.ok(!fold.includes('renderTasks()'), '方向切换不得重建 DOM');
+  assert.ok(!fold.includes('setTimeout'), '禁止固定延时');
+  assert.ok(!js.includes('setTimeout(renderTasks'), '全文件禁止延时重建');
+  const machine = js.slice(js.indexOf('function setDeckFold('), js.indexOf('function unfoldTasks()'));
+  assert.ok(!machine.includes('getBoundingClientRect'), '不得做跨参照系换算');
+  assert.ok(machine.includes('deck.dataset.fold = want'), '由 data-fold 驱动 CSS 静态目标');
+  assert.ok(machine.includes('nodes.map(deckVisual)'), '起点取当前视觉值（含中断中间帧）');
+  assert.ok(machine.includes('a.cancel()'), '旧动画先取消');
+  assert.ok(machine.includes('fill: \'both\''), '双向 fill 保证首末帧');
 });
 
-test('卡片堆叠：deckTransform/deckOpacity 输出正确的 Z 轴变换', () => {
+test('卡片堆叠：setDeckFold 从当前视觉状态插值到目标，末帧 cancel 与静态一致', () => {
   const src = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
-  const start = src.indexOf('var DECK_MS = 400;');
-  const end = src.indexOf('function deckCanAnimate()', start);
-  const ctx = {};
-  vm.createContext(ctx);
-  vm.runInContext(src.slice(start, end), ctx);
-  assert.equal(vm.runInContext('deckTransform(0)', ctx), 'translateY(0px) scale(1)');
-  assert.equal(vm.runInContext('deckTransform(1)', ctx), 'translateY(-12px) scale(0.96)');
-  assert.equal(vm.runInContext('deckTransform(2)', ctx), 'translateY(-24px) scale(0.92)');
-  assert.equal(vm.runInContext('deckTransform(3)', ctx), 'translateY(-24px) scale(0.92)', '超出层数封顶到第三层');
-  assert.equal(vm.runInContext('deckOpacity(1)', ctx), 0.7);
-  assert.equal(vm.runInContext('deckOpacity(2)', ctx), 0.4);
+  const start = src.indexOf('var deckAnims = null;');
+  const end = src.indexOf('function unfoldTasks()', start);
+  const machine = src.slice(start, end);
+  // 快照 -> 取消 -> 切状态 -> 读目标 -> 动画 -> finished 后 cancel
+  assert.ok(machine.indexOf('nodes.map(deckVisual)') < machine.indexOf('deck.dataset.fold = want'),
+    '必须在改状态前快照当前视觉');
+  assert.ok(machine.indexOf('a.cancel()') < machine.indexOf('deck.dataset.fold = want'),
+    '必须在切状态前取消旧动画');
+  assert.ok(machine.includes('var after = nodes.map(deckVisual)'), '目标取新 CSS 静态值');
+  assert.ok(machine.includes('n.animate([before[i], after[i]]'), '单条插值 from=当前 to=静态');
+  assert.ok(machine.includes('last.finished.then(settle, settle)'), '由动画完成事件收口');
+  assert.ok(machine.includes('duration: DECK_MS, easing: DECK_EASE'), '统一时长与缓动');
+});
+
+test('卡片堆叠：持久 DOM 含主卡、两张装饰底牌与两视图，折叠态不换节点', () => {
+  const { S, els, run } = loadToday();
+  run('renderTasks()');
+  const deck = els.taskWrap.children.find((c) => c.dataset && 'fold' in c.dataset);
+  assert.ok(deck, '存在持久 .deck 容器');
+  assert.equal(deck.dataset.fold, '0', '初始为展开态');
+  const walk = (nodes) => nodes.flatMap((n) => [n, ...walk(n.children || [])]);
+  const all = walk([deck]);
+  const mains = all.filter((n) => n.classList.contains('main') && n.classList.contains('card'));
+  assert.equal(mains.length, 1, '只有一个持久主卡节点');
+  const backs = all.filter((n) => n.classList.contains('deck-l'));
+  assert.equal(backs.length, 2, '两张装饰底牌常驻');
+  assert.ok(backs.every((n) => n.children.length === 0), '装饰底牌不含业务内容');
+  assert.ok(all.some((n) => n.classList.contains('deck-peek')), '折叠提示视图常驻 DOM');
+  assert.ok(all.some((n) => n.classList.contains('card-body')), '展开内容视图常驻 DOM');
+  assert.equal(S.settings.tasksFold, false);
 });
 
 test('卡片堆叠：移动端取消重叠，prefers-reduced-motion 关闭动画', () => {
   const css = fs.readFileSync(path.join(APP, 'today.css'), 'utf8');
   assert.ok(/@media\(max-width:640px\)\{[\s\S]*?\.deck-l\{display:none\}/.test(css), '移动端隐藏堆叠层');
   assert.ok(/@media\(prefers-reduced-motion:reduce\)\{[\s\S]*?animation:none/.test(css), '减少动态效果时关闭动画');
+});
+
+test('卡片堆叠：运行时双向插值——起点取当前帧、终点取目标静态、结束 cancel', () => {
+  const src = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
+  const start = src.indexOf('var DECK_MS = 400;');
+  const end = src.indexOf('function unfoldTasks()', start);
+  const machine = src.slice(start, end);
+
+  const anims = [];
+  let cancels = 0;
+  const makeNode = (name) => ({
+    name,
+    animate(frames, opt) {
+      anims.push({ name, from: frames[0], to: frames[1], opt });
+      return { finished: Promise.resolve(), cancel() { cancels++; } };
+    },
+  });
+  const l1 = makeNode('l1'), body = makeNode('body');
+  const deck = {
+    dataset: { fold: '0' },
+    querySelectorAll: () => [l1, body], // 两个节点足够验证插值
+  };
+  // computed 随 data-fold 变化，模拟 CSS 规则；中间帧用 animate 桩覆盖
+  const staticFor = (n) => deck.dataset.fold === '1'
+    ? { transform: 'matrix(.96,0,0,.96,0,-12)', opacity: '0.7', height: '40px' }
+    : { transform: 'none', opacity: '1', height: '100px' };
+  const ctx = {
+    console, DECK_MS: 400, DECK_EASE: 'cubic-bezier(.22,1,.36,1)',
+    DECK_ANIM_PROPS: ['transform', 'opacity', 'height'],
+    getComputedStyle: () => staticFor(),
+    Element: { prototype: { animate() {} } },
+    S: { settings: { tasksFold: false } }, save() {},
+    document: { getElementById: () => ({ textContent: '' }) },
+  };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(machine + '\n$ = function(){ return globalThis.wrap; };', ctx);
+  ctx.wrap = { querySelector: () => deck };
+
+  vm.runInContext('setDeckFold(true)', ctx);
+  assert.equal(deck.dataset.fold, '1', '状态切到折叠');
+  assert.equal(ctx.S.settings.tasksFold, true, '业务状态同步');
+  assert.equal(anims.length, 2, '两节点都参与插值');
+  assert.equal(anims[0].from.opacity, '1', '起点 = 旧静态（展开）');
+  assert.equal(anims[0].to.opacity, '0.7', '终点 = 新静态（折叠第二层）');
+  assert.equal(anims[0].opt.duration, 400);
+  assert.equal(anims[0].opt.easing, 'cubic-bezier(.22,1,.36,1)');
+  assert.equal(anims[0].opt.fill, 'both');
+
+  // 动画中途反向：current 被 animate 覆盖为新值，起点必须来自该中间帧而非旧静态
+  const mid = { transform: 'matrix(.98,0,0,.98,0,-6)', opacity: '0.85', height: '70px' };
+  ctx.getComputedStyle = () => mid;
+  vm.runInContext('setDeckFold(false)', ctx);
+  assert.equal(deck.dataset.fold, '0', '反向切回展开');
+  assert.equal(anims.length, 4, '第二段动画启动');
+  assert.equal(anims[2].from.opacity, '0.85', '反向起点 = 动画中间帧，不瞬移');
+  assert.equal(anims[2].to.opacity, '0.85', '桩 computed 固定时终点等于当前（真实浏览器按 data-fold 变化）');
+  assert.ok(cancels >= 2, '旧动画在切状态前被取消');
 });

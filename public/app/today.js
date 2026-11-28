@@ -86,46 +86,9 @@ function renderTasks(){
   }
   $('toggleDone').textContent = S.settings.showDone ? '隐藏已完成' : '显示已完成';
 
-  // 折叠：三张卡叠成一摞，只露顶边，点一下展开
-  if(S.settings.tasksFold && total){
-    box.appendChild(buildTaskDeck(t0));
-    return;
-  }
-
-  var due = buildDuePlanGroup();
-  if(due){
-    var dueCard = el('div','card tcard');
-    dueCard.dataset.cat = 'due';
-    dueCard.appendChild(due);
-    box.appendChild(dueCard);
-  }
-  box.appendChild(buildTaskCard('today', t0));
-
-  if(pluginOn('tags')){
-    var tagCard = el('div','card tagcard');
-    tagCard.appendChild(buildTagFoot());
-    box.appendChild(tagCard);
-  }
-
-  // 刚从牌堆展开：卡片沿 Z 轴从堆叠位落回原位（400ms 缓出）
-  if(justUnfolded){
-    justUnfolded = false;
-    var dealt = box.querySelectorAll('.tcard, .tagcard');
-    for(var i = 0; i < dealt.length; i++){
-      (function(el2, i){
-        if(deckCanAnimate()){
-          var a = el2.animate([
-            { transform: deckTransform(i), opacity: deckOpacity(i) },
-            { transform: 'none', opacity: 1 }
-          ], { duration: DECK_MS, delay: i * 35, easing: DECK_EASE, fill: 'backwards' });
-          a.onfinish = function(){ a.cancel(); };
-        }else{
-          el2.classList.add('deal');
-          el2.style.animationDelay = (i * 55) + 'ms';
-        }
-      })(dealt[i], i);
-    }
-  }
+  /* 折叠态与展开态共用同一批节点：这里只按当前状态生成静态结构，
+     折叠/展开动作本身不再重建 DOM，改由 setDeckFold 做双向插值。 */
+  box.appendChild(buildTaskDeck(t0));
 }
 
 /* 一个分类 = 一张卡 */
@@ -213,46 +176,106 @@ function buildTaskRow(t, cat){
   return row;
 }
 
-/* 折叠态：一张汇总卡 + 后面两层真实卡片（stylekit card-stack 公式） */
-var justUnfolded = false;
-function buildTaskDeck(t0){
-  var deck = el('div','deck');
-  deck.appendChild(el('div','deck-l l2'));
-  deck.appendChild(el('div','deck-l l1'));
-  var card = el('div','card tcard top');
-  card.dataset.action = 'deck-open';
-  var list = tasksOf('today', t0);
-  var head = el('div','th');
-  head.appendChild(el('div','th-n', U('today.card.tasks')));
-  var dn = list.filter(function(t){ return isDone(t, t0); }).length;
-  head.appendChild(el('div','th-c', list.length ? dn + '/' + list.length : ''));
-  card.appendChild(head);
-  card.appendChild(el('div','empty',U('today.empty.tasksExpand')));
-  deck.appendChild(card);
-  return deck;
-}
-function unfoldTasks(){
-  S.settings.tasksFold = false;
-  justUnfolded = true;
-  save();
-  renderTasks();
-}
-
-/* 卡片堆叠：收拢 / 摊开共用一套 Z 轴参数，与 today.css 的 .deck-l.l1/.l2 一致 */
+/* 卡片堆叠：展开态与折叠态共用同一批持久节点。
+   .deck[data-fold] 同时承载两种静态视觉（层参数只写在 today.css，避免两套来源竞争）；
+   切换只改状态 + 用 WAAPI 从当前视觉值插值到目标静态值，不再销毁 DOM 重建。 */
 var DECK_MS = 400;
 var DECK_EASE = 'cubic-bezier(.22,1,.36,1)';
-var DECK_LAYERS = [
-  { y: 0,   s: 1,   o: 1   },  /* 顶层 */
-  { y: -12, s: .96, o: .7  },  /* 第二层：向上 12px */
-  { y: -24, s: .92, o: .4  }   /* 第三层：向上 24px */
-];
-function deckLayer(i){ return DECK_LAYERS[Math.min(i, DECK_LAYERS.length - 1)]; }
-function deckTransform(i){ var L = deckLayer(i); return 'translateY(' + L.y + 'px) scale(' + L.s + ')'; }
-function deckOpacity(i){ return deckLayer(i).o; }
+var DECK_ANIM_PROPS = ['transform','opacity','height','paddingTop','paddingBottom','marginTop','borderTopWidth','borderBottomWidth'];
 function deckCanAnimate(){
   return !!(window.Element && Element.prototype.animate) &&
     !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
+
+/* 持久 DOM：主卡 + 两张装饰底牌始终存在，内容视图用 opacity/height 切换 */
+function buildTaskDeck(t0){
+  var deck = el('div','deck');
+  deck.dataset.fold = S.settings.tasksFold ? '1' : '0';
+  deck.appendChild(deckBackCard('l2'));
+  deck.appendChild(deckBackCard('l1'));
+
+  var stage = el('div','deck-stage');
+  var due = buildDuePlanGroup();
+  if(due){
+    var dueCard = el('div','card tcard');
+    dueCard.dataset.cat = 'due';
+    dueCard.appendChild(due);
+    stage.appendChild(dueCard);
+  }
+
+  /* 主卡：折叠态只显示 .deck-peek，展开态只显示 .card-body；两视图常驻同一节点 */
+  var main = buildTaskCard('today', t0);
+  main.classList.add('main');
+  main.dataset.action = 'deck-open';
+  var body = el('div','card-body');
+  var head = main.firstChild;
+  Array.prototype.slice.call(main.children).forEach(function(ch){
+    if(ch !== head) body.appendChild(ch);
+  });
+  main.appendChild(body);
+  var peek = el('div','deck-peek');
+  peek.appendChild(el('div','deck-peek-in', U('today.empty.tasksExpand')));
+  main.appendChild(peek);
+
+  stage.appendChild(main);
+  if(pluginOn('tags')){
+    var tagCard = el('div','card tagcard');
+    tagCard.appendChild(buildTagFoot());
+    stage.appendChild(tagCard);
+  }
+  deck.appendChild(stage);
+  return deck;
+}
+function deckBackCard(k){
+  var d = el('div','deck-l ' + k);
+  d.setAttribute('aria-hidden','true');
+  return d;
+}
+
+/* 双向状态切换：
+   1) 在改状态前快照当前视觉值（含被中断动画的中间帧）；
+   2) 取消旧动画（cancel 后回到当前 data-fold 的 CSS 静态，视觉不变）；
+   3) 切 data-fold，让 CSS 成为唯一目标状态；
+   4) WAAPI 从快照插值到新 CSS 静态，末帧 cancel 后与静态完全一致。 */
+var deckAnims = null;
+function deckVisual(n){
+  var cs = getComputedStyle(n), v = {};
+  DECK_ANIM_PROPS.forEach(function(p){ v[p] = cs[p]; });
+  return v;
+}
+function setDeckFold(toFold){
+  var box = $('taskWrap');
+  var deck = box && box.querySelector('.deck');
+  if(!deck) return;
+  var want = toFold ? '1' : '0';
+  if(deck.dataset.fold === want) return;
+
+  var nodes = [].slice.call(deck.querySelectorAll('.deck-l.l1, .deck-l.l2, .deck-stage > .card, .card-body, .deck-peek'));
+  var before = nodes.map(deckVisual);
+
+  if(deckAnims){ deckAnims.forEach(function(a){ a.cancel(); }); deckAnims = null; }
+
+  deck.dataset.fold = want;
+  S.settings.tasksFold = toFold;
+  save();
+  var foldEl = $('foldTasks');
+  if(foldEl) foldEl.textContent = toFold ? '展开 ▾' : '收起 ▴';
+
+  if(!deckCanAnimate()) return;
+
+  var after = nodes.map(deckVisual);
+  deckAnims = nodes.map(function(n, i){
+    return n.animate([before[i], after[i]], { duration: DECK_MS, easing: DECK_EASE, fill: 'both' });
+  });
+  var last = deckAnims[deckAnims.length - 1];
+  var settle = function(){
+    if(deckAnims){ deckAnims.forEach(function(a){ a.cancel(); }); deckAnims = null; }
+  };
+  if(last && last.finished && typeof last.finished.then === 'function') last.finished.then(settle, settle);
+  else if(last) last.onfinish = settle;
+  else settle();
+}
+function unfoldTasks(){ setDeckFold(false); }
 
 /* 重算某张卡的计数和全勾按钮 */
 function syncGroupHead(card){
@@ -400,37 +423,8 @@ function toggleDoneFilter(){
   renderTasks();
 }
 function toggleTasksFold(){
-  if(S.settings.tasksFold){ unfoldTasks(); return; }
-  var box = $('taskWrap');
-  var cards = [];
-  box.querySelectorAll('.tcard, .tagcard').forEach(function(c){ cards.push(c); });
-  S.settings.tasksFold = true;
-  save();
-  if(deckCanAnimate() && cards.length){
-    /* 收拢：卡片沿 Z 轴重排到堆叠位；最后一张结束时才重建 DOM，
-       时长由动画完成事件决定，不再用硬编码 setTimeout。 */
-    var anims = [];
-    cards.forEach(function(c, i){
-      c.style.zIndex = String(20 - i);
-      c.style.position = 'relative';
-      anims.push(c.animate([
-        { transform:'none', opacity:1 },
-        { transform:deckTransform(i), opacity:deckOpacity(i) }
-      ], { duration:DECK_MS, delay:i * 35, easing:DECK_EASE, fill:'forwards' }));
-    });
-    var settle = function(){
-      anims.forEach(function(a){ a.cancel(); });
-      renderTasks();
-    };
-    var last = anims[anims.length - 1];
-    if(last.finished && typeof last.finished.then === 'function'){
-      last.finished.then(settle, settle);
-    }else{
-      last.onfinish = settle;
-    }
-  }else{
-    renderTasks();
-  }
+  /* 收拢 / 展开走同一套双向状态机，不因方向不同而重建 DOM */
+  setDeckFold(!S.settings.tasksFold);
   var sec = $('toggleDone').closest('.sec');
   if(sec) window.scrollTo({ top: sec.getBoundingClientRect().top + window.scrollY - 8, behavior:'smooth' });
 }

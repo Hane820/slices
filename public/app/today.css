@@ -62,49 +62,67 @@
   color:var(--ink3);font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0;
 }
 
-/* ---------- 折叠：今日待办沿 Z 轴叠成一摞（card-stack 公式） ----------
-   三张卡同色、16px 圆角、一级阴影；只靠 transform 分层：
-   后置层向上 12/24px、缩放 .96/.92、不透明度 .7/.4。
-   切换只过渡 transform 与 opacity，400ms cubic-bezier(.22,1,.36,1)。 */
+/* ---------- 折叠：今日待办沿 Z 轴叠成一摞（card-stack） ----------
+   三层同色白卡、16px 圆角、无旋转；只靠 transform / opacity 分层：
+   主卡 0/1/1 · 第二层 -12px/.96/.7 · 第三层 -24px/.92/.4。
+   静态状态由 .deck[data-fold] 定义；动画末帧与之逐项一致，
+   统一 400ms cubic-bezier(.22,1,.36,1)，展开/收拢是同一批节点的双向插值。 */
 .deck{
   --deck-ease:cubic-bezier(.22,1,.36,1);
-  position:relative;cursor:pointer;margin-bottom:16px;
+  --deck-ms:400ms;
+  position:relative;margin-bottom:16px;
   padding-top:48px; /* 为向上偏移的后置层预留 48px */
 }
 .deck-l{
   position:absolute;top:48px;bottom:0;left:0;right:0;
-  background:var(--paper);border:1px solid var(--line);border-radius:16px;
-  box-shadow:0 8px 20px rgba(57,45,39,.08);
+  background:#ffffff;border:1px solid var(--line);border-radius:16px;
+  box-shadow:0 8px 20px rgba(26,26,46,.08);
   transform-origin:50% 0;pointer-events:none;
-  transition:transform .4s var(--deck-ease),opacity .4s var(--deck-ease);
+  transform:translateY(0) scale(1);opacity:0;
+  will-change:transform,opacity;
 }
-.deck-l.l1{transform:translateY(-12px) scale(.96);opacity:.7}
-.deck-l.l2{transform:translateY(-24px) scale(.92);opacity:.4}
-@media(hover:hover){
-  .deck:hover .deck-l.l1{transform:translateY(-12px) scale(.96) translateX(4px)}
-  .deck:hover .deck-l.l2{transform:translateY(-24px) scale(.92) translateX(8px)}
-}
-.deck .top{position:relative;z-index:2;box-shadow:0 18px 40px rgba(57,45,39,.12)}
-.deck .top:active{transform:scale(.99)}
-.deck .top .th{cursor:default}
-.deck .top .th + .th{border-top:1px solid var(--line2)}
+.deck-l.l1{z-index:1}
+.deck-l.l2{z-index:0}
+.deck[data-fold="1"] .deck-l.l1{transform:translateY(-12px) scale(.96);opacity:.7}
+.deck[data-fold="1"] .deck-l.l2{transform:translateY(-24px) scale(.92);opacity:.4}
 
-/* 展开：卡片沿 Z 轴从堆叠位落回原位（400ms 缓出） */
+.deck-stage{position:relative;z-index:2}
+.deck-stage > .card{
+  background:#ffffff;border-radius:16px;
+  box-shadow:0 18px 40px rgba(26,26,46,.12);
+}
+/* 折叠态：其余真实卡收进主卡位置并折叠高度，只有主卡（第一层）完整显示 */
+.deck[data-fold="1"] .deck-stage > .card:not(.main){
+  pointer-events:none;transform:translateY(-12px) scale(.96);opacity:0;
+  height:0;min-height:0;margin-top:0;padding-top:0;padding-bottom:0;
+  border-top-width:0;border-bottom-width:0;overflow:hidden;
+}
+.deck[data-fold="1"] .deck-stage > .main .th{cursor:default}
+
+/* 主卡的两种内容视图始终是同一批节点，只切高度/透明度，不重建 DOM */
+.deck-peek,.card-body{overflow:hidden;will-change:height,opacity,transform}
+.deck-peek{height:0;opacity:0;transform:translateY(-8px)}
+.deck[data-fold="1"] .deck-peek{height:auto;opacity:1;transform:none}
+.deck-peek-in{padding:9px 0 13px;color:var(--ink3);font-size:12px;line-height:1.6}
+.card-body{height:auto;opacity:1;transform:none}
+.deck[data-fold="1"] .card-body{height:0;opacity:0;transform:translateY(-8px)}
+
+/* 不支持 Web Animations 时的兜底入场；静态状态仍由 data-fold 决定 */
 .tcard.deal,.tagcard.deal{animation:dealIn .4s cubic-bezier(.22,1,.36,1) both}
 @keyframes dealIn{
   from{opacity:.4;transform:translateY(-24px) scale(.92)}
   to{opacity:1;transform:none}
 }
 
-/* 移动端不保留重叠：只显示单卡，取消后置层与悬停摊开 */
+/* 移动端不保留重叠：只显示单卡，取消后置层 */
 @media(max-width:640px){
   .deck{padding-top:0;margin-bottom:8px}
   .deck-l{display:none}
+  .deck[data-fold="1"] .deck-stage > .card:not(.main){display:none}
 }
 
-/* 尊重减少动态效果偏好：层级照常显示，不做位移/缩放动画 */
+/* 尊重减少动态效果偏好：层级照常显示，跳过非必要动画 */
 @media(prefers-reduced-motion:reduce){
-  .deck-l{transition:none}
   .tcard.deal,.tagcard.deal{animation:none}
 }
 
@@ -178,7 +196,7 @@
 .pd-x{border:none;background:transparent;color:var(--ink3);font-size:14px;cursor:pointer;font-family:inherit;padding:0 2px;opacity:.6}
 
 @media(max-width:360px){
-  .hd-hi{font-size:calc(24px * var(--ui-scale))}
+  .hd-hi{font-size:calc(18px * var(--ui-scale))}
   .goal-v{font-size:19px}
 }
 
