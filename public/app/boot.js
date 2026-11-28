@@ -23,8 +23,6 @@ var itemAddEl = $('itemAdd');
 if(itemAddEl) itemAddEl.addEventListener('click', itemAddLog);
 var itemCurEl = $('itemCur');
 if(itemCurEl) itemCurEl.addEventListener('click', openItemPicker);
-$('writeNote').addEventListener('click', function(){ openNote(TODAY()); });
-$('goRecords').addEventListener('click', function(){ showPage('pRecords'); });
 
 // 灵光一闪：输入停顿后自动存
 (function(){

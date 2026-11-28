@@ -325,7 +325,6 @@ function tagQuick(b){
   var r = b.getBoundingClientRect();
   floatText('+1', r.left + r.width/2, r.top - 2);
   buzz();
-  renderRecent();
 }
 
 function toggleTask(t, row){
@@ -873,7 +872,7 @@ function togglePlanDone(p){
   p.done = !p.done;
   if(p.done){ p.doneAt = TODAY(); p.doneTime = nowHHMM(); } else { delete p.doneAt; delete p.doneTime; }
   save(function(){ toastCfg(p.done ? 'planDone' : 'planUndone'); });
-  renderPlan(); renderTasks(); renderRecent(); renderRemind();
+  renderPlan(); renderTasks(); renderRemind();
 }
 function openPlanEdit(p){
   var body = openSheet(
@@ -1100,45 +1099,7 @@ function openStudy(itemId){
   });
 }
 
-function openNote(dateKey){
-  var d = parse(dateKey);
-  var isToday = dateKey === TODAY();
-  openLogSheet({
-    title: isToday ? '今天的手账' : (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日的手账',
-    sub: '两三句话就够，不用写得完整。',
-    date: dateKey, time: null, minutes: false, lockDate: true,
-    note: S.notes[dateKey] || '', noteArea: true, noteLabel: '今天怎么样了',
-    notePlaceholder: '今天怎么样了？', okText: '记下',
-    onSave: function(dt){
-      if(dt.note) S.notes[dateKey] = dt.note; else delete S.notes[dateKey];
-      save(function(){ toastCfg(dt.note ? 'noteSaved' : 'noteCleared'); }); closeSheet(); renderGoals(); renderRemind();
-      if(currentPage === 'pRecords') renderRecords();
-    }
-  });
-}
-
 /* ==================== 今日汇总渲染 ==================== */
-var recentCount = 3;
-function renderRecent(){
-  var box = $('recentWrap');
-  box.innerHTML = '';
-  var dates = allRecordDates().slice(0, 3);
-  if(!dates.length){
-    box.appendChild(el('div','empty',U('today.empty.recordsEmpty')));
-    return;
-  }
-  dates.forEach(function(k){
-    var d = parse(k);
-    var r = dayRecord(k);
-    var row = el('div','rec');
-    row.appendChild(el('div','rec-d', (d.getMonth()+1) + '/' + d.getDate()));
-    var bits = recordSummary(r);
-    row.appendChild(el('div','rec-t', bits.length ? bits.join(' · ') : '还没有内容'));
-    row.addEventListener('click', function(){ openDayDetail(k); });
-    box.appendChild(row);
-  });
-}
-
 function renderToday(){
   renderHeader();
   renderRemind();
@@ -1146,7 +1107,6 @@ function renderToday(){
   renderGoals();
   renderSchedule();
   renderFlashes();
-  renderRecent();
 }
 
 /* ==================== 标签速记（今日页） ==================== */
@@ -1169,7 +1129,7 @@ function openTagsSheet(){
       b.addEventListener('click', function(){
         S.tagLogs.push({ id: uid('l'), tagId: t.id, date: t0, ts: Date.now() });
         cnt[t.id] = (cnt[t.id]||0)+1;
-        save(); draw(); renderRecent();
+        save(); draw();
         var r = b.getBoundingClientRect();
         floatText('+1', r.left + r.width/2, r.top - 4);
       });

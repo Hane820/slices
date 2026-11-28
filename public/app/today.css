@@ -1,4 +1,4 @@
-/* today.css — 今日页：提醒条 / 待办 / 今日重点 / 灵光一闪 / 日程 / 最近 / 计划 */
+/* today.css — 今日页：提醒条 / 待办 / 今日重点 / 随手记 / 日程 / 计划 */
 /* ---------- 提醒条 ---------- */
 .remind{
   margin:0 18px 4px;background:var(--paper2);border-left:3px solid var(--clay);
@@ -162,12 +162,6 @@
 .sch.next .sch-time{color:var(--sage-d);font-weight:600}
 .sch.next .sch-t{color:var(--sage-d);font-weight:600}
 .now-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--sage);margin-right:5px;vertical-align:1px}
-
-/* ---------- 最近 ---------- */
-.rec{display:flex;gap:10px;padding:10px 0;cursor:pointer}
-.rec+.rec{border-top:1px solid var(--line2)}
-.rec-d{font-size:11.5px;color:var(--ink3);flex:0 0 46px;font-variant-numeric:tabular-nums;padding-top:1px}
-.rec-t{flex:1;font-size:12.5px;color:var(--ink2);line-height:1.55;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* ---------- 接下来 / 计划 / 倒计时 ---------- */
 .up-row{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer}

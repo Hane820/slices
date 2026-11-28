@@ -12,10 +12,7 @@
     'today.action.hideDone': '隐藏已完成',
     'today.section.focus': '今日重点',
     'today.section.schedule': '今天的安排',
-    'today.section.recent': '最近',
-    'today.action.writeNote': '写手账',
-    'today.action.allRecords': '全部记录',
-    'today.section.flash': '灵光一闪',
+    'today.section.flash': '随手记',
     'today.hint.flash': '随手写，松手自动存',
     'today.action.saveFlash': '记下来',
   });
@@ -31,6 +28,5 @@
     'today.card.tasks': '待办事项',
     'today.empty.tasks': '还没有待办，点下面加一条。',
     'today.placeholder.task': '要做什么',
-    'today.empty.recordsEmpty': '还没有记录。勾掉一条待办，这里就有痕迹了。',
   });
 })();
