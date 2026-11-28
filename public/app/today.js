@@ -1,40 +1,30 @@
 /* today.js — 今日：提醒/待办/重点/计划/日程/学习/汇总/标签速记 */
-/* ==================== 今日：提醒 ==================== */
-function minutesWorkout(date){
-  return sum(S.workouts.filter(function(w){ return w.date === date; }).map(function(w){ return w.minutes || 0; }));
-}
+/* ==================== 今日：提醒 ====================
+   提醒内容来自计划安排（S.plans）：当天及以前到期、尚未完成的计划。
+   不读健身/学习统计、不混入普通待办；无符合条件的计划时整个区域不渲染。 */
 function minutesStudy(date){
   return sum(S.studyLogs.filter(function(l){ return l.date === date; }).map(function(l){ return l.minutes || 0; }));
 }
+function duePlansToday(){
+  var t0 = TODAY();
+  return planSorted().filter(function(p){ return !p.done && p.date <= t0; });
+}
 function renderRemind(){
   var box = $('remindWrap');
+  if(!box) return;
   box.innerHTML = '';
-  if(!S.settings.remind) return;
   var t0 = TODAY();
   if(S.restDays.indexOf(t0) >= 0) return;
   if(S.settings.remindDismissed === t0) return;
-
-  var g = S.settings.goals;
-  var lines = [];
-  var wm = minutesWorkout(t0);
-  if(wm < (g.trainMin || 0) && (g.trainMin || 0) > 0){
-    lines.push({ t:'今天还没有健身记录，要不要安排 ' + g.trainMin + ' 分钟？', a:'去记录', act:'gym' });
-  }
-  if((g.studyMin || 0) > 0 && minutesStudy(t0) < g.studyMin){
-    lines.push({ t:'今天学了 ' + minutesStudy(t0) + ' 分钟，离 ' + g.studyMin + ' 还差一点。', a:'加时间', act:'study' });
-  }
-  if(!lines.length) return;
+  var list = duePlansToday();
+  if(!list.length) return;
 
   var wrap = el('div','remind');
-  lines.slice(0,2).forEach(function(l){
+  list.slice(0,2).forEach(function(p){
     var row = el('div','remind-line');
-    var sp = el('span', null, l.t);
-    var a = el('button','remind-act', l.a);
-    a.addEventListener('click', function(){
-      if(l.act === 'gym') openWorkout(null);
-      if(l.act === 'study') openStudy();
-      if(l.act === 'note') openNote(t0);
-    });
+    var sp = el('span', null, U('today.remind.planPrefix') + p.title);
+    var a = el('button','remind-act', U('today.action.goPlanShort'));
+    a.addEventListener('click', openPlanView);
     row.appendChild(sp); row.appendChild(a);
     wrap.appendChild(row);
   });
@@ -64,7 +54,8 @@ function taskVisible(t, t0){
 }
 function tasksOf(cat, t0){
   return S.tasks.filter(function(t){
-    return t.cat === cat && taskVisible(t, t0) && !isSkipped(t, t0);
+    /* 'today' = 合并视图：旧分类字段原样保留，只是不再分开展示 */
+    return (cat === 'today' || t.cat === cat) && taskVisible(t, t0) && !isSkipped(t, t0);
   });
 }
 function dueText(t){
@@ -108,9 +99,7 @@ function renderTasks(){
     dueCard.appendChild(due);
     box.appendChild(dueCard);
   }
-  [CAT_MUST, CAT_WANT, CAT_ROUTINE].forEach(function(cat){
-    box.appendChild(buildTaskCard(cat, t0));
-  });
+  box.appendChild(buildTaskCard('today', t0));
 
   if(pluginOn('tags')){
     var tagCard = el('div','card tagcard');
@@ -148,7 +137,7 @@ function buildTaskCard(cat, t0){
   var list = tasksOf(cat, t0);
 
   var head = el('div','th');
-  head.appendChild(el('div','th-n', CAT_LABEL[cat]));
+  head.appendChild(el('div','th-n', cat === 'today' ? U('today.card.tasks') : CAT_LABEL[cat]));
   var doneN = list.filter(function(t){ return isDone(t, t0); }).length;
   head.appendChild(el('div','th-c', list.length ? doneN + '/' + list.length : ''));
   var all = el('button','allbtn' + (list.length && doneN === list.length ? ' on' : ''));
@@ -159,8 +148,8 @@ function buildTaskCard(cat, t0){
 
   var shown = list.filter(function(t){ return S.settings.showDone || !isDone(t, t0); });
   if(!shown.length){
-    var hint = '这一组都做完了';
-    if(!list.length){
+    var hint = cat === 'today' ? U('today.empty.tasks') : '这一组都做完了';
+    if(!list.length && cat !== 'today'){
       hint = cat === CAT_MUST ? '没有赶时间的事' : (cat === CAT_WANT ? '今天还没想好要做什么' : '还没有每天要做的事');
     }
     card.appendChild(el('div','empty', hint));
@@ -184,8 +173,8 @@ function buildInlineAdd(st){
   inp.type = 'text';
   inp.maxLength = 30;
   inp.value = st.value || '';
-  inp.placeholder = st.cat === CAT_ROUTINE ? '每天要做的事' : '要做什么';
-  var ok = el('button','ok',OLT('加上'));
+  inp.placeholder = U('today.placeholder.task');
+  var ok = el('button','ok',U('common.action.add'));
   ok.dataset.action = 'add-ok';
   var no = el('button','no','×');
   no.dataset.action = 'add-cancel';
@@ -205,7 +194,7 @@ function buildTaskRow(t, cat){
   main.appendChild(el('div','task-t', t.title));
 
   var metaBits = [];
-  if(t.due && cat === CAT_MUST) metaBits.push({ txt: dueText(t), cls:'due' });
+  if(t.due) metaBits.push({ txt: dueText(t), cls:'due' });
   if(cat === CAT_ROUTINE && t.repeat === 'daily') metaBits.push({ txt:'每天', cls:'' });
   if(t.duration) metaBits.push({ txt: durText(t.duration), cls:'' });
   if(t.note) metaBits.push({ txt: t.note, cls:'' });
@@ -234,16 +223,13 @@ function buildTaskDeck(t0){
   deck.appendChild(el('div','deck-l l1'));
   var card = el('div','card tcard top');
   card.dataset.action = 'deck-open';
-  var visible = S.tasks.filter(function(t){ return taskVisible(t, t0) && !isSkipped(t, t0); });
-  [CAT_MUST, CAT_WANT, CAT_ROUTINE].forEach(function(cat){
-    var list = visible.filter(function(t){ return t.cat === cat; });
-    var head = el('div','th');
-    head.appendChild(el('div','th-n', CAT_LABEL[cat]));
-    var dn = list.filter(function(t){ return isDone(t, t0); }).length;
-    head.appendChild(el('div','th-c', list.length ? dn + '/' + list.length : ''));
-    card.appendChild(head);
-  });
-  card.appendChild(el('div','empty',OLT('点一下展开，回到今天的事')));
+  var list = tasksOf('today', t0);
+  var head = el('div','th');
+  head.appendChild(el('div','th-n', U('today.card.tasks')));
+  var dn = list.filter(function(t){ return isDone(t, t0); }).length;
+  head.appendChild(el('div','th-c', list.length ? dn + '/' + list.length : ''));
+  card.appendChild(head);
+  card.appendChild(el('div','empty',U('today.empty.tasksExpand')));
   deck.appendChild(card);
   return deck;
 }
@@ -279,7 +265,7 @@ function syncGroupHead(card){
 function buildTagFoot(){
   var t0 = TODAY();
   var foot = el('div','tagfoot');
-  foot.appendChild(el('div','tf-l',OLT('标签')));
+  foot.appendChild(el('div','tf-l',U('common.noun.tag')));
 
   var counts = {};
   S.tagLogs.forEach(function(l){ if(l.date === t0) counts[l.tagId] = (counts[l.tagId]||0)+1; });
@@ -379,12 +365,13 @@ function commitInline(){
   if(!st) return;
   var v = String(st.value || '').trim();
   if(v){
+    var cat = st.cat === 'today' ? CAT_WANT : st.cat;
     S.tasks.push({
-      id: uid('t'), title:v, cat:st.cat,
-      repeat: st.cat === CAT_ROUTINE ? 'daily' : 'once',
+      id: uid('t'), title:v, cat:cat,
+      repeat: cat === CAT_ROUTINE ? 'daily' : 'once',
       due:'', duration:0, done:{}, createdAt: Date.now()
     });
-    save(function(){ toastCfg(st.cat === CAT_ROUTINE ? 'taskAddedRoutine' : 'taskAddedTodayList'); });
+    save(function(){ toastCfg(cat === CAT_ROUTINE ? 'taskAddedRoutine' : 'taskAddedTodayList'); });
   }
   /* 加完留一个空输入行，连着加第二条第三条；不再靠 DOM 残留来「保持焦点」 */
   taskUI.inline = { cat:st.cat, value:'' };
@@ -447,8 +434,6 @@ function onAppClick(e){
   var a = hit.dataset.action, t, p, card, row;
 
   switch(a){
-    case 'go-decide':     showPage('pDecide'); return;
-    case 'go-eat':        showPage('pDecide'); if(typeof switchDecideTab === 'function') switchDecideTab('eat'); return;
     case 'go-home':       showPage('pToday'); return;
     case 'scene-full':    chooseScene(hit.dataset.k); return;
     case 'add-open':      openInline(hit.dataset.cat); return;
@@ -486,6 +471,7 @@ function onAppClick(e){
       t = byId(S.settings.focusItems, hit.dataset.iid);
       if(t) tapFocusItem(t, hit);
       return;
+    case 'lib-fold':      toggleLibFold(hit); return;
   }
 }
 /* 打字只改 state，不重渲染，光标不跳 */
@@ -567,10 +553,7 @@ function openTaskEdit(t){
   var body = openSheet(
     '<div class="shd"><div class="shd-t">编辑这条</div></div>' +
     '<div class="field"><div class="field-l">内容</div><input class="inp" id="teTitle" maxlength="30" value="' + esc(t.title) + '"></div>' +
-    '<div class="field"><div class="field-l">分类</div><select class="sel" id="teCat">' +
-      '<option value="must">必须处理</option><option value="want">今天想完成</option><option value="routine">每天重复</option>' +
-    '</select></div>' +
-    '<div class="field"><div class="field-l">截止日期（只有「必须处理」用得上）</div><input class="inp" id="teDue" type="date" value="' + esc(t.due || '') + '"></div>' +
+    '<div class="field"><div class="field-l">截止日期</div><input class="inp" id="teDue" type="date" value="' + esc(t.due || '') + '"></div>' +
     '<div class="field"><div class="field-l">专注时长</div><div class="dur-row">' +
       '<input class="inp" id="teMin" type="number" inputmode="numeric" min="0" max="599" value="' + durParts(t.duration).m + '"><span>分</span>' +
       '<input class="inp" id="teSec" type="number" inputmode="numeric" min="0" max="59" value="' + durParts(t.duration).s + '"><span>秒</span>' +
@@ -579,17 +562,15 @@ function openTaskEdit(t){
     '<div class="acts"><button class="btn g" id="teNo">取消</button><button class="btn p" id="teOk">保存</button></div>'
   );
   if(window.OLDatePicker) OLDatePicker.attach(body.querySelector('#teDue'), { allowEmpty: true });
-  body.querySelector('#teCat').value = t.cat;
   body.querySelector('#teNo').addEventListener('click', closeSheet);
   body.querySelector('#teOk').addEventListener('click', function(){
     var v = body.querySelector('#teTitle').value.trim();
     if(!v){ toastCfg('contentEmpty'); return; }
     t.title = v;
-    t.cat = body.querySelector('#teCat').value;
     t.due = body.querySelector('#teDue').value || '';
     t.duration = durFromInputs(body.querySelector('#teMin'), body.querySelector('#teSec'));
     t.note = body.querySelector('#teNote').value.trim();
-    if(t.cat !== CAT_ROUTINE && !t.repeat) t.repeat = 'once';
+    if(!t.repeat) t.repeat = t.cat === CAT_ROUTINE ? 'daily' : 'once';
     save(function(){ toastCfg('taskEdited'); }); closeSheet(); renderTasks();
   });
 }
@@ -616,7 +597,7 @@ function renderGoals(){
   box.innerHTML = '';
   var items = S.settings.focusItems || [];
   if(!items.length){
-    box.appendChild(el('div','empty',OLT('今日重点都删掉了，去设置里加一条。')));
+    box.appendChild(el('div','empty',U('today.empty.focusEmpty')));
     return;
   }
   items.forEach(function(it){
@@ -805,29 +786,6 @@ function openPlanView(){
   window.scrollTo(0, 0);
 }
 
-/* 首页「接下来」 */
-function renderUpcoming(){
-  var box = $('upcomingWrap');
-  if(!box) return;
-  box.innerHTML = '';
-  var t0 = TODAY();
-  var list = planSorted().filter(function(p){ return !p.done && p.date > t0; }).slice(0, 3);
-  if(!list.length){
-    var e = el('div','empty',OLT('后面还没定事情。晚上可以先把明天写下来。'));
-    e.addEventListener('click', openPlanView);
-    box.appendChild(e);
-    return;
-  }
-  list.forEach(function(p){
-    var row = el('div','up-row');
-    row.appendChild(el('div','up-d', countdownText(p.date)));
-    row.appendChild(el('div','up-t', p.title));
-    row.appendChild(el('div','up-a','›'));
-    row.addEventListener('click', openPlanView);
-    box.appendChild(row);
-  });
-}
-
 /* 计划页 */
 function renderPlan(){
   var q = $('planQuick');
@@ -849,7 +807,7 @@ function renderPlan(){
   var list = planSorted().filter(function(p){ return planShowDone || !p.done; });
   $('planToggleDone').textContent = planShowDone ? '隐藏已完成' : '显示已完成';
   if(!list.length){
-    box.appendChild(el('div','empty',OLT('还没有定过计划。选好日期，在下面输入一行就行。')));
+    box.appendChild(el('div','empty',U('today.empty.planEmpty')));
     return;
   }
   var byDate = {}, order = [];
@@ -880,7 +838,7 @@ function renderPlan(){
         ev.stopPropagation();
         confirmBox('删掉「' + p.title + '」？', '这条计划会消失。', function(){
           S.plans = S.plans.filter(function(y){ return y.id !== p.id; });
-          save(function(){ toastCfg('planDeleted'); }); renderPlan(); renderUpcoming(); renderTasks();
+          save(function(){ toastCfg('planDeleted'); }); renderPlan(); renderTasks(); renderRemind();
         });
       });
       row.appendChild(x);
@@ -901,13 +859,13 @@ function addPlan(){
   });
   save(function(){ toastCfg('planAdded', { date: countdownText(planDateDraft) }); });
   inp.value = '';
-  renderPlan(); renderUpcoming(); renderTasks();
+  renderPlan(); renderTasks(); renderRemind();
 }
 function togglePlanDone(p){
   p.done = !p.done;
   if(p.done){ p.doneAt = TODAY(); p.doneTime = nowHHMM(); } else { delete p.doneAt; delete p.doneTime; }
   save(function(){ toastCfg(p.done ? 'planDone' : 'planUndone'); });
-  renderPlan(); renderUpcoming(); renderTasks(); renderRecent();
+  renderPlan(); renderTasks(); renderRecent(); renderRemind();
 }
 function openPlanEdit(p){
   var body = openSheet(
@@ -923,7 +881,7 @@ function openPlanEdit(p){
   body.querySelector('#peDel').addEventListener('click', function(){
     confirmBox('删掉这条计划？', '找不回来了。', function(){
       S.plans = S.plans.filter(function(y){ return y.id !== p.id; });
-      save(function(){ toastCfg('planDeleted'); }); closeSheet(); renderPlan(); renderUpcoming(); renderTasks();
+      save(function(){ toastCfg('planDeleted'); }); closeSheet(); renderPlan(); renderTasks(); renderRemind();
     });
   });
   body.querySelector('#peOk').addEventListener('click', function(){
@@ -932,7 +890,7 @@ function openPlanEdit(p){
     p.date = body.querySelector('#peDate').value || p.date;
     p.title = t;
     p.note = body.querySelector('#peNote').value.trim();
-    save(function(){ toastCfg('planEdited'); }); closeSheet(); renderPlan(); renderUpcoming(); renderTasks();
+    save(function(){ toastCfg('planEdited'); }); closeSheet(); renderPlan(); renderTasks(); renderRemind();
   });
 }
 
@@ -943,7 +901,7 @@ function buildDuePlanGroup(){
   if(!list.length) return null;
   var group = el('div','tgroup');
   var head = el('div','th');
-  head.appendChild(el('div','th-n',OLT('今天到期')));
+  head.appendChild(el('div','th-n',U('today.label.dueToday')));
   head.appendChild(el('div','th-c', list.length + ' 件'));
   group.appendChild(head);
   list.forEach(function(p){
@@ -986,13 +944,13 @@ function openPlanActions(p){
   }
   row('推到明天', '不改内容，只换一天', function(){
     p.date = addDays(TODAY(), 1);
-    save(function(){ toastCfg('taskPostponed'); }); closeSheet(); renderTasks(); renderUpcoming(); renderPlan();
+    save(function(){ toastCfg('taskPostponed'); }); closeSheet(); renderTasks(); renderPlan(); renderRemind();
   });
   row('编辑', '改日期、内容和备注', function(){ closeSheet(); setTimeout(function(){ openPlanEdit(p); }, 180); });
   row('删除', '删掉之后找不回来', function(){
     confirmBox('删掉「' + p.title + '」？', '这条计划会消失。', function(){
       S.plans = S.plans.filter(function(y){ return y.id !== p.id; });
-      save(function(){ toastCfg('planDeleted'); }); closeSheet(); renderTasks(); renderUpcoming(); renderPlan();
+      save(function(){ toastCfg('planDeleted'); }); closeSheet(); renderTasks(); renderPlan(); renderRemind();
     });
   }, true);
 }
@@ -1158,7 +1116,7 @@ function renderRecent(){
   box.innerHTML = '';
   var dates = allRecordDates().slice(0, 3);
   if(!dates.length){
-    box.appendChild(el('div','empty',OLT('还没有记录。勾掉一条待办，这里就有痕迹了。')));
+    box.appendChild(el('div','empty',U('today.empty.recordsEmpty')));
     return;
   }
   dates.forEach(function(k){
@@ -1178,12 +1136,9 @@ function renderToday(){
   renderRemind();
   renderTasks();
   renderGoals();
-  renderUpcoming();
   renderSchedule();
   renderFlashes();
   renderRecent();
-  var eatSec = $('eatSec');
-  if(eatSec) eatSec.style.display = pluginOn('food') ? '' : 'none';
 }
 
 /* ==================== 标签速记（今日页） ==================== */
@@ -1212,7 +1167,7 @@ function openTagsSheet(){
       });
       row.appendChild(b);
     });
-    var add = el('button','chip ghost',OLT('+ 新标签'));
+    var add = el('button','chip ghost',U('common.action.newTag'));
     add.addEventListener('click', function(){
       openModal({
         title:'新建标签', sub:'', input:true, placeholder:'标签名', okText:'加上',

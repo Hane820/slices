@@ -9,7 +9,6 @@
     '+ 新标记': '+ 新标记',
     '一个 JSON 文件，包含全部记录': '一个 JSON 文件，包含全部记录',
     '不可恢复，请先导出': '不可恢复，请先导出',
-    '主题色': '主题色',
     '今天算休息日': '今天算休息日',
     '今日重点条目': '今日重点条目',
     '从备份恢复': '从备份恢复',
@@ -22,7 +21,6 @@
     '导出备份': '导出备份',
     '导出表格': '导出表格',
     '导出配置文件': '导出配置文件',
-    '打开应用就能看到，关掉应用不会弹系统通知': '打开应用就能看到，关掉应用不会弹系统通知',
     '把记录按日期排成一张表，Excel / WPS 能打开': '把记录按日期排成一张表，Excel / WPS 能打开',
     '拖到喜欢的大小就行，全 App 一起变': '拖到喜欢的大小就行，全 App 一起变',
     '月历 + 时间轴 + 小结，打印或存成 PDF': '月历 + 时间轴 + 小结，打印或存成 PDF',
@@ -30,11 +28,9 @@
     '清空全部数据': '清空全部数据',
     '点右上角「+ 新建」加一个': '点右上角「+ 新建」加一个',
     '笔 / 标签 / 决策库 / 偏好设置，不含日常记录，换设备导入用': '笔 / 标签 / 决策库 / 偏好设置，不含日常记录，换设备导入用',
-    '一套四层配色，点一个全局换色': '一套四层配色，点一个全局换色',
     '还没有情况': '还没有情况',
     '还没有条目，点右上角加一条。': '还没有条目，点右上角加一条。',
     '首页一行三张；「健身」「学习」是默认预设，可改可删': '首页一行三张；「健身」「学习」是默认预设，可改可删',
-    '首页提醒': '首页提醒',
     '＋ 加一条': '＋ 加一条',
   });
 
@@ -54,5 +50,33 @@
     'settings.section.space': '空间',
     'settings.section.data': '数据',
     'settings.hint.data': '数据只存在这个浏览器里。清缓存、换设备或误删都可能丢掉，建议偶尔导出一次备份。',
+  });
+
+  /* ===== 英文语义 key · 设置页（第二批迁移：JS 渲染文案；Auth 登录/空间/备份文案保留 OLT，待 Auth 批次统一处理） ===== */
+  T.register('settings', {
+    'settings.restday.title': '今天算休息日',
+    'settings.daycut.title': '几点算新的一天',
+    'settings.daycut.subtitle': '每天重复的清单在这个时间清零',
+    'settings.font.title': '字号',
+    'settings.font.subtitle': '拖到喜欢的大小就行，全 App 一起变',
+    'settings.data.exportPdf.title': '导出 PDF 记录',
+    'settings.data.exportPdf.subtitle': '月历 + 时间轴 + 小结，打印或存成 PDF',
+    'settings.data.exportBackup.title': '导出备份',
+    'settings.data.exportBackup.subtitle': '一个 JSON 文件，包含全部记录',
+    'settings.data.exportTable.title': '导出表格',
+    'settings.data.exportTable.subtitle': '把记录按日期排成一张表，Excel / WPS 能打开',
+    'settings.data.exportConfig.title': '导出配置文件',
+    'settings.data.exportConfig.subtitle': '笔 / 标签 / 决策库 / 偏好设置，不含日常记录，换设备导入用',
+    'settings.data.importConfig.title': '导入配置文件',
+    'settings.data.importConfig.subtitle': '先给你看预览和冲突，确认后才会写进来',
+    'settings.data.restoreBackup.title': '从备份恢复',
+    'settings.data.restoreBackup.subtitle': '会先给你看摘要，再决定合并还是替换',
+    'settings.data.clearAll.title': '清空全部数据',
+    'settings.data.clearAll.subtitle': '不可恢复，请先导出',
+    'settings.focus.title': '今日重点条目',
+    'settings.focus.subtitle': '首页一行三张；「健身」「学习」是默认预设，可改可删',
+    'settings.focus.addOne': '＋ 加一条',
+    'settings.focus.empty': '还没有条目，点右上角加一条。',
+
   });
 })();

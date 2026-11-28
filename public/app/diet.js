@@ -378,7 +378,7 @@ function renderDiet(){
       hist.appendChild(row);
     });
   } else if(dietState.histDate === today && hs.all.length){
-    hist.appendChild(el('div', 'diet-hist-more', OLT('今天的记录见上面「今日饮食」，同样可以编辑删除。')));
+    hist.appendChild(el('div', 'diet-hist-more', U('diet.hint.history')));
   }
   wrap.appendChild(hist);
   hist.addEventListener('click', function(e){

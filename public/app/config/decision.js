@@ -23,6 +23,27 @@
     '随机抽到': '随机抽到',
   });
 
+  /* ===== 英文语义 key · 决策页（第二批迁移：JS 渲染文案） ===== */
+  T.register('decide', {
+    'decide.scene.manageTitle': '管理情景',
+    'decide.scene.askTitle': '你现在是什么情况',
+    'decide.scene.doneBtn': '完成',
+    'decide.scene.customBtn': '自定义',
+    'decide.scene.empty': '还没有情景',
+    'decide.scene.tagSystem': '系统',
+    'decide.scene.tagDisabled': '停用',
+    'decide.scene.actionEdit': '编辑',
+    'decide.scene.addNew': '新建情景',
+    'decide.empty.sceneNoSuggestion': '这个情境下还没有建议，或者今天都做过了。到建议库新建一条，勾上这个情境就行。',
+    'decide.action.startNow': '现在开始',
+    'decide.action.addToTodo': '加入待办',
+    'decide.action.another': '换一个',
+    'decide.result.label': '随机抽到',
+    'decide.label.notRandom': '不参与随机',
+    'decide.eat.loggedLabel': '今天吃了',
+    'decide.eat.chooseThis': '就吃这个',
+  });
+
   /* ===== 英文语义 key · 决策页 / 吃什么（第一批迁移：index.html 静态文案） ===== */
   T.register('decide', {
     'decide.action.backToday': '← 返回今日',

@@ -18,6 +18,13 @@
   T.register('records', {
     'records.page.title': '生活记录',
     'records.page.subtitle': '往前是计划，往后是记录。',
+    'records.empty.main': '还没有记录。勾一个待办、写两句话，这里就会出现。',
+    'records.empty.recent': '近两周还没有记录。',
+    'records.label.thatDay': '那天',
+    'records.label.note': '手账',
+    'records.legend.less': '少',
+    'records.legend.more': '多',
+    'records.action.toggle': '切换 ▾',
     'records.action.exportPdf': '导出 PDF ↗',
     'records.tab.plan': '计划',
     'records.tab.timeline': '时间轴',

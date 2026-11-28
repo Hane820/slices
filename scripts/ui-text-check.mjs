@@ -24,6 +24,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import { lex } from './ui-text-lex.mjs';
 
 const argv = process.argv.slice(2);
 const STRICT = argv.includes('--strict');
@@ -49,132 +50,7 @@ const unverifiable = [];     // 无法静态判断的 HTML 写入（必须可见
 const err = (m) => errors.push(m);
 const warn = (m) => warnings.push(m);
 
-/* ============================================================================
- * 0. 词法器
- *    产出 { t:'id'|'str'|'punc'|'num', v, line, hasSubst?, quote? }
- *    - 跳过行注释与块注释
- *    - 字符串保留「值」，模板字符串保留「是否有 ${} 插值」
- *    - 模板插值内部会被当成普通 token 继续切（U() 写在 ${} 里也能被发现）
- * ========================================================================== */
-function lex(src) {
-  const toks = [];
-  let i = 0;
-  let line = 1;
-  const isIdStart = (c) => /[A-Za-z_$]/.test(c || '');
-  const isIdPart = (c) => /[A-Za-z0-9_$]/.test(c || '');
-  const PUNCT = ['>>>=', '...', '===', '!==', '**=', '<<=', '>>=', '&&=', '||=', '??=',
-    '=>', '==', '!=', '<=', '>=', '&&', '||', '??', '?.', '+=', '-=', '*=', '/=', '%=',
-    '++', '--', '<<', '>>', '**'];
-
-  const push = (t, v, ln, extra) => {
-    const o = { t, v, line: ln === undefined ? line : ln };
-    if (extra) Object.assign(o, extra);
-    toks.push(o);
-    return o;
-  };
-
-  function readQuoted(quote) {
-    const startLine = line;
-    i += 1;
-    let value = '';
-    while (i < src.length) {
-      const c = src[i];
-      if (c === '\\') {
-        const n = src[i + 1];
-        if (n === 'n') value += '\n';
-        else if (n === 't') value += '\t';
-        else if (n === '\n') line += 1;
-        else if (n !== undefined) value += n;
-        i += 2;
-        continue;
-      }
-      if (c === quote) { i += 1; push('str', value, startLine, { quote, hasSubst: false }); return; }
-      if (c === '\n') line += 1;      // 未闭合：容忍并继续，由后续检查报错
-      value += c;
-      i += 1;
-    }
-    push('str', value, startLine, { quote, hasSubst: false, unterminated: true });
-  }
-
-  function readTemplate() {
-    const startLine = line;
-    let partLine = startLine;
-    i += 1;
-    let value = '';
-    let hasSubst = false;
-    while (i < src.length) {
-      const c = src[i];
-      if (c === '\\') {
-        const n = src[i + 1];
-        if (n !== undefined) value += n;
-        if (n === '\n') line += 1;
-        i += 2;
-        continue;
-      }
-      if (c === '`') { i += 1; push('str', value, partLine, { quote: '`', hasSubst }); return; }
-      if (c === '$' && src[i + 1] === '{') {
-        hasSubst = true;
-        push('str', value, partLine, { quote: '`', hasSubst: true });
-        value = '';
-        i += 2;
-        push('punc', '{', line, { tpl: true });
-        run(true);                          // 吃掉 ${ ... } 内部
-        partLine = line;
-        continue;
-      }
-      if (c === '\n') line += 1;
-      value += c;
-      i += 1;
-    }
-    push('str', value, partLine, { quote: '`', hasSubst });
-  }
-
-  function run(stopAtBrace) {
-    let depth = 0;
-    while (i < src.length) {
-      const c = src[i];
-      if (c === '\n') { line += 1; i += 1; continue; }
-      if (c === ' ' || c === '\t' || c === '\r') { i += 1; continue; }
-      if (c === '/' && src[i + 1] === '/') { while (i < src.length && src[i] !== '\n') i += 1; continue; }
-      if (c === '/' && src[i + 1] === '*') {
-        i += 2;
-        while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) { if (src[i] === '\n') line += 1; i += 1; }
-        i += 2;
-        continue;
-      }
-      if (c === '"' || c === "'") { readQuoted(c); continue; }
-      if (c === '`') { readTemplate(); continue; }
-      if (stopAtBrace && c === '}' && depth === 0) {
-        i += 1;
-        push('punc', '}', line, { tpl: true });   // 保留右括号，保证 token 括号平衡
-        return;
-      }
-      if (isIdStart(c)) {
-        const s = i;
-        while (i < src.length && isIdPart(src[i])) i += 1;
-        push('id', src.slice(s, i));
-        continue;
-      }
-      if (c >= '0' && c <= '9') {
-        const s = i;
-        while (i < src.length && /[0-9a-zA-Z._]/.test(src[i])) i += 1;
-        push('num', src.slice(s, i));
-        continue;
-      }
-      let p = null;
-      for (const cand of PUNCT) { if (src.startsWith(cand, i)) { p = cand; break; } }
-      if (!p) p = c;
-      if (p === '{') depth += 1;
-      else if (p === '}') depth -= 1;
-      push('punc', p);
-      i += p.length;
-    }
-  }
-
-  run(false);
-  return toks;
-}
-
+/* 词法器已抽出至 scripts/ui-text-lex.mjs（含正则字面量支持，见该文件头注释） */
 const isP = (t, v) => !!t && t.t === 'punc' && t.v === v;
 const isId = (t, v) => !!t && t.t === 'id' && (v === undefined || t.v === v);
 
@@ -418,8 +294,11 @@ for (const name of appFiles) {
   for (let i = 0; i < toks.length; i += 1) {
     const t = toks[i];
     if (t.t !== 'id' || (t.v !== 'U' && t.v !== 'UH')) continue;
-    /* 跳过对象属性 { U: ... } */
-    if (toks[i - 1] && isP(toks[i - 1], ':')) continue;
+    /* 跳过对象属性 { U: ... } / { a: 1, U: ... }；
+       三元表达式 cond ? U('a') : U('b') 的第二分支同样以 ':' 开头，
+       但其 ':' 前是 ')' 或其他表达式结尾，不是对象字面量上下文，不可跳过。 */
+    if (toks[i - 1] && isP(toks[i - 1], ':') &&
+        toks[i - 2] && (isP(toks[i - 2], '{') || isP(toks[i - 2], ','))) continue;
     if (!isP(toks[i + 1], '(')) continue;
 
     const arg = toks[i + 2];

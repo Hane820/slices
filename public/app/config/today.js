@@ -12,17 +12,25 @@
     'today.action.hideDone': '隐藏已完成',
     'today.section.focus': '今日重点',
     'today.section.schedule': '今天的安排',
-    'today.section.decideDo': '不知道做什么',
-    'today.action.goDecide': '帮你决策 →',
-    'today.section.decideEat': '不知道吃什么',
-    'today.action.goEat': '帮我选 →',
-    'today.section.upcoming': '接下来',
-    'today.action.goPlan': '去计划 ↗',
     'today.section.recent': '最近',
     'today.action.writeNote': '写手账',
     'today.action.allRecords': '全部记录',
     'today.section.flash': '灵光一闪',
     'today.hint.flash': '随手写，松手自动存',
     'today.action.saveFlash': '记下来',
+  });
+
+  /* ===== 英文语义 key · 今日页（第二批迁移：JS 渲染文案） ===== */
+  T.register('today', {
+    'today.empty.tasksExpand': '点一下展开，回到今天的事',
+    'today.empty.focusEmpty': '今日重点都删掉了，去设置里加一条。',
+    'today.empty.planEmpty': '还没有定过计划。选好日期，在下面输入一行就行。',
+    'today.label.dueToday': '今天到期',
+    'today.remind.planPrefix': '今天的安排：',
+    'today.action.goPlanShort': '去计划',
+    'today.card.tasks': '待办事项',
+    'today.empty.tasks': '还没有待办，点下面加一条。',
+    'today.placeholder.task': '要做什么',
+    'today.empty.recordsEmpty': '还没有记录。勾掉一条待办，这里就有痕迹了。',
   });
 })();

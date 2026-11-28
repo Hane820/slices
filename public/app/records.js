@@ -123,7 +123,7 @@ function renderTimeline(){
 
   var dates = tlMonth === '全部' ? all : all.filter(function(k){ return k.slice(0,7) === tlMonth; });
   if(!dates.length){
-    box.appendChild(el('div','empty',OLT('还没有记录。勾一个待办、写两句话，这里就会出现。')));
+    box.appendChild(el('div','empty',U('records.empty.main')));
     $('tlMore').style.display = 'none';
     return;
   }
@@ -189,13 +189,13 @@ function renderTimeline(){
       });
       if(r.mark && r.mark.length){
         var mrow = el('div','tl-row');
-        mrow.appendChild(el('div','tl-k',OLT('那天')));
+        mrow.appendChild(el('div','tl-k',U('records.label.thatDay')));
         mrow.appendChild(el('div','tl-v', r.mark.map(function(it){ var p = penOf(it.penId); return (p.emoji ? p.emoji + ' ' : '') + p.name; }).join('、')));
         card.appendChild(mrow);
       }
       if(r.note){
         var nrow = el('div','tl-row');
-        nrow.appendChild(el('div','tl-k',OLT('手账')));
+        nrow.appendChild(el('div','tl-k',U('records.label.note')));
         nrow.appendChild(el('div','tl-v', r.note));
         card.appendChild(nrow);
       }
@@ -380,9 +380,9 @@ function renderHeat(mkey){
 
   box.appendChild(wrap);
   var lg = el('div','heat-legend');
-  lg.appendChild(el('span','hl-t',OLT('少')));
+  lg.appendChild(el('span','hl-t',U('records.legend.less')));
   [0,1,2,3,4].forEach(function(lv){ lg.appendChild(el('span','hl-sw lv' + lv)); });
-  lg.appendChild(el('span','hl-t',OLT('多')));
+  lg.appendChild(el('span','hl-t',U('records.legend.more')));
   box.appendChild(lg);
 }
 
@@ -557,7 +557,7 @@ function renderProject(){
   if(cur){
     cur.innerHTML = '';
     cur.appendChild(el('span','ic-n', it ? it.text : '还没有项目'));
-    cur.appendChild(el('span','ic-a',OLT('切换 ▾')));
+    cur.appendChild(el('span','ic-a',U('records.action.toggle')));
   }
   var hint = $('itemHint');
   var st = $('itemStats');
@@ -619,7 +619,7 @@ function renderProject(){
   if(listT) listT.textContent = '最近' + it.text;
   var recent = logs.filter(function(r){ return r.date >= l0; });
   if(!recent.length){
-    listEl.appendChild(el('div','empty',OLT('近两周还没有记录。')));
+    listEl.appendChild(el('div','empty',U('records.empty.recent')));
   }else{
     var cardEl = el('div','card plain');
     recent.slice(0, 24).forEach(function(r){

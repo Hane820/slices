@@ -376,13 +376,15 @@ test('apply.js 的 DOMContentLoaded 补跑是幂等的', () => {
   assert.equal(el.textContent, '动态值');
 });
 
-test('旧接口 OLT 仍能命中 153 条中文 key', () => {
+/* UI 精简后旧中文 key 由 150 降至 146：主题色/首页提醒及其说明共 4 条随功能删除；
+   OLT 兼容接口本身与中文兜底机制保持不变。 */
+test('旧接口 OLT 仍能命中现有中文 key', () => {
   const app = createApp();
   app.load('config/index.js');
   app.loadGroups();
   assert.equal(app.win.OLText.text('取消'), '取消');
   assert.equal(app.win.OLText.text('今日待办'), '今日待办');
-  assert.equal(Object.keys(app.win.OLText.flat).length, 150, '旧中文 key 去重后 150 条（153 处定义，3 处重复同值）');
+  assert.equal(Object.keys(app.win.OLText.flat).length, 146, '旧中文 key 去重后 146 条（UI 精简删除主题色/首页提醒 4 条）');
 });
 
 /* ============================================================================

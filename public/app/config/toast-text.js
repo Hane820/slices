@@ -329,7 +329,6 @@
   C.resetHourSaved = { enabled:false, type:"success", text:"改好了", duration:2200 };
 
   /* 设置页 · 主题色 · 触发：切换主题并保存成功 */
-  C.themeChanged = { enabled:true, type:"info", text:"换成「{name}」了", duration:2200 };
 
   /* 设置页 · 字号 · 触发：拖动字号滑杆（滑杆即视）
      默认关闭理由：滑杆位置即反馈，无需额外提示 */

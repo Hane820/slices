@@ -320,19 +320,15 @@ function defaults(){
 var S = defaults();
 var migrated = false;
 
-/* ---------- 主题色（莫兰迪预设） ---------- */
+/* ---------- 主题色：固定橘子汽水（clay） ----------
+   旧存档里的 settings.theme 字段保留只为备份/迁移兼容，绝不参与显示。
+   normalize 仍会把非法值回退 default，保证旧档规范化契约与备份兼容。 */
 var THEME_KEYS = ['default', 'mist', 'clay', 'matcha', 'lotus', 'warm'];
 function applyTheme(){
-  var t = S.settings.theme || 'default';
-  document.documentElement.classList.remove('theme-mist','theme-clay','theme-matcha','theme-lotus','theme-warm');
-  if(t !== 'default') document.documentElement.classList.add('theme-' + t);
+  /* 无操作：base.css :root 已固定为橘子汽水色板，兼容旧调用方。 */
 }
 function themeRGB(){
-  var map = {
-    default: '110,155,128', mist: '113,134,178', clay: '193,121,92',
-    matcha: '139,166,99', lotus: '185,106,133', warm: '156,107,82'
-  };
-  return map[S.settings.theme] || map.default;
+  return '193,121,92';   /* 橘子汽水主色 --sage-rgb */
 }
 
 function loadState(){
@@ -1012,15 +1008,15 @@ var OLTimePicker = (function(){
     var cur = parse(input.value) || parse(nowHM());
     var picked = { h: cur.h, m: cur.m };
     var body = OLPickLayer.open(
-      '<div class="shd"><div class="shd-t">' + OLT('选择时间') + '</div></div>' +
-      '<div class="tp-head"><span>' + OLT('时') + '</span><span>' + OLT('分') + '</span></div>' +
+      '<div class="shd"><div class="shd-t">' + UH('common.picker.timeTitle') + '</div></div>' +
+      '<div class="tp-head"><span>' + UH('common.time.hour') + '</span><span>' + UH('common.time.minute') + '</span></div>' +
       '<div class="tp-wheel">' +
         '<div class="tp-col" id="tpHour">' + colHtml(HOURS, cur.h) + '</div>' +
         '<div class="tp-col" id="tpMin">' + colHtml(MINS, cur.m) + '</div>' +
       '</div>' +
-      (opts.allowEmpty ? '<button class="tp-clear" id="tpClear">' + OLT('清空') + '</button>' : '') +
-      '<div class="acts"><button class="btn g" id="tpNo">' + OLT('取消') + '</button>' +
-      '<button class="btn p" id="tpOk">' + OLT('确定') + '</button></div>'
+      (opts.allowEmpty ? '<button class="tp-clear" id="tpClear">' + UH('common.action.clear') + '</button>' : '') +
+      '<div class="acts"><button class="btn g" id="tpNo">' + UH('common.action.cancel') + '</button>' +
+      '<button class="btn p" id="tpOk">' + UH('common.action.confirm') + '</button></div>'
     );
     var hCol = body.querySelector('#tpHour'), mCol = body.querySelector('#tpMin');
     var hSettle = bindCol(hCol, function(i){ picked.h = i; });
@@ -1128,16 +1124,16 @@ var OLDatePicker = (function(){
     var sel = { y: cur.y, m: cur.m, d: cur.d };
     var view = { y: cur.y, m: cur.m };
     var body = OLPickLayer.open(
-      '<div class="shd"><div class="shd-t">' + OLT('选择日期') + '</div></div>' +
+      '<div class="shd"><div class="shd-t">' + UH('common.picker.dateTitle') + '</div></div>' +
       '<div class="dp-head"><button class="dp-nav" id="dpPrev">‹</button>' +
         '<div class="dp-title" id="dpTitle"></div>' +
         '<button class="dp-nav" id="dpNext">›</button></div>' +
       '<div class="dp-wd">' + WD.map(function(w){ return '<span>' + w + '</span>'; }).join('') + '</div>' +
       '<div class="dp-grid" id="dpGrid"></div>' +
-      '<div class="dp-quick"><button class="tp-clear" id="dpToday">' + OLT('今天') + '</button>' +
-        (opts.allowEmpty ? '<button class="tp-clear" id="dpClear">' + OLT('清空') + '</button>' : '') + '</div>' +
-      '<div class="acts"><button class="btn g" id="dpNo">' + OLT('取消') + '</button>' +
-        '<button class="btn p" id="dpOk">' + OLT('确定') + '</button></div>'
+      '<div class="dp-quick"><button class="tp-clear" id="dpToday">' + UH('common.time.today') + '</button>' +
+        (opts.allowEmpty ? '<button class="tp-clear" id="dpClear">' + UH('common.action.clear') + '</button>' : '') + '</div>' +
+      '<div class="acts"><button class="btn g" id="dpNo">' + UH('common.action.cancel') + '</button>' +
+        '<button class="btn p" id="dpOk">' + UH('common.action.confirm') + '</button></div>'
     );
     var title = body.querySelector('#dpTitle');
     var grid = body.querySelector('#dpGrid');

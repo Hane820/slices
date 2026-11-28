@@ -1,24 +1,14 @@
 /* settings.js — 设置 */
 /* ==================== 设置 ==================== */
 function renderSettings(){
-  // 提醒
+  // 提醒：只保留「今天算休息日」——它抑制当天计划提醒，也会在导出的记录里标注休息日
   var rb = $('remindSet');
   rb.innerHTML = '';
-  var r1 = el('div','row');
-  var rm = el('div','row-main');
-  rm.appendChild(el('div','row-t',OLT('首页提醒')));
-  rm.appendChild(el('div','row-s',OLT('打开应用就能看到，关掉应用不会弹系统通知')));
-  r1.appendChild(rm);
-  var rsw = el('button','sw' + (S.settings.remind ? ' on' : ''));
-  rsw.addEventListener('click', function(){ S.settings.remind = !S.settings.remind; save(); renderSettings(); renderRemind(); });
-  r1.appendChild(rsw);
-  rb.appendChild(r1);
-
   var isRest = S.restDays.indexOf(TODAY()) >= 0;
   var r2 = el('div','row');
   var r2m = el('div','row-main');
-  r2m.appendChild(el('div','row-t',OLT('今天算休息日')));
-  r2m.appendChild(el('div','row-s', isRest ? '今天不提醒，目标也不算数' : '想休息就打开，今天不会有提醒'));
+  r2m.appendChild(el('div','row-t',U('settings.restday.title')));
+  r2m.appendChild(el('div','row-s', isRest ? '今天不提醒，记录里标成休息日' : '想休息就打开，今天不提醒'));
   r2.appendChild(r2m);
   var r2s = el('button','sw' + (isRest ? ' on' : ''));
   r2s.addEventListener('click', function(){
@@ -54,7 +44,7 @@ function renderSettings(){
     pill.addEventListener('click', function(){ openPenEdit(p); });
     pp.appendChild(pill);
   });
-  var addP = el('button','pill add',OLT('+ 新标记'));
+  var addP = el('button','pill add',U('common.action.newMarker'));
   addP.addEventListener('click', function(){ openPenEdit(null); });
   pp.appendChild(addP);
 
@@ -82,7 +72,7 @@ function renderSettings(){
     });
     tp.appendChild(pill);
   });
-  var addT = el('button','pill add',OLT('+ 新标签'));
+  var addT = el('button','pill add',U('common.action.newTag'));
   addT.addEventListener('click', function(){
     openModal({
       title:'新建标签', sub:'点一下记一次，用来数频率', input:true, placeholder:'比如「晒了太阳」', okText:'加上',
@@ -121,8 +111,8 @@ function renderSettings(){
   ob.innerHTML = '';
   var rr = el('div','row');
   var rrm = el('div','row-main');
-  rrm.appendChild(el('div','row-t',OLT('几点算新的一天')));
-  rrm.appendChild(el('div','row-s',OLT('每天重复的清单在这个时间清零')));
+  rrm.appendChild(el('div','row-t',U('settings.daycut.title')));
+  rrm.appendChild(el('div','row-s',U('settings.daycut.subtitle')));
   rr.appendChild(rrm);
   rr.appendChild(el('div','row-a', '凌晨 ' + S.settings.resetHour + ':00'));
   rr.addEventListener('click', function(){
@@ -132,47 +122,13 @@ function renderSettings(){
   });
   ob.appendChild(rr);
 
-  // 外观：主题色（莫兰迪预设）+ 全局字号（滑杆，自由选，不搞大中小）
+  // 外观：固定橘子汽水配色，没有主题切换；只保留全局字号
   var lb = $('lookSet');
   lb.innerHTML = '';
-  /* [键, 名称, 主色, 背景色, 深色锚点/主色/次级面/点缀色] —— 预览直接展示整条色板
-     名称从 presets.js 的 THEMES 读，颜色是配色方案，留在代码里。 */
-  var THEME_NAMES = (window.OLPresets && window.OLPresets.THEMES) || {};
-  var THEME_LIST = [
-    ['default', THEME_NAMES.default || '', '#6E9B80', '#F6F8F3', ['#2B3A31','#6E9B80','#EAF1E7','#A8C8BE']],
-    ['mist', THEME_NAMES.mist || '', '#7186B2', '#F7F6FA', ['#2F3448','#7186B2','#EAEAF4','#C795A4']],
-    ['clay', THEME_NAMES.clay || '', '#C1795C', '#FDF8F1', ['#392D27','#C1795C','#F7EDE0','#7FA596']],
-    ['matcha', THEME_NAMES.matcha || '', '#8BA663', '#F8F9EF', ['#30382B','#8BA663','#F0F4E2','#8FB7A2']],
-    ['lotus', THEME_NAMES.lotus || '', '#B96A85', '#FCF5F8', ['#3A2B33','#B96A85','#F8EAF0','#8FC2B8']],
-    ['warm', THEME_NAMES.warm || '', '#9C6B52', '#FAF7F3', ['#352D28','#9C6B52','#F3EDE5','#8FA993']]
-  ];
-  var trow = el('div','row');
-  var trowm = el('div','row-main');
-  trowm.appendChild(el('div','row-t',OLT('主题色')));
-  trowm.appendChild(el('div','row-s',OLT('一套四层配色，点一个全局换色')));
-  trow.appendChild(trowm);
-  lb.appendChild(trow);
-  var tgrid = el('div','themes');
-  THEME_LIST.forEach(function(t){
-    var cur = (S.settings.theme || 'default') === t[0];
-    var sw = el('button','theme-sw' + (cur ? ' on' : ''));
-    sw.style.background = t[3];
-    var band = t[4].map(function(c, i){ return c + ' ' + (i * 25) + '%,' + c + ' ' + ((i + 1) * 25) + '%'; }).join(',');
-    sw.innerHTML = '<span class="sw-band" style="background:linear-gradient(90deg,' + band + ')"></span>' +
-      '<i style="background:' + t[2] + '"></i><b>' + t[1] + '</b>' + (cur ? '<span class="ck">✓</span>' : '');
-    sw.addEventListener('click', function(){
-      if(S.settings.theme === t[0]) return;
-      S.settings.theme = t[0];
-      save(function(){ toastCfg('themeChanged', { name: t[1] }); }); applyTheme(); renderSettings();
-    });
-    tgrid.appendChild(sw);
-  });
-  lb.appendChild(tgrid);
   var lrow = el('div','row');
-  lrow.style.marginTop = '10px';
   var lrm = el('div','row-main');
-  lrm.appendChild(el('div','row-t',OLT('字号')));
-  lrm.appendChild(el('div','row-s',OLT('拖到喜欢的大小就行，全 App 一起变')));
+  lrm.appendChild(el('div','row-t',U('settings.font.title')));
+  lrm.appendChild(el('div','row-s',U('settings.font.subtitle')));
   lrow.appendChild(lrm);
   var lval = el('div','row-a', Math.round((S.settings.uiScale || 1.12) * 100) + '%');
   lrow.appendChild(lval);
@@ -206,13 +162,13 @@ function renderSettings(){
     r.addEventListener('click', fn);
     db.appendChild(r);
   }
-  dataRow(OLT('导出 PDF 记录'), OLT('月历 + 时间轴 + 小结，打印或存成 PDF'), openPdfPanel);
-  dataRow(OLT('导出备份'), OLT('一个 JSON 文件，包含全部记录'), exportJSON);
-  dataRow(OLT('导出表格'), OLT('把记录按日期排成一张表，Excel / WPS 能打开'), exportTable);
-  dataRow(OLT('导出配置文件'), OLT('笔 / 标签 / 决策库 / 偏好设置，不含日常记录，换设备导入用'), exportConfig);
-  dataRow(OLT('导入配置文件'), OLT('先给你看预览和冲突，确认后才会写进来'), importConfig);
-  dataRow(OLT('从备份恢复'), OLT('会先给你看摘要，再决定合并还是替换'), importJSON);
-  dataRow(OLT('清空全部数据'), OLT('不可恢复，请先导出'), function(){
+  dataRow(U('settings.data.exportPdf.title'), U('settings.data.exportPdf.subtitle'), openPdfPanel);
+  dataRow(U('settings.data.exportBackup.title'), U('settings.data.exportBackup.subtitle'), exportJSON);
+  dataRow(U('settings.data.exportTable.title'), U('settings.data.exportTable.subtitle'), exportTable);
+  dataRow(U('settings.data.exportConfig.title'), U('settings.data.exportConfig.subtitle'), exportConfig);
+  dataRow(U('settings.data.importConfig.title'), U('settings.data.importConfig.subtitle'), importConfig);
+  dataRow(U('settings.data.restoreBackup.title'), U('settings.data.restoreBackup.subtitle'), importJSON);
+  dataRow(U('settings.data.clearAll.title'), U('settings.data.clearAll.subtitle'), function(){
     if(bizWriteBlocked()){ bizWriteBlockedNotice(); return; }   /* idb 模式：入口拦截，S 不被清空 */
     confirmBox('清空全部数据？', '所有待办、标记、记录、训练都会消失，而且找不回来。', function(){
       S = defaults();
@@ -570,17 +526,17 @@ function renderFocusSet(){
 
   var head = el('div','row');
   var hm = el('div','row-main');
-  hm.appendChild(el('div','row-t',OLT('今日重点条目')));
-  hm.appendChild(el('div','row-s',OLT('首页一行三张；「健身」「学习」是默认预设，可改可删')));
+  hm.appendChild(el('div','row-t',U('settings.focus.title')));
+  hm.appendChild(el('div','row-s',U('settings.focus.subtitle')));
   head.appendChild(hm);
-  var add = el('div','row-a',OLT('＋ 加一条'));
+  var add = el('div','row-a',U('settings.focus.addOne'));
   add.style.color = 'var(--sage-d)';
   add.addEventListener('click', function(){ openFocusEdit(null, true); });
   head.appendChild(add);
   box.appendChild(head);
 
   if(!list.length){
-    box.appendChild(el('div','row-s',OLT('还没有条目，点右上角加一条。')));
+    box.appendChild(el('div','row-s',U('settings.focus.empty')));
     return;
   }
 

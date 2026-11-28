@@ -64,7 +64,15 @@ function randomPick(filterCat){
 /* ---------- 决策页 UI ---------- */
 var decState = { list:[], idx:0, mode:'scene', filter:'全部', scene:'' };
 var libOpen = false;
+var libFoldOpen = false;   /* 建议库整块默认折叠；展开后搜索/筛选/开关全部保留 */
 var libQuery = '';
+function toggleLibFold(node){
+  libFoldOpen = !libFoldOpen;
+  var body = document.getElementById('libBody');
+  if(body) body.style.display = libFoldOpen ? '' : 'none';
+  var btn = node || document.getElementById('libFold');
+  if(btn) btn.textContent = libFoldOpen ? U('common.action.collapse') : U('common.action.expand');
+}
 var sceneEditMode = false;      /* 情景管理：在决策页原地切换，默认关闭 */
 
 function renderScenes(){
@@ -83,9 +91,9 @@ function renderScenes(){
   var ask = $('sceneAsk');
   if(ask) ask.classList.toggle('editing', sceneEditMode);
   var askT = $('sceneAskT');
-  if(askT) askT.textContent = OLT(sceneEditMode ? '管理情景' : '你现在是什么情况');
+  if(askT) askT.textContent = sceneEditMode ? U('decide.scene.manageTitle') : U('decide.scene.askTitle');
   var customBtn = $('sceneCustomBtn');
-  if(customBtn) customBtn.textContent = OLT(sceneEditMode ? '完成' : '自定义');
+  if(customBtn) customBtn.textContent = sceneEditMode ? U('decide.scene.doneBtn') : U('decide.scene.customBtn');
   var mg = $('sceneManage');
   if(mg) mg.style.display = sceneEditMode ? '' : 'none';
   var decBar = document.querySelector('#decPaneDo .dec-bar'), decResult = $('decResult');
@@ -101,20 +109,20 @@ function renderSceneManage(){
   if(!box) return;
   var list = allScenes();
   var html = '';
-  if(!list.length) html += '<div class="scm-none">' + OLT('还没有情景') + '</div>';
+  if(!list.length) html += '<div class="scm-none">' + UH('decide.scene.empty') + '</div>';
   list.forEach(function(sc, i){
     html += '<div class="scm-row" data-i="' + i + '">' +
       '<div class="scm-m"><div class="scm-n">' + esc(sc.name) +
-        (sc.sys ? '<span class="scm-tag">' + OLT('系统') + '</span>' : '') +
-        (sc.enabled ? '' : '<span class="scm-tag">' + OLT('停用') + '</span>') + '</div>' +
+        (sc.sys ? '<span class="scm-tag">' + UH('decide.scene.tagSystem') + '</span>' : '') +
+        (sc.enabled ? '' : '<span class="scm-tag">' + UH('decide.scene.tagDisabled') + '</span>') + '</div>' +
       (sc.desc ? '<div class="scm-d">' + esc(sc.desc) + '</div>' : '') + '</div>' +
       '<div class="scm-a">' +
-        '<span class="scm-b" data-act="edit">' + OLT('编辑') + '</span>' +
+        '<span class="scm-b" data-act="edit">' + UH('decide.scene.actionEdit') + '</span>' +
         (i > 0 ? '<span class="scm-b" data-act="up">↑</span>' : '') +
         (i < list.length - 1 ? '<span class="scm-b" data-act="down">↓</span>' : '') +
       '</div></div>';
   });
-  html += '<div class="scm-add" id="scmAdd">＋ ' + OLT('新建情景') + '</div>';
+  html += '<div class="scm-add" id="scmAdd">＋ ' + UH('decide.scene.addNew') + '</div>';
   box.innerHTML = html;
 }
 
@@ -186,7 +194,7 @@ function renderSceneResult(k){
 
   var list = sceneSuggestions(k);
   if(!list.length){
-    box.appendChild(el('div','empty',OLT('这个情境下还没有建议，或者今天都做过了。到建议库新建一条，勾上这个情境就行。')));
+    box.appendChild(el('div','empty',U('decide.empty.sceneNoSuggestion')));
     return;
   }
   var card = el('div','card');
@@ -203,9 +211,9 @@ function renderSceneResult(k){
     if(sg.note) d.appendChild(el('span', null, sg.note));
     main.appendChild(d);
     var acts = el('div','scene-acts');
-    var go = el('button','btn p sm',OLT('现在开始'));
+    var go = el('button','btn p sm',U('decide.action.startNow'));
     go.addEventListener('click', function(){ startPomo(suggPick(sg), go); });
-    var add = el('button','btn o sm',OLT('加入待办'));
+    var add = el('button','btn o sm',U('decide.action.addToTodo'));
     add.addEventListener('click', function(){ addAsTask(suggPick(sg), add); });
     acts.appendChild(go); acts.appendChild(add);
     item.appendChild(main); item.appendChild(acts);
@@ -662,7 +670,7 @@ function renderDecisionResult(){
   if(!decState.list.length) return;
   var c = decState.list[decState.idx % decState.list.length];
   var card = el('div','res');
-  card.appendChild(el('div','res-k',OLT('随机抽到')));
+  card.appendChild(el('div','res-k',U('decide.result.label')));
   card.appendChild(el('div','res-t', c.name));
   if(c.sub) card.appendChild(el('div','res-d', c.sub));
   var meta = el('div','res-meta');
@@ -670,11 +678,11 @@ function renderDecisionResult(){
   if(c.duration) meta.appendChild(el('span','mtag', '大约 ' + durText(c.duration)));
   card.appendChild(meta);
   var acts = el('div','res-acts');
-  var go = el('button','btn p',OLT('现在开始'));
+  var go = el('button','btn p',U('decide.action.startNow'));
   go.addEventListener('click', function(){ startPomo(c, go); });
-  var add = el('button','btn g',OLT('加入待办'));
+  var add = el('button','btn g',U('decide.action.addToTodo'));
   add.addEventListener('click', function(){ addAsTask(c, add); });
-  var again = el('button','btn o',OLT('换一个'));
+  var again = el('button','btn o',U('decide.action.another'));
   again.addEventListener('click', function(){
     card.style.transition = 'opacity .45s var(--ease), transform .45s var(--ease)';
     card.style.opacity = '0';
@@ -765,7 +773,7 @@ function renderLib(){
     var d = el('div','lib-d');
     d.appendChild(catTag(sg.cat));
     if(sg.duration) d.appendChild(el('span', null, durText(sg.duration)));
-    if(!sg.random) d.appendChild(el('span', null, OLT('不参与随机')));
+    if(!sg.random) d.appendChild(el('span', null, U('decide.label.notRandom')));
     if((sg.scenes||[]).length){
       d.appendChild(el('span', null, '情境：' + sg.scenes.map(sceneName).join('、')));
     }
@@ -999,7 +1007,7 @@ function renderEatToday(){
   var list = foodTodayLog();
   if(!list.length) return;
   var line = el('div','eat-log');
-  line.appendChild(el('span','eat-log-k',OLT('今天吃了')));
+  line.appendChild(el('span','eat-log-k',U('decide.eat.loggedLabel')));
   list.slice(-6).forEach(function(l){
     line.appendChild(el('span','eat-log-i', (l.slot ? foodSlotName(l.slot) + ' · ' : '') + l.name));
   });
@@ -1021,9 +1029,9 @@ function renderEatResult(){
   meta.appendChild(el('span','mtag', foodSlotName(eatState.slot)));
   card.appendChild(meta);
   var acts = el('div','res-acts');
-  var ok = el('button','btn p',OLT('就吃这个'));
+  var ok = el('button','btn p',U('decide.eat.chooseThis'));
   ok.addEventListener('click', function(){ logEat(c.item, ok); });
-  var again = el('button','btn o',OLT('换一个'));
+  var again = el('button','btn o',U('decide.action.another'));
   again.addEventListener('click', function(){
     card.style.transition = 'opacity .4s var(--ease), transform .4s var(--ease)';
     card.style.opacity = '0';

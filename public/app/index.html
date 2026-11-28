@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F6F8F3">
+<meta name="theme-color" content="#FDF8F1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title data-i18n="common.app.name">地球online</title>
@@ -40,12 +40,6 @@
 
       <div class="sec"><span class="sec-t" data-i18n="today.section.schedule">今天的安排</span><span class="sec-line"></span><span class="sec-a" id="addSch" data-i18n="common.action.addOne">+ 加一条</span></div>
       <div class="card" id="schWrap"></div>
-
-      <div class="sec"><span class="sec-t" data-i18n="today.section.decideDo">不知道做什么</span><span class="sec-line"></span><span class="sec-a" data-action="go-decide" data-i18n="today.action.goDecide">帮你决策 →</span></div>
-
-      <div class="sec" id="eatSec" style="display:none"><span class="sec-t" data-i18n="today.section.decideEat">不知道吃什么</span><span class="sec-line"></span><span class="sec-a" data-action="go-eat" data-i18n="today.action.goEat">帮我选 →</span></div>
-
-      <div class="sec" id="goPlanSec" style="cursor:pointer"><span class="sec-t" data-i18n="today.section.upcoming">接下来</span><span class="sec-line"></span><span class="sec-a" data-i18n="today.action.goPlan">去计划 ↗</span></div>
 
       <div class="sec"><span class="sec-t" data-i18n="today.section.recent">最近</span><span class="sec-line"></span><span class="sec-a" id="writeNote" data-i18n="today.action.writeNote">写手账</span><span class="sec-a" id="goRecords" data-i18n="today.action.allRecords">全部记录</span></div>
       <div class="card" id="recentWrap"></div>
@@ -87,12 +81,14 @@
 
       <div class="hr"></div>
 
-      <div class="sec"><span class="sec-t" data-i18n="decide.section.library">建议库</span><span class="sec-line"></span><span class="sec-a" id="addLib" data-i18n="common.action.new">+ 新建</span></div>
-      <input class="lib-search" id="libSearch" placeholder="找一下，比如 下课" data-i18n="decide.placeholder.librarySearch" data-i18n-attr="placeholder" maxlength="20">
-      <div class="chips" id="libFilter" style="margin-bottom:4px"></div>
-      <div class="card plain" id="libWrap" style="margin-top:9px;padding:2px 14px"></div>
-      <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0" data-i18n="decide.hint.library">
-        每条建议可以绑几个情境，选了才会出现在上面。开关决定它参不参与随机抽取。
+      <div class="sec"><span class="sec-t" data-i18n="decide.section.library">建议库</span><span class="sec-line"></span><span class="sec-a" id="addLib" data-i18n="common.action.new">+ 新建</span><span class="sec-a" id="libFold" data-action="lib-fold" data-i18n="common.action.expand">展开 ▾</span></div>
+      <div id="libBody" style="display:none">
+        <input class="lib-search" id="libSearch" placeholder="找一下，比如 下课" data-i18n="decide.placeholder.librarySearch" data-i18n-attr="placeholder" maxlength="20">
+        <div class="chips" id="libFilter" style="margin-bottom:4px"></div>
+        <div class="card plain" id="libWrap" style="margin-top:9px;padding:2px 14px"></div>
+        <div style="font-size:10.5px;color:var(--ink3);line-height:1.65;margin:9px 4px 0" data-i18n="decide.hint.library">
+          每条建议可以绑几个情境，选了才会出现在上面。开关决定它参不参与随机抽取。
+        </div>
       </div>
       <div style="height:26px"></div>
     </div>

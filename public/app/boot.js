@@ -26,9 +26,6 @@ if(itemCurEl) itemCurEl.addEventListener('click', openItemPicker);
 $('writeNote').addEventListener('click', function(){ openNote(TODAY()); });
 $('goRecords').addEventListener('click', function(){ showPage('pRecords'); });
 
-// 今日页
-var goPlanEl = $('goPlanSec');
-if(goPlanEl) goPlanEl.addEventListener('click', openPlanView);
 // 灵光一闪：输入停顿后自动存
 (function(){
   var ta = $('flashTa');

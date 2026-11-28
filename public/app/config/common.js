@@ -106,6 +106,7 @@
     'common.action.addRecord': '+ 记一条',
     'common.action.showDone': '显示已完成',
     'common.action.collapse': '收起 ▴',
+    'common.action.expand': '展开 ▾',
     'common.a11y.backToTop': '回到顶端',
     'common.weekday.sun': '日',
     'common.weekday.mon': '一',
@@ -114,5 +115,18 @@
     'common.weekday.thu': '四',
     'common.weekday.fri': '五',
     'common.weekday.sat': '六',
+  });
+
+  /* ===== 英文语义 key · 通用层（第二批迁移：JS 渲染的通用词） ===== */
+  T.register('common', {
+    'common.picker.timeTitle': '选择时间',
+    'common.picker.dateTitle': '选择日期',
+    'common.time.hour': '时',
+    'common.time.minute': '分',
+    'common.time.today': '今天',
+    'common.action.clear': '清空',
+    'common.noun.tag': '标签',
+    'common.action.newTag': '+ 新标签',
+    'common.action.newMarker': '+ 新标记',
   });
 })();
