@@ -17,12 +17,12 @@
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.19",
-    "@astrojs/sitemap": "^3.7.4",
-    "astro": "^7.4.0",
+    "@astrojs/sitemap": "^3.7.6",
+    "astro": "^7.4.13",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.10",
+    "@astrojs/check": "^0.9.12",
     "fake-indexeddb": "^6.2.8",
     "typescript": "^6.0.3"
   }
