@@ -232,3 +232,49 @@ test('主题：固定橘子汽水，旧主题设置不再影响显示', () => {
   assert.equal(vm.runInContext('themeRGB()', ctx), '193,121,92');
   assert.ok(!/S\.settings\.theme/.test(core.match(/function applyTheme\(\)\{[\s\S]*?\}/)[0]), 'applyTheme 不读取旧设置');
 });
+
+/* ---------- 卡片堆叠动画（沿 Z 轴重排） ---------- */
+
+test('卡片堆叠：Z 轴参数与 CSS 层定义一致（12/24px、.96/.92、.7/.4）', () => {
+  const js = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
+  const css = fs.readFileSync(path.join(APP, 'today.css'), 'utf8');
+  assert.ok(js.includes('var DECK_MS = 400;'), '动画时长统一 400ms');
+  assert.ok(js.includes('cubic-bezier(.22,1,.36,1)'), '缓动曲线与参考一致');
+  assert.ok(js.includes('{ y: -12, s: .96, o: .7  }'), '第二层参数');
+  assert.ok(js.includes('{ y: -24, s: .92, o: .4  }'), '第三层参数');
+  assert.ok(css.includes('transform:translateY(-12px) scale(.96);opacity:.7'), 'CSS 第二层需匹配 JS');
+  assert.ok(css.includes('transform:translateY(-24px) scale(.92);opacity:.4'), 'CSS 第三层需匹配 JS');
+  assert.ok(css.includes('cubic-bezier(.22,1,.36,1)'), 'CSS 缓动曲线需匹配 JS');
+});
+
+test('卡片堆叠：不再有硬编码 setTimeout 或跨参照系 getBoundingClientRect 换算', () => {
+  const js = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
+  const block = js.slice(js.indexOf('function toggleTasksFold()'), js.indexOf('/* ==================== 单一事件委托'));
+  assert.ok(!block.includes('setTimeout(renderTasks'), '禁止用固定延时重建 DOM');
+  const animBlock = block.slice(0, block.indexOf('var sec ='));
+  assert.ok(!animBlock.includes('getBoundingClientRect'), '收拢动画不得依赖跨参照系换算');
+  const unfold = js.slice(js.indexOf('// 刚从牌堆展开'), js.indexOf('/* 一个分类 = 一张卡 */'));
+  assert.ok(!unfold.includes('getBoundingClientRect'), '展开动画不得依赖跨参照系换算');
+  assert.ok(block.includes('.finished.then(settle, settle)'), '重建须由动画完成事件驱动');
+});
+
+test('卡片堆叠：deckTransform/deckOpacity 输出正确的 Z 轴变换', () => {
+  const src = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
+  const start = src.indexOf('var DECK_MS = 400;');
+  const end = src.indexOf('function deckCanAnimate()', start);
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(src.slice(start, end), ctx);
+  assert.equal(vm.runInContext('deckTransform(0)', ctx), 'translateY(0px) scale(1)');
+  assert.equal(vm.runInContext('deckTransform(1)', ctx), 'translateY(-12px) scale(0.96)');
+  assert.equal(vm.runInContext('deckTransform(2)', ctx), 'translateY(-24px) scale(0.92)');
+  assert.equal(vm.runInContext('deckTransform(3)', ctx), 'translateY(-24px) scale(0.92)', '超出层数封顶到第三层');
+  assert.equal(vm.runInContext('deckOpacity(1)', ctx), 0.7);
+  assert.equal(vm.runInContext('deckOpacity(2)', ctx), 0.4);
+});
+
+test('卡片堆叠：移动端取消重叠，prefers-reduced-motion 关闭动画', () => {
+  const css = fs.readFileSync(path.join(APP, 'today.css'), 'utf8');
+  assert.ok(/@media\(max-width:640px\)\{[\s\S]*?\.deck-l\{display:none\}/.test(css), '移动端隐藏堆叠层');
+  assert.ok(/@media\(prefers-reduced-motion:reduce\)\{[\s\S]*?animation:none/.test(css), '减少动态效果时关闭动画');
+});

@@ -107,19 +107,17 @@ function renderTasks(){
     box.appendChild(tagCard);
   }
 
-  // 刚从牌堆展开：卡片从堆叠状态弹回原位
+  // 刚从牌堆展开：卡片沿 Z 轴从堆叠位落回原位（400ms 缓出）
   if(justUnfolded){
     justUnfolded = false;
     var dealt = box.querySelectorAll('.tcard, .tagcard');
-    var firstR = dealt.length ? dealt[0].getBoundingClientRect() : null;
     for(var i = 0; i < dealt.length; i++){
       (function(el2, i){
-        if(deckCanAnimate() && firstR){
-          var r = el2.getBoundingClientRect();
+        if(deckCanAnimate()){
           var a = el2.animate([
-            { transform: deckTransform(i, firstR.left - r.left, firstR.top - r.top), opacity: i === 0 ? 1 : 0.85 },
+            { transform: deckTransform(i), opacity: deckOpacity(i) },
             { transform: 'none', opacity: 1 }
-          ], { duration: 430 + i * 60, delay: i * 35, easing: DECK_EASE, fill: 'backwards' });
+          ], { duration: DECK_MS, delay: i * 35, easing: DECK_EASE, fill: 'backwards' });
           a.onfinish = function(){ a.cancel(); };
         }else{
           el2.classList.add('deal');
@@ -240,11 +238,17 @@ function unfoldTasks(){
   renderTasks();
 }
 
-/* 卡片堆叠的统一参数（收拢 / 摊开共用一套公式） */
-var DECK_EASE = 'cubic-bezier(.16,1,.3,1)';
-function deckTransform(i, dx, dy){
-  return 'translate(' + (dx + i * 6) + 'px,' + (dy + i * 10) + 'px) scale(' + (1 - i * 0.05) + ') rotate(' + (i * 1.5) + 'deg)';
-}
+/* 卡片堆叠：收拢 / 摊开共用一套 Z 轴参数，与 today.css 的 .deck-l.l1/.l2 一致 */
+var DECK_MS = 400;
+var DECK_EASE = 'cubic-bezier(.22,1,.36,1)';
+var DECK_LAYERS = [
+  { y: 0,   s: 1,   o: 1   },  /* 顶层 */
+  { y: -12, s: .96, o: .7  },  /* 第二层：向上 12px */
+  { y: -24, s: .92, o: .4  }   /* 第三层：向上 24px */
+];
+function deckLayer(i){ return DECK_LAYERS[Math.min(i, DECK_LAYERS.length - 1)]; }
+function deckTransform(i){ var L = deckLayer(i); return 'translateY(' + L.y + 'px) scale(' + L.s + ')'; }
+function deckOpacity(i){ return deckLayer(i).o; }
 function deckCanAnimate(){
   return !!(window.Element && Element.prototype.animate) &&
     !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -403,18 +407,27 @@ function toggleTasksFold(){
   S.settings.tasksFold = true;
   save();
   if(deckCanAnimate() && cards.length){
-    var first = cards[0].getBoundingClientRect();
+    /* 收拢：卡片沿 Z 轴重排到堆叠位；最后一张结束时才重建 DOM，
+       时长由动画完成事件决定，不再用硬编码 setTimeout。 */
+    var anims = [];
     cards.forEach(function(c, i){
-      var r = c.getBoundingClientRect();
       c.style.zIndex = String(20 - i);
       c.style.position = 'relative';
-      var a = c.animate([
+      anims.push(c.animate([
         { transform:'none', opacity:1 },
-        { transform: deckTransform(i, first.left - r.left, first.top - r.top), opacity: i === 0 ? 1 : 0.82 }
-      ], { duration:420 + i * 40, easing:DECK_EASE, fill:'forwards' });
-      a.onfinish = function(){ a.cancel(); };
+        { transform:deckTransform(i), opacity:deckOpacity(i) }
+      ], { duration:DECK_MS, delay:i * 35, easing:DECK_EASE, fill:'forwards' }));
     });
-    setTimeout(renderTasks, 470);
+    var settle = function(){
+      anims.forEach(function(a){ a.cancel(); });
+      renderTasks();
+    };
+    var last = anims[anims.length - 1];
+    if(last.finished && typeof last.finished.then === 'function'){
+      last.finished.then(settle, settle);
+    }else{
+      last.onfinish = settle;
+    }
   }else{
     renderTasks();
   }
