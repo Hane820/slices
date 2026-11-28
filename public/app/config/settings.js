@@ -9,7 +9,6 @@
     '+ 新标记': '+ 新标记',
     '一个 JSON 文件，包含全部记录': '一个 JSON 文件，包含全部记录',
     '不可恢复，请先导出': '不可恢复，请先导出',
-    '今天算休息日': '今天算休息日',
     '今日重点条目': '今日重点条目',
     '从备份恢复': '从备份恢复',
     '会先给你看摘要，再决定合并还是替换': '会先给你看摘要，再决定合并还是替换',
@@ -38,7 +37,6 @@
   T.register('settings', {
     'settings.page.title': '设置',
     'settings.page.subtitle': '东西都只在这台设备上。',
-    'settings.section.remind': '提醒',
     'settings.section.pens': '我的标记',
     'settings.hint.pens': '点标记改名字和颜色，点 × 删掉。',
     'settings.section.tags': '标签',
@@ -54,7 +52,6 @@
 
   /* ===== 英文语义 key · 设置页（第二批迁移：JS 渲染文案；Auth 登录/空间/备份文案保留 OLT，待 Auth 批次统一处理） ===== */
   T.register('settings', {
-    'settings.restday.title': '今天算休息日',
     'settings.daycut.title': '几点算新的一天',
     'settings.daycut.subtitle': '每天重复的清单在这个时间清零',
     'settings.font.title': '字号',
@@ -73,10 +70,6 @@
     'settings.data.restoreBackup.subtitle': '会先给你看摘要，再决定合并还是替换',
     'settings.data.clearAll.title': '清空全部数据',
     'settings.data.clearAll.subtitle': '不可恢复，请先导出',
-    'settings.focus.title': '今日重点条目',
-    'settings.focus.subtitle': '首页一行三张；「健身」「学习」是默认预设，可改可删',
-    'settings.focus.addOne': '＋ 加一条',
-    'settings.focus.empty': '还没有条目，点右上角加一条。',
 
   });
 

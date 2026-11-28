@@ -1,29 +1,55 @@
-/* pdf.css — PDF 报告：导出设置面板 + 打印预览纸面 + 打印规则 */
-/* 导出设置面板里的勾选项 */
+/* ============================================================================
+ * pdf.css — 「导出 PDF / 打印预览」样式
+ * ----------------------------------------------------------------------------
+ * 这套样式平时看不到：它只在记录页点「导出 PDF」后出现的预览层里生效，
+ * 以及真正调用打印时（@media print）生效。
+ * 阅读顺序：
+ *   1 导出设置面板里的勾选项 .pdfck
+ *   2 预览浮层 #printView 与顶部工具栏 .pv-bar
+ *   3 纸面 .pv-paper（实际是 A4 尺寸的一块白纸）
+ *   4 纸面内容：标题 / 统计 / 月历 / 热力图 / 每日记录
+ *   5 打印规则（@page 与 @media print）
+ * 注意：这里的字号都用绝对 px 而不是 var(--ui-scale)，
+ *       因为纸面输出不应该跟随屏幕字号设置变化。
+ * ========================================================================== */
+/* 导出设置面板里的一行勾选：复选框 + 文字（accent-color 让系统勾选框变主色） */
 .pdfck{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink2);padding:8px 0}
 .pdfck input{width:17px;height:17px;accent-color:var(--sage)}
 
-/* 预览浮层与纸面 */
+/* 预览浮层：铺满整屏、盖在最上层（z-index:90），内部自己滚动
+   默认 display:none，JS 加 .on 才显示 */
 #printView{position:fixed;inset:0;background:var(--frame);z-index:90;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}
 #printView.on{display:block}
+/* 预览层顶部工具栏：返回 / 标题 / 打印按钮
+   position:sticky 让它随滚动一直贴在顶上 */
 .pv-bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;background:var(--bg);border-bottom:1px solid var(--line);padding:9px 14px}
 .pv-bar-t{flex:1;text-align:center;font-size:11px;color:var(--ink3)}
+/* A4 纸面：210mm × 297mm 的真实尺寸，屏幕上也按这个比例显示
+   padding 是纸内边距（相当于打印时的页边距）
+   窄屏（<800px）会切成满宽流式排版（见下面媒体查询） */
 .pv-paper{width:210mm;min-height:297mm;background:#fff;margin:18px auto;padding:16mm 14mm;box-shadow:0 10px 40px rgba(60,50,40,.16);color:#2E2C28;font-size:12px;line-height:1.75}
+/* 手机上不做纸张模拟：满宽、无外边距、无阴影，直接当普通长页面看 */
 @media(max-width:800px){.pv-paper{width:100%;min-height:0;margin:0;padding:18px;box-shadow:none}}
+/* 纸面大标题（报告名）与副标题 .pv-sub（副标题下面带一条分隔线） */
 .pv-h1{font-family:var(--serif);font-size:23px;font-weight:600;letter-spacing:1px}
 .pv-sub{font-size:11px;color:#8C8A85;margin-top:5px;padding-bottom:12px;border-bottom:1.5px solid #E9E3D8}
+/* 纸面小节标题：左侧一条主色竖线作为层级标记 */
 .pv-h2{font-family:var(--serif);font-size:16px;font-weight:600;margin:20px 0 9px;padding-left:9px;border-left:3px solid var(--sage)}
+/* 纸面顶部的统计三格（数字 + 标签） */
 .pv-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
 .pv-stat{min-width:0;border:1px solid #E9E3D8;border-radius:8px;padding:8px 10px}
 .pv-stat .l{font-size:10px;color:#8C8A85}
 .pv-stat .v{font-family:var(--serif);font-size:18px;font-weight:600;margin-top:2px}
+/* 纸面月历块
+   break-inside:avoid 是打印专用属性：这一块不要被分页切两半 */
 .pv-cal{margin-bottom:12px;break-inside:avoid}
 .pv-cal-t{font-size:12px;font-weight:600;margin-bottom:5px}
 .pv-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
 .pv-cal-grid span{height:26px;border:1px solid #F0EAE0;border-radius:3px;font-size:9px;color:#6D675E;padding:2px 3px;text-align:right}
 .pv-cal-grid span.hd{height:18px;border:none;text-align:center;color:#A79F92;font-size:9px}
 .pv-cal-grid span.out{border:none;background:transparent}
-/* 热力图：三张一排的月历式网格，撑满纸面 */
+/* 纸面热力图：三张一排；每格用 lv1~lv4 四档颜色表示深浅
+   颜色同样取自主色变量（--sage-rgb），所以换主题时纸面也会跟着变 */
 .pv-heat{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:8px}
 .pv-hm{break-inside:avoid;border:1px solid #E9E3D8;border-radius:8px;padding:9px 9px 8px}
 .pv-hm-h{margin-bottom:6px}
@@ -49,6 +75,8 @@
 .pv-hm-lg i.lv2{background:rgba(var(--sage-rgb),.45)}
 .pv-hm-lg i.lv3{background:rgba(var(--sage-rgb),.66)}
 .pv-hm-lg i.lv4{background:rgba(var(--sage-rgb),.88)}
+/* 纸面「每日记录」块：一天一段，虚线分隔
+   break-inside:avoid 保证一天不会被分页切开 */
 .pv-day{border-bottom:1px dashed #E4DED2;padding:9px 0 11px;break-inside:avoid}
 .pv-day-t{font-family:var(--serif);font-size:14px;font-weight:600;margin-bottom:5px}
 .pv-day-t em{font-style:normal;font-size:10px;color:#8C8A85;font-family:inherit;font-weight:400;margin-left:7px}
@@ -59,7 +87,15 @@
 .pv-empty{font-size:11.5px;color:#A79F92;padding:16px 0}
 .pv-foot{margin-top:24px;padding-top:10px;border-top:1px solid #E9E3D8;font-size:10px;color:#A79F92;text-align:center}
 
+/* 真正打印时的纸张设置：A4、四边 12mm 页边距 */
 @page{size:A4;margin:12mm}
+/* ===== 打印规则 =====
+ * 只在「真的打印/存 PDF」时生效，屏幕上完全不影响：
+ *   body.printing 时隐藏 App 本体、只输出预览纸面
+ *   .pv-bar 工具栏不打印、纸面去掉阴影与固定宽度
+ *   break-inside / break-after 控制哪些块不许被分页切开
+ *   print-color-adjust:exact 让背景色也能打印出来（默认浏览器会省墨去底色）
+ * ===== */
 @media print{
   html,body{background:#fff!important;overflow:visible!important}
   body.printing #app{display:none!important}

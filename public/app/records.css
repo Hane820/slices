@@ -1,91 +1,146 @@
-/* records.css — 记录页：项目 / 时间轴 / 月历 / 热力图 / 统计图表 */
-/* ---------- 项目切换条 ---------- */
+/* ============================================================================
+ * records.css — 「记录」页（底部导航第 3 个）专属样式
+ * ----------------------------------------------------------------------------
+ * 这一页有四个分段：计划 / 时间轴 / 月历 / 项目，样式按这个顺序排：
+ *   1 项目切换条  2 时间轴  3 月历（含荧光笔标记）  4 热力图  5 统计与图例
+ * 注意：月历有两套外观——本文件的是「记录页大月历」，
+ *       base.css 的 .dp-* 是弹层里的小日历，改之前确认改的是哪一套。
+ * ========================================================================== */
+/* ===== 1. 项目切换条（「项目」分段顶部那条）=====
+ * 一通栏大按钮：左边项目名 .ic-n、右边提示 .ic-a
+ * 点它打开项目选择浮层（不是下拉菜单）
+ * ===== */
 .item-cur{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
   background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);
   padding:15px 17px;font-family:inherit;cursor:pointer;box-shadow:var(--sh1);margin-bottom:14px;
   transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .4s var(--ease)}
+/* 电脑上悬停轻微上浮（手机无效果） */
 .item-cur:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:#E2D8C6}
 .item-cur .ic-n{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:600;color:var(--ink);letter-spacing:1px}
 .item-cur .ic-a{font-size:12px;color:var(--ink3);white-space:nowrap}
 
-/* ---------- 时间轴 ---------- */
+/* ===== 2. 时间轴 =====
+ * 左边一条贯穿竖线用 ::before 画（1px，绝对定位）
+ * 每个条目自己在 ::before 画一个圆点，压在竖线上 → 形成时间轴节点
+ * ===== */
 .tl{position:relative;padding-left:20px}
 .tl::before{content:"";position:absolute;left:4.5px;top:8px;bottom:14px;width:1px;background:var(--line)}
+/* 时间轴上的一个日期块；.today 时圆点变主色（下一条） */
 .tl-item{position:relative;margin-bottom:18px}
+/* 节点圆点：left:-19px 让它落在左边那条竖线上，而不是内容区里 */
 .tl-item::before{content:"";position:absolute;left:-19px;top:7px;width:8px;height:8px;border-radius:50%;background:var(--paper);border:1.6px solid #D7CDBC}
+/* 今天那一块：圆点实心主色，一眼能找到「今天在哪」 */
 .tl-item.today::before{background:var(--sage);border-color:var(--sage)}
+/* 日期标题行：日期 + 星期 + 右侧条数 */
 .tl-h{display:flex;align-items:baseline;gap:8px;margin-bottom:7px;cursor:pointer}
+/* 日期大字（衬线体），如「11/28」 */
 .tl-date{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:600;letter-spacing:.3px}
 .tl-wd{font-size:11px;color:var(--ink3)}
+/* 右侧「3 条」这类计数；margin-left:auto 推到最右 */
 .tl-n{margin-left:auto;font-size:10.5px;color:var(--ink3);letter-spacing:.5px}
+/* 一天的内容卡片（比主卡小一档圆角 r1） */
 .tl-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:4px 13px;box-shadow:var(--sh1)}
+/* 卡片里的一行：左边类型 .tl-k（计划/标记/训练…）、右边内容 .tl-v
+   类型列固定 42px 宽，所有行的内容才会左对齐 */
 .tl-row{display:flex;gap:9px;padding:8px 0;font-size:12.5px;line-height:1.6}
 .tl-row+.tl-row{border-top:1px solid var(--line2)}
 .tl-k{flex:0 0 42px;font-size:10.5px;color:var(--ink3);padding-top:2px;font-variant-numeric:tabular-nums}
 .tl-v{flex:1;min-width:0;color:var(--ink2);word-break:break-word;line-height:1.85}
 .tl-v b{font-weight:600;color:var(--ink)}
+/* 「加载更早的记录」虚线按钮（时间轴底部） */
 .tl-load{width:100%;margin-top:4px;padding:12px;border:1px dashed var(--line);background:transparent;border-radius:var(--r1);font-family:inherit;font-size:12.5px;color:var(--ink2);cursor:pointer}
 .tl-load:active{background:var(--paper2)}
 
-/* ---------- 月历 ---------- */
+/* ===== 3. 月历 =====
+ * 顶部是「大月份 + 统计信息 + 左右切换」，下面是星期行和日期格
+ * 日期格里可能同时叠了：荧光笔道（彩色横条）、表情、数字
+ * ===== */
 .mhead{display:flex;align-items:flex-start;justify-content:space-between;padding:0 2px 12px}
+/* 那个很大的月份数字，如「11」 */
 .mtitle{font-family:var(--serif);font-size:calc(26px * var(--ui-scale));font-weight:700;letter-spacing:.5px;line-height:1.15}
 .mmeta{font-size:11px;color:var(--ink3);margin-top:5px}
+/* 右侧「上月 / 今 / 下月」三个方块按钮 */
 .mnav{display:flex;gap:6px}
 .mnav button{
   width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:10px;color:var(--ink2);
   font-size:14px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;
 }
 .mnav button:active{background:var(--paper2)}
+/* 月份下方的一行说明文字 */
 .mf-hint{font-size:10.5px;color:var(--ink3);margin:10px 2px 12px;line-height:1.6}
+/* 星期行：7 列等宽网格（日 一 二 … 六） */
 .wrow{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px}
 .wrow span{text-align:center;font-size:10px;color:var(--ink3);padding:3px 0}
+/* 日期网格：7 列等宽；切换月份时 JS 会临时加 .anim 播一次淡入（关键帧在下一行） */
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
 .grid.anim{animation:calIn .65s var(--ease)}
 @keyframes calIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* 一个日期格：正方形（aspect-ratio:1）、相对定位
+   相对定位是为了让里面绝对定位的荧光笔道和表情叠在数字上
+   overflow:hidden 保证笔道不会溢出圆角 */
 .day{
   aspect-ratio:1;border-radius:11px;display:flex;align-items:center;justify-content:center;
   font-size:15px;cursor:pointer;position:relative;color:var(--ink);overflow:hidden;
   transition:transform .14s ease,background .2s,opacity .25s;
 }
 .day:active{transform:scale(.9)}
+/* 月初补位的空格子：不可点、完全透明 */
 .day.blank{cursor:default;opacity:0}
+/* 该日期没有任何记录时压暗（筛选状态下才会加） */
 .day.dim{opacity:.3}
+/* 今天：内阴影描边 + 数字加粗 */
 .day.today{box-shadow:inset 0 0 0 1.4px var(--sage);font-weight:600}
+/* 日期格上方的表情符号（叠在荧光笔道之上，z-index:1） */
 .day .emo{position:absolute;top:3px;left:0;right:0;text-align:center;font-size:12px;line-height:1;z-index:1}
+/* 日期数字本身；text-shadow 是一圈浅光，让数字在彩色笔道上依然清楚 */
 .day .dnum{position:relative;z-index:1;font-weight:600;color:var(--ink);text-shadow:0 0 3px rgba(255,253,249,.9)}
-/* 荧光笔道：压在数字后面，多支笔时粗细交替 */
+/* 荧光笔道（多支标记叠加时，一道压一道）
+   pointer-events:none 不挡点击；整层绝对定位铺满格子上 */
 .day .swipes{position:absolute;inset:0;pointer-events:none}
+/* 单道笔迹：左右各留 6%，透明度 0.42 让底色透出来 */
 .day .swipe{position:absolute;left:6%;right:6%;border-radius:999px;opacity:.42}
+/* 三档笔迹粗细/位置：s1 最细（一道）、s2 中等、s3 最粗
+   高度百分比相对格子高度，所以格子变大时会等比变粗 */
 .day .swipe.s1{height:18%;top:60%}
 .day .swipe.s2{height:32%;top:42%}
 .day .swipe.s3{height:40%;top:34%}
 
-/* 多标记选择行 */
+/* 多标记选择行（点某一天后弹出的「给这天标几笔」面板里的行）
+   一行 = 色点 + 标记名 + 粗细选择 + × */
 .mksel{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:calc(13px * var(--ui-scale))}
 .mksel+.mksel{border-top:1px solid var(--line2)}
 .mksel-dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
 .mksel-n{flex:1;min-width:0;color:var(--ink)}
 .mksel-sizes{display:flex;gap:4px}
+/* 粗细选择按钮；.on 表示当前选中的粗细（浅主色底 + 主色字） */
 .mksel-sz{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:4px 9px;font-family:inherit;font-size:11px;color:var(--ink2);cursor:pointer;transition:all .16s}
 .mksel-sz.on{background:var(--sage-l);border-color:var(--sage);color:var(--sage-d);font-weight:600}
 .mksel-x{border:none;background:transparent;color:var(--ink3);font-size:15px;cursor:pointer;font-family:inherit;padding:0 2px}
 
-/* ---------- 热力图 ---------- */
+/* ===== 4. 热力图（记录页「热力图」区块）=====
+ * 外层两列网格，每个卡片是一个指标的月历式热力块
+ * 颜色深浅不是写死的：用 lv1~lv4 四档，颜色来自主色变量按透明度叠加
+ * ===== */
 .heat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* 一个指标的热力卡片 */
 .heat-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:13px 12px 12px;box-shadow:var(--sh1)}
+/* 卡片头：指标名 + 右侧合计 */
 .heat-h{display:flex;align-items:baseline;gap:6px;margin-bottom:7px}
 .heat-n{font-family:var(--serif);font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:54%}
 .heat-v{font-size:9px;color:var(--ink3);margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
 .heat-card .heat{gap:2px}
 .heat-card .heat .hc{font-size:7.5px;border-radius:3px}
+/* 热力格网格：7 列（一周七天一行） */
 .heat{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+/* 一个热力格；默认浅底，按记录条数由 JS 加 lv1~lv4 逐级加深 */
 .heat .hc{aspect-ratio:1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9.5px;color:var(--ink3);background:var(--line2)}
 .heat .hc.blank{background:transparent}
+/* 四档深浅：lv1 最浅 → lv4 最深（颜色 = 主色 + 不同透明度） */
 .heat .hc.lv1{background:rgba(var(--sage-rgb),.22);color:var(--ink2)}
 .heat .hc.lv2{background:rgba(var(--sage-rgb),.38);color:var(--ink2)}
 .heat .hc.lv3{background:rgba(var(--sage-rgb),.58);color:#fff}
 .heat .hc.lv4{background:rgba(var(--sage-rgb),.8);color:#fff}
+/* 图例：一排小方块说明「越深越多」 */
 .heat-legend{display:flex;align-items:center;gap:5px;margin-top:10px;font-size:10px;color:var(--ink3)}
 .heat-legend .hl-sw{width:11px;height:11px;border-radius:3px;background:var(--line2);display:inline-block}
 .heat-legend .hl-sw.lv1{background:rgba(var(--sage-rgb),.22)}
@@ -94,29 +149,42 @@
 .heat-legend .hl-sw.lv4{background:rgba(var(--sage-rgb),.8)}
 .heat-legend .hl-t{font-size:10px}
 
-/* ---------- 统计 / 图表 / 记录列表 ---------- */
+/* ===== 5. 统计数字、柱状图、训练列表 =====
+ * .gym-stats 是「三格数字卡」的容器（记录页与项目页共用）
+ * ===== */
 .gym-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+/* 一格数字卡：上面小标签 .l、下面大数字 .v */
 .gym-stat{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:12px;box-shadow:var(--sh1)}
 .gym-stat .l{font-size:10px;letter-spacing:1.2px;color:var(--ink3)}
 .gym-stat .v{font-family:var(--serif);font-size:calc(22px * var(--ui-scale));font-weight:600;margin-top:6px;line-height:1}
 .gym-stat .v em{font-style:normal;font-size:10px;font-family:inherit;font-weight:400;color:var(--ink3);margin-left:3px}
+/* 柱状图容器：flex + align-items:flex-end，柱子从底部往上长
+ * height:74px 是图表固定高度，改这里柱子整体高度会变
+ * 柱子宽度由 flex:1 均分，不需要单独设宽 */
 .chart{display:flex;align-items:flex-end;gap:4px;height:74px;margin-top:6px;border-bottom:1px solid var(--line2);padding-bottom:1px}
+/* 一根柱子：高度由 JS 写 inline style（按数值换算），transition 让它长起来
+   .has = 这天有数据（主色）；.today = 今天（陶红，作为参照） */
 .bar{flex:1;border-radius:3px 3px 0 0;background:#EFE8DB;position:relative;transition:height .5s var(--ease);min-height:3px}
 .bar.has{background:var(--sage)}
 .bar.today{background:var(--clay)}
+/* 柱子下方的横轴文字 */
 .chart-x{display:flex;gap:4px;margin-top:6px}
 .chart-x span{flex:1;text-align:center;font-size:8.5px;color:var(--ink3)}
+/* 训练记录列表的一行；首行不画上边框 */
 .wk-item{display:flex;gap:10px;padding:11px 0;border-top:1px solid var(--line2);align-items:flex-start;cursor:pointer}
 .wk-item:first-child{border-top:none}
 .wk-d{flex:0 0 44px;font-size:11px;color:var(--ink3);padding-top:2px;line-height:1.5}
 .wk-main{flex:1;min-width:0}
 .wk-t{font-size:13.5px;line-height:1.4}
 .wk-s{font-size:10.5px;color:var(--ink3);margin-top:3px}
+/* 行尾的数值（分钟/次数），用衬线体强调 */
 .wk-v{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--sage-d);flex:0 0 auto}
 
-/* 记录页头部的导出入口 */
+/* 记录页头部右下角的「导出 PDF ↗」文字入口 */
 .hd-pdf{display:inline-block;margin-top:10px;font-size:11.5px;color:var(--sage-d);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 
+/* 很窄的手机：日期数字和表情各收一号
+   注意：只影响记录页大月历，不影响弹层里的小日历 */
 @media(max-width:360px){
   .day{font-size:12px}.day .emo{font-size:14px}
 }

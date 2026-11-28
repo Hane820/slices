@@ -749,6 +749,19 @@ function normalize(){
     if(!t.done || typeof t.done !== 'object') t.done = {};
     if(!t.cat) t.cat = CAT_WANT;
     if(!t.repeat) t.repeat = t.cat === CAT_ROUTINE ? 'daily' : 'once';
+    /* 重复规则：daily 不需要 weekdays；weekly 必须有 0-6 的星期数组，坏数据兜底成周一 */
+    if(t.repeat === 'weekly'){
+      t.cat = CAT_ROUTINE;
+      if(!Array.isArray(t.weekdays)) t.weekdays = [];
+      t.weekdays = t.weekdays.filter(function(n){ return typeof n === 'number' && n >= 0 && n <= 6; });
+      t.weekdays = t.weekdays.filter(function(n, i){ return t.weekdays.indexOf(n) === i; }).sort();
+      if(!t.weekdays.length) t.weekdays = [1];
+    }else if(t.repeat === 'daily'){
+      t.cat = CAT_ROUTINE;
+      if(t.weekdays) delete t.weekdays;
+    }else if(t.weekdays){
+      delete t.weekdays;
+    }
   });
   S.suggestions.forEach(function(sg){
     if(!Array.isArray(sg.tags)) sg.tags = [];

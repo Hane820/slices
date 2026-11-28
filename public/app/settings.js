@@ -1,25 +1,6 @@
 /* settings.js — 设置 */
 /* ==================== 设置 ==================== */
 function renderSettings(){
-  // 提醒：只保留「今天算休息日」——它抑制当天计划提醒，也会在导出的记录里标注休息日
-  var rb = $('remindSet');
-  rb.innerHTML = '';
-  var isRest = S.restDays.indexOf(TODAY()) >= 0;
-  var r2 = el('div','row');
-  var r2m = el('div','row-main');
-  r2m.appendChild(el('div','row-t',U('settings.restday.title')));
-  r2m.appendChild(el('div','row-s', isRest ? '今天不提醒，记录里标成休息日' : '想休息就打开，今天不提醒'));
-  r2.appendChild(r2m);
-  var r2s = el('button','sw' + (isRest ? ' on' : ''));
-  r2s.addEventListener('click', function(){
-    var t0 = TODAY();
-    if(isRest) S.restDays = S.restDays.filter(function(d){ return d !== t0; });
-    else S.restDays.push(t0);
-    save(function(){ toastCfg(isRest ? 'remindRestOn' : 'remindRestOff'); }); renderSettings(); renderRemind();
-  });
-  r2.appendChild(r2s);
-  rb.appendChild(r2);
-
   // 标记池
   var pp = $('penPool');
   pp.innerHTML = '';
@@ -146,8 +127,6 @@ function renderSettings(){
   });
   slider.addEventListener('change', function(){ save(function(){ toastCfg('fontScaleSaved'); }, { highFrequency:true }); });
   lb.appendChild(slider);
-
-  renderFocusSet();
 
   // 数据
   var db = $('dataSet');
@@ -526,41 +505,8 @@ function openPenEdit(existing){
 }
 
 
-/* 今日重点：和首页、记录页「项目」共用同一份数据 */
-function renderFocusSet(){
-  var box = $('focusSet');
-  if(!box) return;
-  box.innerHTML = '';
-  var list = S.settings.focusItems || [];
-
-  var head = el('div','row');
-  var hm = el('div','row-main');
-  hm.appendChild(el('div','row-t',U('settings.focus.title')));
-  hm.appendChild(el('div','row-s',U('settings.focus.subtitle')));
-  head.appendChild(hm);
-  var add = el('div','row-a',U('settings.focus.addOne'));
-  add.style.color = 'var(--sage-d)';
-  add.addEventListener('click', function(){ openFocusEdit(null, true); });
-  head.appendChild(add);
-  box.appendChild(head);
-
-  if(!list.length){
-    box.appendChild(el('div','row-s',U('settings.focus.empty')));
-    return;
-  }
-
-  list.forEach(function(it){
-    var row = el('div','row');
-    row.dataset.fid = it.id;
-    var m = el('div','row-main');
-    var t = el('div','row-t', it.text);
-    m.appendChild(t);
-    m.appendChild(el('div','row-s', (it.mode === 'multi' ? '多选' : '自填') + ' · ' + (focusHasGoal(it) ? focusGoalText(it) : '不设目标') + ' · 点开编辑'));
-    row.appendChild(m);
-    row.addEventListener('click', function(){ openFocusEdit(it, false); });
-    box.appendChild(row);
-  });
-}
+/* 今日重点的入口已移到首页（每张卡下的半圆书签 + 末尾新建卡），
+   这里只保留编辑面板本身，不再渲染设置页列表。 */
 
 /* 一条重点的完整编辑：名字 / 输入方式（多选 chips / 自填文本）/ 每天目标（数字 + 单位，可不设） */
 function openFocusEdit(it, isNew){
@@ -736,7 +682,7 @@ function openFocusEdit(it, isNew){
       it.text = name; it.goal = goal; it.unit = gu || '分钟';
       it.mode = fields.mode; it.options = fields.options; it.label = fields.label; it.ph = fields.ph;
     }
-    save(function(){ toastCfg(isNew ? 'focusAdded' : 'focusSaved'); }); closeSheet(); renderFocusSet(); renderGoals(); renderRemind();
+    save(function(){ toastCfg(isNew ? 'focusAdded' : 'focusSaved'); }); closeSheet(); renderGoals(); renderRemind();
     if(currentPage === 'pRecords') renderProject();
   });
   if(!isNew){
@@ -744,30 +690,16 @@ function openFocusEdit(it, isNew){
       var pos = S.settings.focusItems.indexOf(it);
       confirmBox('删除这条重点？', '删除「' + it.text + '」？此操作不可撤销。', function(){
         closeSheet();
-        /* 行淡出 + 高度收起（0.2s），然后移除数据 */
-        var row = document.querySelector('#focusSet .row[data-fid="' + it.id + '"]');
-        if(row && deckCanAnimate()){
-          row.style.transition = 'opacity .2s ease, max-height .2s ease, padding .2s ease';
-          row.style.maxHeight = row.offsetHeight + 'px';
-          row.style.overflow = 'hidden';
-          requestAnimationFrame(function(){
-            row.style.opacity = '0';
-            row.style.maxHeight = '0';
-            row.style.paddingTop = '0';
-            row.style.paddingBottom = '0';
+        S.settings.focusItems = S.settings.focusItems.filter(function(x){ return x !== it; });
+        save(function(){
+          toastCfg('focusDeleted', { name: it.text }, '撤销', function(){
+            S.settings.focusItems.splice(Math.min(pos, S.settings.focusItems.length), 0, it);
+            save(function(){ toastCfg('focusRestored'); }); renderGoals();
+            if(currentPage === 'pRecords') renderProject();
           });
-        }
-        setTimeout(function(){
-          S.settings.focusItems = S.settings.focusItems.filter(function(x){ return x !== it; });
-          save(function(){
-            toastCfg('focusDeleted', { name: it.text }, '撤销', function(){
-              S.settings.focusItems.splice(Math.min(pos, S.settings.focusItems.length), 0, it);
-              save(function(){ toastCfg('focusRestored'); }); renderFocusSet(); renderGoals();
-              if(currentPage === 'pRecords') renderProject();
-            });
-          }); renderFocusSet(); renderGoals();
-          if(currentPage === 'pRecords') renderProject();
-        }, deckCanAnimate() ? 210 : 0);
+        });
+        renderGoals();
+        if(currentPage === 'pRecords') renderProject();
       }, { okText: '确认删除' });
     });
   }

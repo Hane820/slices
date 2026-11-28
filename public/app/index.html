@@ -20,30 +20,21 @@
 
   <!-- ================= 今日 ================= -->
   <section class="page on" id="pToday">
-    <div class="pad hd">
+    <div class="pad hd hd-inline">
       <div class="hd-date" id="hdDate"></div>
       <h1 class="hd-hi" id="hdHi" data-i18n="today.greeting.morning">早上好</h1>
     </div>
     <div id="remindWrap"></div>
-    <div class="pad">
-      <div class="sec">
-        <span class="sec-t" data-i18n="today.section.tasks">今日待办</span><span class="sec-line"></span>
-        <span class="sec-a" id="toggleDone" data-action="toggle-done" data-i18n="today.action.hideDone">隐藏已完成</span>
-        <span class="sec-a" id="foldTasks" data-action="fold-tasks" data-i18n="common.action.collapse">收起 ▴</span>
-      </div>
-    </div>
     <div class="pad" id="taskWrap"></div>
 
     <div class="pad">
-      <div class="sec"><span class="sec-t" data-i18n="today.section.focus">今日重点</span><span class="sec-line"></span></div>
       <div class="goals" id="goalWrap"></div>
 
       <div class="sec"><span class="sec-t" data-i18n="today.section.schedule">今天的安排</span><span class="sec-line"></span><span class="sec-a" id="addSch" data-i18n="common.action.addOne">+ 加一条</span></div>
       <div class="card" id="schWrap"></div>
 
-      <div class="sec"><span class="sec-t" data-i18n="today.section.flash">随手记</span><span class="sec-line"></span></div>
       <div class="card plain" id="flashBox">
-        <textarea class="flash-ta" id="flashTa"></textarea>
+        <textarea class="flash-ta" id="flashTa" placeholder="随手记" data-i18n="today.placeholder.flash" data-i18n-attr="placeholder"></textarea>
         <div class="flash-foot"><span class="flash-hint" data-i18n="today.hint.flash">随手写，松手自动存</span><button class="btn p sm" id="flashSave" data-i18n="today.action.saveFlash">记下来</button></div>
       </div>
       <div class="flash-list" id="flashList"></div>
@@ -190,12 +181,6 @@
       <div class="hd-sub" data-i18n="settings.page.subtitle">东西都只在这台设备上。</div>
     </div>
     <div class="pad">
-      <div class="sec"><span class="sec-t" data-i18n="today.section.focus">今日重点</span><span class="sec-line"></span></div>
-      <div class="card plain" id="focusSet"></div>
-
-      <div class="sec"><span class="sec-t" data-i18n="settings.section.remind">提醒</span><span class="sec-line"></span></div>
-      <div class="card plain" id="remindSet"></div>
-
       <div class="sec"><span class="sec-t" data-i18n="settings.section.pens">我的标记</span><span class="sec-line"></span><span class="sec-a" id="addPen" data-i18n="common.action.new">+ 新建</span></div>
       <div class="pool" id="penPool"></div>
       <div style="font-size:10.5px;color:var(--ink3);margin:8px 4px 0;line-height:1.6" data-i18n="settings.hint.pens">点标记改名字和颜色，点 × 删掉。</div>

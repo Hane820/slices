@@ -527,11 +527,6 @@ var itemSel = null;
 function focusItemKind(it){
   return { key:'item', unit: focusUnit(it) };
 }
-function focusItemOf(id){
-  var items = S.settings.focusItems || [];
-  for(var i = 0; i < items.length; i++) if(items[i].id === id) return items[i];
-  return null;
-}
 function focusItemCur(){
   var items = S.settings.focusItems || [];
   if(!items.length) return null;
@@ -679,36 +674,7 @@ function itemAddLog(){
   openFocusLog(it);
 }
 
-function openWorkout(w, itemId){
-  var isNew = !w;
-  var item = w || { id: uid('w'), date: TODAY(), start:'', minutes:'', parts:[], kcal:'', note:'', itemId: itemId || '' };
-  openLogSheet({
-    title: isNew ? '记一次训练' : '改这次训练',
-    sub: '时长必填，其它都可以留空。',
-    date: item.date, time: item.start || '', minutes: item.minutes,
-    minutesLabel: '时长（分钟，必填）',
-    tagLabel: '练了什么（可多选）', tagOptions: PARTS, tags: item.parts,
-    extra: { label: '消耗（千卡）', value: item.kcal, placeholder: '—' },
-    note: item.note, noteLabel: '备注', notePlaceholder: '状态、重量、感觉',
-    needMinutes: true, okText: '保存',
-    onDelete: isNew ? null : function(){
-      confirmBox('删掉这次训练？', '这条记录会消失，统计也会跟着变。', function(){
-        S.workouts = S.workouts.filter(function(x){ return x.id !== item.id; });
-        save(function(){ toastCfg('recordEntryDeleted'); }); closeSheet(); renderProject(); renderGoals(); renderRemind();
-      });
-    },
-    onSave: function(d){
-      item.date = d.date; item.start = d.time; item.minutes = d.minutes;
-      item.parts = d.tags; item.kcal = d.extra; item.note = d.note;
-      if(isNew) S.workouts.push(item);
-      save(function(){ toastCfg('workoutSaved', { minutes: d.minutes }); }); closeSheet();
-      if(currentPage === 'pRecords') renderProject();
-      renderGoals(); renderRemind(); renderToday();
-    }
-  });
-}
-
-/* ==================== 记录：学习 ==================== */
+/* ==================== 记录页视图切换 ==================== */
 function renderRecords(){
   var v = recordView;
   /* 饮食记录（插件）：开关只控制入口显隐，数据不动；关掉时若正停在饮食视图则回落 */

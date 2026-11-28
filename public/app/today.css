@@ -1,174 +1,313 @@
-/* today.css — 今日页：提醒条 / 待办 / 今日重点 / 随手记 / 日程 / 计划 */
-/* ---------- 提醒条 ---------- */
+/* ============================================================================
+ * today.css — 「今日」页（首页）专属样式
+ * ----------------------------------------------------------------------------
+ * 谁在用：index.html 里 id="pToday" 这一屏（底部导航第 1 个「今日」）。
+ * 依赖：base.css 提供主题变量、卡片骨格、按钮、弹层；这里只写今日页特有的部分。
+ * 阅读顺序 = 页面从上到下的顺序：
+ *   1 提醒条 → 2 待办卡 → 3 每天重复 → 4 标签条 → 5 卡片折叠
+ *   → 6 今日重点 → 7 随手记 → 8 日程 → 9 计划 → 10 窄屏与动画
+ * 想改某个元素：按屏幕上的位置找到对应区块，再看该规则上方的说明。
+ * ========================================================================== */
+/* ===== 1. 提醒条（今天到期的计划）
+ * 位置：首页问候语下面、待办卡上面；有到期计划才出现（JS renderRemind）
+ * 控制：左侧竖色条、浅米底、只有右侧两个圆角
+ * 注意：整条是「一条提示」，里面的 × 是「今天不再提醒」
+ * ===== */
 .remind{
   margin:0 18px 4px;background:var(--paper2);border-left:3px solid var(--clay);
   border-radius:0 var(--r1) var(--r1) 0;padding:11px 28px 11px 13px;position:relative;
 }
+/* 提醒里的一行文字；最多显示 2 行（JS 里 slice(0,2)），两条之间才加间距 */
 .remind-line{font-size:12.5px;line-height:1.65;color:#7A533D;display:flex;gap:8px;align-items:flex-start;padding-right:16px}
 .remind-line+.remind-line{margin-top:6px}
 .remind-line span{flex:1}
+/* 右上角的 ×：写 remindDismissed，今天不再弹这条提醒 */
 .remind-x{border:none;background:transparent;color:var(--ink3);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit;position:absolute;right:6px;top:5px;opacity:.7;transition:opacity .18s}
 .remind-x:active{opacity:1}
+/* 行尾的「去计划」文字按钮（下划线样式，不是实心按钮） */
 .remind-act{border:none;background:transparent;color:#8B5A3E;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
 
-/* ---------- 待办：一个分类一张卡 ---------- */
+/* ===== 2. 待办卡（首页第一张大卡）
+ * 结构：卡头 .th → 待办行 .task → 「+ 加一条」.addline → 每天重复 .routine-sec
+ * 整张卡由 JS buildTaskCard 生成，样式只管外观
+ * ===== */
 .th{display:flex;align-items:center;gap:9px;padding:11px 0 7px}
+/* 卡头左侧标题「待办事项」；flex:1 把右侧计数和全勾按钮挤到最右 */
 .th-n{font-size:calc(14px * var(--ui-scale));letter-spacing:1px;color:var(--ink);font-weight:700;flex:1}
 .th-c{font-size:calc(12px * var(--ui-scale));color:var(--ink2);font-weight:600;font-variant-numeric:tabular-nums}
+/* 标签卡（首页最下面那张，插件 tags 打开时才有），内边距比普通卡窄 */
 .tagcard{padding:2px 14px;margin-top:13px}
+/* 卡头右侧圆形「全勾」按钮；.on = 这一组已经全部勾完（实心主色） */
 .allbtn{
   width:21px;height:21px;border-radius:50%;border:1.4px solid var(--line);background:#fff;
   cursor:pointer;flex:0 0 auto;transition:all .22s cubic-bezier(.3,1.4,.5,1);padding:0;
 }
 .allbtn:active{transform:scale(.88)}
 .allbtn.on{background:var(--sage);border-color:var(--sage)}
+/* ===== 一条待办（普通待办与每天重复共用同一套行样式）
+ * 勾选后不会消失：加 .done 变灰划线，并排到列表下方（JS 排序）
+ * .task 本身是整行的点击热区
+ * ===== */
 .task{display:flex;align-items:flex-start;gap:12px;padding:14px 0;cursor:pointer;position:relative}
 .task+.task{border-top:1px solid var(--line2)}
+/* 左侧圆形勾选圈，21px；勾中时 .on 变主色并弹一下（见下条 pop 动画） */
 .check{
   width:21px;height:21px;border:1.4px solid #DCD3C4;border-radius:50%;flex:0 0 auto;margin-top:2px;
   display:flex;align-items:center;justify-content:center;transition:all .18s ease;background:#fff;
 }
+/* 勾中态：变主色 + 播一次 pop（pop 关键帧在本条下一行） */
 .check.on{background:var(--sage);border-color:var(--sage);animation:pop .32s cubic-bezier(.3,1.6,.5,1)}
+/* 勾选瞬间的小回弹：先缩到 0.5，过冲到 1.15，回到 1 */
 @keyframes pop{0%{transform:scale(.5)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+/* 勾中后的白色对勾：用两条边框旋转 45° 拼成，不额外加载图标 */
 .check.on::after{content:"";width:9px;height:4.5px;border-left:1.8px solid #fff;border-bottom:1.8px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+/* 文字区；min-width:0 是长标题能正常换行的关键，去掉会被撑破布局 */
 .task-main{flex:1;min-width:0}
+/* 待办标题文字 */
 .task-t{font-size:calc(14px * var(--ui-scale));line-height:1.75;color:var(--ink);transition:color .2s;word-break:break-word}
+/* 已完成：灰字 + 删除线 */
 .task.done .task-t{color:var(--ink3);text-decoration:line-through;text-decoration-color:#CFC6B7}
-/* 番茄钟结束自动打钩后的确认脉冲 */
+/* 历史遗留：JS 目前加的是 .pomo-hit（文件末尾），这条 .hit 实际不会被触发 */
 .task.hit{animation:taskHit 1.2s var(--ease) 1}
 @keyframes taskHit{0%{background:var(--sage-l)}100%{background:transparent}}
+/* 标题下的小字：到期 / 重复规则 / 时长 / 备注，自动换行 */
 .task-m{font-size:10.5px;color:var(--ink3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
 .task-m .due{color:var(--clay)}
+/* 行尾「⋯」更多按钮，平时半透明，按下才清晰 */
 .task-more{
   border:none;background:transparent;color:var(--ink3);font-size:14px;letter-spacing:1px;cursor:pointer;
   font-family:inherit;padding:0 2px;flex:0 0 auto;line-height:1.4;opacity:.5;transition:opacity .18s;
 }
 .task-more:active{opacity:.9}
+/* 「+ 加一条」行；待办区和每天重复区各一个，靠 data-cat 决定加到哪 */
 .addline{display:flex;align-items:center;gap:8px;padding:13px 0 14px;cursor:pointer;font-size:calc(14px * var(--ui-scale));color:var(--ink2);transition:color .18s}
 .addline:active{color:var(--sage-d)}
 .addline b{font-weight:500;font-size:calc(17px * var(--ui-scale));line-height:1}
+/* 点「+ 加一条」后就地展开的输入行（不是弹窗），带「加上 / ×」 */
 .inline-add{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line2)}
 .inline-add input{flex:1;border:none;background:transparent;outline:none;font-family:inherit;font-size:16px;color:var(--ink);min-width:0}
 .inline-add input::placeholder{font-size:13px;color:var(--ink3)}
 .inline-add .ok{border:none;background:transparent;font-family:inherit;font-size:12.5px;color:var(--sage-d);font-weight:600;cursor:pointer;padding:3px 4px}
 .inline-add .no{border:none;background:transparent;color:var(--ink3);font-size:15px;cursor:pointer;font-family:inherit;padding:3px 2px}
+/* 卡内空状态提示文字 */
 .empty{padding:9px 0 13px;font-size:12px;color:var(--ink3);line-height:1.6}
 
-/* 标签条：待办卡最后一行 */
+/* ===== 3. 每天重复（待办卡里的子区块）
+ * 判定：JS isRoutineTask；每天项天天出现，每周项只在选中的星期出现
+ * 外观：上面一条淡分隔线，把自己的标题和「加一条重复」围成一个区块
+ * ===== */
+.routine-sec{margin-top:14px;border-top:1px solid var(--line2);padding-top:11px}
+.routine-head{display:flex;align-items:center;gap:8px;padding:1px 0 3px}
+/* 「每天重复」小标题 */
+.routine-t{font-size:calc(11.5px * var(--ui-scale));font-weight:700;letter-spacing:1.2px;color:var(--ink2)}
+/* 区块右侧的 0/3 完成计数 */
+.routine-c{font-size:10.5px;color:var(--ink3);font-variant-numeric:tabular-nums;margin-left:auto;letter-spacing:.5px}
+.routine-empty{font-size:11.5px;color:var(--ink3);padding:7px 0 3px;line-height:1.6}
+/* 「加一条重复」比普通「加一条」字号略小，视觉上从属于该区块 */
+.routine-add{padding:10px 0 12px;font-size:calc(13px * var(--ui-scale))}
+/* 重复规则那截小字（每天 / 每周二、五）用主色深调，和到期提醒区分 */
+.task-m .rep{color:var(--sage-d)}
+
+/* ===== 4. 标签条（待办卡最后一行）
+ * 插件 tags 打开时才有：一排可点标签 + 圆形「＋」打开全部标签
+ * ===== */
 .tagfoot{display:flex;align-items:center;gap:10px;padding:10px 0 11px;border-top:1px solid var(--line2);flex-wrap:wrap}
 .tf-l{font-size:11px;letter-spacing:1.6px;color:var(--ink3);flex:0 0 auto;font-weight:600}
+/* 标签条末尾的虚线圆形「＋」 */
 .tf-add{
   flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:1px dashed var(--line);background:transparent;
   color:var(--ink3);font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0;
 }
 
-/* ---------- 折叠：今日待办沿 Z 轴叠成一摞（card-stack） ----------
-   三层同色白卡、16px 圆角、无旋转；只靠 transform / opacity 分层：
-   主卡 0/1/1 · 第二层 -12px/.96/.7 · 第三层 -24px/.92/.4。
-   静态状态由 .deck[data-fold] 定义；动画末帧与之逐项一致，
-   统一 400ms cubic-bezier(.22,1,.36,1)，展开/收拢是同一批节点的双向插值。 */
+/* ===== 5. 待办卡折叠成「一摞纸」
+ * 入口：卡片上沿正中的绿色书签 .deck-bookmark
+ * 结构：.deck 外层 → .deck-stage 真实卡片（最上层）→ .deck-l.l1/.l2 两张纯装饰底牌
+ * 状态：.deck[data-fold="1"] = 收起，"0" = 展开（JS setDeckFold）
+ * 动画：时长/缓动在 JS（DECK_MS / DECK_EASE）用 WAAPI 插值，CSS 只定义收起后的终点外观
+ * 注意：改这里的外观必须同步检查 JS 的动画参数，否则最后一帧会跳
+ * ===== */
 .deck{
-  --deck-ease:cubic-bezier(.22,1,.36,1);
-  --deck-ms:400ms;
-  position:relative;margin-bottom:16px;
-  padding-top:48px; /* 为向上偏移的后置层预留 48px */
+  position:relative;margin-bottom:38px;
 }
+/* 一张装饰底牌：铺满外层、不接收点击；展开时 opacity:0 完全看不见 */
 .deck-l{
-  position:absolute;top:48px;bottom:0;left:0;right:0;
-  background:#ffffff;border:1px solid var(--line);border-radius:16px;
-  box-shadow:0 8px 20px rgba(26,26,46,.08);
-  transform-origin:50% 0;pointer-events:none;
-  transform:translateY(0) scale(1);opacity:0;
+  position:absolute;top:0;bottom:0;left:0;right:0;
+  background:#FFFDF9;border:1px solid var(--line);border-radius:var(--r2);
+  box-shadow:var(--sh1);transform-origin:50% 0;pointer-events:none;
+  transform:translate(0,0) scale(1) rotate(0);opacity:0;
   will-change:transform,opacity;
 }
+/* 第二层（紧贴主卡那张） */
 .deck-l.l1{z-index:1}
 .deck-l.l2{z-index:0}
-.deck[data-fold="1"] .deck-l.l1{transform:translateY(-12px) scale(.96);opacity:.7}
-.deck[data-fold="1"] .deck-l.l2{transform:translateY(-24px) scale(.92);opacity:.4}
+/* 收起后两层底牌向右下错开、轻微旋转，模拟纸张叠放；.l2 在最下面所以露得更多 */
+.deck[data-fold="1"] .deck-l.l1{transform:translate(6px,10px) scale(.95) rotate(1.5deg);opacity:.9}
+.deck[data-fold="1"] .deck-l.l2{transform:translate(12px,20px) scale(.9) rotate(3deg);opacity:.8;background:#FAF4E9}
 
+/* 真实卡片的舞台：z-index:2 确保永远盖在两张底牌之上 */
 .deck-stage{position:relative;z-index:2}
+/* 舞台里的卡片统一改成更白的纸色 + 一层外阴影，突出「最上面那张」
+   阴影参数：下移 10px、模糊 24px、扩散 -6px（负扩散把边缘往内收，阴影更贴近卡片）
+   想更轻就减小前三项、或把 -6px 调得更负；想更重就反过来 */
 .deck-stage > .card{
   background:#ffffff;border-radius:16px;
-  box-shadow:0 18px 40px rgba(26,26,46,.12);
+  box-shadow:0 10px 24px -6px rgba(26,26,46,.10);
 }
-/* 折叠态：其余真实卡收进主卡位置并折叠高度，只有主卡（第一层）完整显示 */
+/* 收起时把主卡以外的真实卡（如标签卡）压扁收回主卡背后；
+   height/padding/border 一起归零，才真的不占高度 */
 .deck[data-fold="1"] .deck-stage > .card:not(.main){
-  pointer-events:none;transform:translateY(-12px) scale(.96);opacity:0;
+  pointer-events:none;transform:translate(6px,10px) scale(.95) rotate(1.5deg);opacity:0;
   height:0;min-height:0;margin-top:0;padding-top:0;padding-bottom:0;
   border-top-width:0;border-bottom-width:0;overflow:hidden;
 }
+/* 收起态卡头不再有可点击的手感 */
 .deck[data-fold="1"] .deck-stage > .main .th{cursor:default}
 
-/* 主卡的两种内容视图始终是同一批节点，只切高度/透明度，不重建 DOM */
+/* 绿色书签：收起/展开的唯一开关
+   left:50% + translateX(-50%) 做水平居中；top:-2px 压在卡片上边框上
+   z-index:4 高于所有卡片；clip-path 把矩形裁成底部带 V 形缺口 */
+.deck-bookmark{
+  position:absolute;left:50%;top:-2px;z-index:4;
+  transform:translateX(-50%);
+  border:none;cursor:pointer;font-family:inherit;
+  width:30px;height:32px;padding:8px 0 0;
+  background:#5E9E7A;color:#fff;font-size:13px;line-height:1;
+  border-radius:0 0 6px 6px;
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 74%,0 100%);
+  box-shadow:0 5px 12px -4px rgba(40,80,58,.45);
+  display:flex;align-items:flex-start;justify-content:center;
+  transition:background .18s,transform .18s;
+}
+/* 悬停加深；:active 时注意要带上 translateX(-50%)，否则会横向跳位 */
+.deck-bookmark:hover{background:#4E8B68}
+.deck-bookmark:active{transform:translateX(-50%) translateY(1px)}
+
+/* 主卡的两个内容视图始终同时存在，只切高度/透明度，不重建 DOM
+   .card-body = 展开后的完整内容；.deck-peek = 收起后的一句话摘要 */
 .deck-peek,.card-body{overflow:hidden;will-change:height,opacity,transform}
+/* 默认（展开态）藏着；下一行在 data-fold="1" 时露出来 */
 .deck-peek{height:0;opacity:0;transform:translateY(-8px)}
 .deck[data-fold="1"] .deck-peek{height:auto;opacity:1;transform:none}
 .deck-peek-in{padding:9px 0 13px;color:var(--ink3);font-size:12px;line-height:1.6}
+/* 展开态完整内容；收起时高度归零 + 淡出（下一行） */
 .card-body{height:auto;opacity:1;transform:none}
 .deck[data-fold="1"] .card-body{height:0;opacity:0;transform:translateY(-8px)}
 
-/* 不支持 Web Animations 时的兜底入场；静态状态仍由 data-fold 决定 */
-.tcard.deal,.tagcard.deal{animation:dealIn .4s cubic-bezier(.22,1,.36,1) both}
-@keyframes dealIn{
-  from{opacity:.4;transform:translateY(-24px) scale(.92)}
-  to{opacity:1;transform:none}
-}
-
-/* 移动端不保留重叠：只显示单卡，取消后置层 */
+/* 窄屏（手机）不做叠纸：只保留一张卡，装饰底牌隐藏
+   注意：这里的 640px 与桌面端 .sheet 的断点不是同一套，改布局时别混 */
 @media(max-width:640px){
   .deck{padding-top:0;margin-bottom:8px}
   .deck-l{display:none}
   .deck[data-fold="1"] .deck-stage > .card:not(.main){display:none}
 }
 
-/* 尊重减少动态效果偏好：层级照常显示，跳过非必要动画 */
-@media(prefers-reduced-motion:reduce){
-  .tcard.deal,.tagcard.deal{animation:none}
-}
-
-/* ---------- 今日重点 ---------- */
+/* ===== 6. 今日重点（一行三格小卡）
+ * 位置：待办卡下方；末尾虚线卡是「新建」
+ * 结构：.goals 网格 → .goal 卡片（内部 .goal-head = 名字 + 右上角书签）
+ * 入口：点卡片 = 记一次；点右上角书签 = 改这条重点（JS openFocusEdit）
+ * 书签不用绝对定位：它就在卡片内部的第一行里，贴着右上边缘，卡片动它跟着动
+ * ===== */
 .goals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+/* 一张重点卡；纵向布局，底部「目标 xx」靠 .goal-sub 的 margin-top:auto 顶到底
+   宽度由网格单元决定，这里不要写死宽度
+   注意：卡片是 <div role="button">（不是 <button>），因为内部要放书签按钮 */
 .goal{
   background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);
-  padding:16px 14px 15px;cursor:pointer;transition:transform .16s;box-shadow:var(--sh1);text-align:left;
+  padding:16px 14px 15px;cursor:pointer;box-shadow:var(--sh1);text-align:middle;
   font-family:inherit;display:flex;flex-direction:column;align-items:stretch;
+  /* 和 base.css 的 .card 用同一组过渡：上浮、阴影、边框色一起变，不会只有一项突变 */
+  transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .4s var(--ease);
+  /* 裁掉书签超出圆角的部分，让它顺着右上圆角收进来，不会戳到卡片外面 */
+  overflow:hidden;
 }
-.goal:active{transform:scale(.97)}
+/* 鼠标悬停：与 .card 完全一致（上浮 2px + 阴影加深）；触屏设备没有 hover，不会触发 */
+.goal:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:var(--line)}
+/* 按下的回弹。:has 排除「按住书签」的情况，否则点书签会连带卡片一起缩
+   带 translateY(0) 是为了从悬停的 -2px 平滑落回，不会瞬移 */
+.goal:active:not(:has(.goal-bm:active)){transform:translateY(0) scale(.97)}
+
+/* 第一行：名字 + 右上角书签
+   -16px 上移抵消卡片 padding-top，让书签顶边与卡片上边缘齐平
+   右边不设负 margin：书签停在距离右边线 14px 处，正好避开 18px 的右上圆角，
+   整块书签不会被裁；想更靠边就把 margin-right 往负数调，但超过 -4px 就会被圆角切角 */
+.goal-head{
+  display:flex;align-items:flex-start;gap:6px;
+  margin:-16px 0 0 0;
+}
+/* 名字单独下移 6px，不跟着书签贴到顶边 */
+.goal-head .goal-l{flex:1;min-width:0;padding-top:6px}
+/* 卡片右上角的绿色书签（点开「改这条重点」）
+   形状：clip-path 切出底部 V 形缺口，看起来像垂下来的书签
+   margin-left:auto 推到这一行最右边；它在卡片内部，卡片怎么动它都跟着 */
+.goal-bm{
+  flex:0 0 auto;margin-left:auto;
+  width:16px;height:28px;padding:0;border:none;cursor:pointer;
+  background:#5E9E7A;
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);
+  transition:background .18s,transform .18s;
+}
+.goal-bm:hover{background:#4E8B68}
+.goal-bm:active{transform:translateY(1px)}
+
+/* 末尾「新建」虚线卡：和实卡同尺寸，点它加一条重点 */
+.goal-add{
+  align-items:center;justify-content:center;text-align:center;
+  background:transparent;border:1px dashed var(--line);box-shadow:none;color:var(--ink3);
+}
+.goal-add:active{transform:scale(.97)}
+.goal-plus{font-family:var(--serif);font-size:22px;line-height:1;font-weight:400;color:var(--ink3)}
+.goal-add-t{font-size:calc(10.5px * var(--ui-scale));letter-spacing:.4px;margin-top:5px;color:var(--ink3)}
 .goal-l{font-size:calc(11.5px * var(--ui-scale));letter-spacing:.8px;color:var(--ink2);font-weight:600;display:flex;align-items:center;gap:4px;line-height:1.5;min-height:1.5em}
+/* 卡片里那个很大的累计数字（26px 衬线体） */
 .goal-v{font-family:var(--serif);font-size:calc(26px * var(--ui-scale));font-weight:600;margin-top:7px;line-height:1.15;letter-spacing:.3px;color:var(--ink)}
 .goal-v em{font-style:normal;font-size:10.5px;font-family:inherit;font-weight:400;color:var(--ink3);margin-left:2px}
 .goal-v.dim{color:var(--ink3)}
+/* 进度条：轨道在 .goal-bar，填充是里面的 <i>，宽度由 JS 按百分比写 */
 .goal-bar{height:2.5px;border-radius:2px;background:var(--paper2);margin-top:10px;overflow:hidden}
 .goal-bar i{display:block;height:100%;border-radius:2px;background:var(--sage);transition:width .5s var(--ease)}
+/* 底部「目标 30 分钟」；margin-top:auto 把它压到卡片最底 */
 .goal-sub{font-size:calc(10.5px * var(--ui-scale));color:var(--ink2);margin-top:auto;padding-top:9px;letter-spacing:.2px;line-height:1.6}
 
-/* ---------- 灵光一闪 ---------- */
+/* ===== 7. 随手记（原「灵光一闪」）
+ * 位置：日程下面的大输入框 + 最多 5 条历史
+ * 输入框占位文字「随手记」来自 HTML placeholder，输入时自动保存
+ * ===== */
 .flash-ta{width:100%;border:none;background:transparent;outline:none;resize:vertical;font-family:inherit;
   font-size:calc(15px * var(--ui-scale));line-height:1.85;color:var(--ink);min-height:132px}
+.flash-ta::placeholder{color:var(--ink3);opacity:.8;letter-spacing:.5px}
+
+/* 区块标题已移除：待办 / 重点 / 随手记三块靠这两条间距区分
+   用 id 选择器，只作用于首页这两个容器 */
+#taskWrap{padding-top:22px}
+#flashBox{margin-top:30px}
+/* 输入框底部：左边「随手写，松手自动存」，右边「记下来」按钮 */
 .flash-foot{display:flex;align-items:center;gap:10px;margin-top:10px;border-top:1px solid var(--line2);padding-top:10px}
 .flash-hint{flex:1;font-size:10.5px;color:var(--ink3);letter-spacing:.2px}
+/* 历史随手记列表（今天以前最近 5 条） */
 .flash-list{margin-top:10px;display:flex;flex-direction:column;gap:8px}
 .flash-item{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:10px 12px;box-shadow:var(--sh1)}
 .flash-d{font-size:10px;color:var(--ink3);letter-spacing:.6px;margin-bottom:4px;font-variant-numeric:tabular-nums}
+/* 历史正文；white-space:pre-wrap 保留用户输入的换行 */
 .flash-t{font-size:calc(13px * var(--ui-scale));color:var(--ink2);line-height:2.05;white-space:pre-wrap;word-break:break-word}
 
-/* ---------- 日程 ---------- */
+/* ===== 8. 日程（今天的安排）
+ * 位置：今日重点下面；一行一场，时间固定在左侧 42px 宽以便对齐
+ * ===== */
 .sch{display:flex;gap:11px;padding:10px 0;align-items:flex-start;cursor:pointer}
 .sch+.sch{border-top:1px solid var(--line2)}
+/* 时间列：固定 42px，不参与伸缩，所有行的时间才会对齐 */
 .sch-time{font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums;flex:0 0 42px;padding-top:1px;line-height:1.5}
 .sch-main{flex:1;min-width:0}
 .sch-t{font-size:13.5px;line-height:1.4}
 .sch-p{font-size:10.5px;color:var(--ink3);margin-top:2px}
+/* 「就是下一场」的高亮（JS 给行加 .next） */
 .sch.next .sch-time{color:var(--sage-d);font-weight:600}
 .sch.next .sch-t{color:var(--sage-d);font-weight:600}
 .now-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--sage);margin-right:5px;vertical-align:1px}
 
-/* ---------- 接下来 / 计划 / 倒计时 ---------- */
-.up-row{display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer}
-.up-row+.up-row{border-top:1px solid var(--line2)}
-.up-d{flex:0 0 62px;font-size:10.5px;color:var(--clay);letter-spacing:.2px}
-.up-t{flex:1;font-size:13px;line-height:1.45;min-width:0}
-.up-a{font-size:11px;color:var(--ink3)}
+/* ===== 9. 计划 / 倒计时（计划面板）
+ * 位置：点「去计划」后打开的计划面板；按日期分组的列表
+ * ===== */
 .plan-pick{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0 12px}
 .plan-date{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:14px;color:var(--ink);outline:none}
 .pd-group{margin-bottom:18px}
@@ -177,10 +316,13 @@
 .pd-d{font-family:var(--serif);font-size:calc(15.5px * var(--ui-scale));font-weight:600}
 .pd-w{font-size:11px;color:var(--ink3)}
 .pd-c{margin-left:auto;font-size:11px;color:var(--clay);font-weight:600}
+/* 一天的计划外面那张卡（比主卡更小的圆角 r1） */
 .pd-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:2px 13px;box-shadow:var(--sh1)}
 .pd-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;cursor:pointer}
 .pd-row+.pd-row{border-top:1px solid var(--line2)}
+/* 计划行的勾选圈，比待办圈略小（20px） */
 .pd-check{width:20px;height:20px;border:1.4px solid #DCD3C4;border-radius:50%;flex:0 0 auto;margin-top:1px}
+/* 已完成计划：勾选圈变实心 + 画白勾，标题灰字划线 */
 .pd-row.is-done .pd-check{background:var(--sage);border-color:var(--sage);position:relative}
 .pd-row.is-done .pd-check::after{content:"";position:absolute;width:8px;height:4px;border-left:1.7px solid #fff;border-bottom:1.7px solid #fff;transform:rotate(-45deg);left:5px;top:6px}
 .pd-main{flex:1;min-width:0}
@@ -189,12 +331,14 @@
 .pd-n{font-size:10.5px;color:var(--ink3);margin-top:3px}
 .pd-x{border:none;background:transparent;color:var(--ink3);font-size:14px;cursor:pointer;font-family:inherit;padding:0 2px;opacity:.6}
 
+/* 很窄的手机：问候语和重点数字各收一号，避免换行
+   这是本文件里唯一做「字号随屏收窄」的地方 */
 @media(max-width:360px){
   .hd-hi{font-size:calc(18px * var(--ui-scale))}
   .goal-v{font-size:19px}
 }
 
-/* 计数类重点 +1 时数字轻轻一跳 */
+/* 计数类重点 +1 时数字轻跳（JS 临时加 .bump，动画结束移除） */
 .goal-v.bump{animation:goalBump .34s var(--ease)}
 @keyframes goalBump{
   0%{transform:translateY(0)}
@@ -202,6 +346,6 @@
   100%{transform:translateY(0)}
 }
 
-/* 番茄钟飞到条目上打钩时的短脉冲 */
+/* 番茄钟结束自动勾掉某条待办时，那一行闪一下主色（JS 加 260ms 后移除） */
 .task.pomo-hit{animation:pomoHit .24s var(--ease) 1}
 @keyframes pomoHit{0%{background:transparent}45%{background:var(--sage-l)}100%{background:transparent}}

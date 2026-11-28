@@ -286,20 +286,7 @@
   /* 记录页 · 月历 · 触发：擦掉某天的标记 */
   C.markerCleared = { enabled:true, type:"info", text:"标记擦掉了", duration:2200 };
 
-  /* 记录页 · 重点记录 · 触发：删除一条记录（界面即反馈）
-     默认关闭理由：记录行已消失，无需额外提示 */
-  C.recordEntryDeleted = { enabled:false, type:"success", text:"已删除", duration:2200 };
-
-  /* 记录页 · 训练 · 触发：保存一条训练记录 */
-  C.workoutSaved = { enabled:true, type:"success", text:"记下了 {minutes} 分钟", duration:2200 };
-
   /* ========== 设置页 ========== */
-
-  /* 设置页 · 休息日 · 触发：标记今天为休息日 */
-  C.remindRestOn = { enabled:true, type:"info", text:"恢复提醒", duration:3000 };
-
-  /* 设置页 · 休息日 · 触发：取消休息日标记 */
-  C.remindRestOff = { enabled:true, type:"info", text:"好好休息", duration:3000 };
 
   /* 设置页 / 记录页 · 标记 · 触发：只剩一个标记时尝试删除 */
   C.lastMarkerProtected = { enabled:true, type:"warning", text:"至少留一个标记", duration:3500 };
@@ -476,11 +463,5 @@
   /* 今日页 · 灵光一闪 · 触发：编辑保存（弹层关闭即反馈）
      默认关闭理由：弹层关闭且列表已更新，无需额外提示 */
   C.ideaSaved = { enabled:false, type:"success", text:"已保存", duration:2200 };
-
-  /* 今日页 · 便签备注 · 触发：便签写了内容并保存 */
-  C.noteSaved = { enabled:true, type:"info", text:"已记下", duration:2200 };
-
-  /* 今日页 · 便签备注 · 触发：便签内容清空 */
-  C.noteCleared = { enabled:true, type:"info", text:"清空了", duration:2200 };
 
 })();

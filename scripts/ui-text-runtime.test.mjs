@@ -211,19 +211,19 @@ test('register 中文 key 进 legacy，text() 与 OLT 语义不变', () => {
 /* ---------------- applyDom ---------------- */
 
 test('注册完成前不替换：只加载 index.js 时 DOM 不动', () => {
-  const el = makeEl({ text: '今日待办', attrs: { 'data-i18n': 'today.section.tasks' } });
+  const el = makeEl({ text: '今天的安排', attrs: { 'data-i18n': 'today.section.schedule' } });
   const app = createApp({ els: [el] });
   app.load('config/index.js');
-  assert.equal(el.textContent, '今日待办', 'index.js 不应自己触发替换');
+  assert.equal(el.textContent, '今天的安排', 'index.js 不应自己触发替换');
 });
 
 test('注册完成后替换：apply.js 执行即完成首轮，无需等 DOMContentLoaded', () => {
-  const el = makeEl({ text: '今日待办', attrs: { 'data-i18n': 'today.section.tasks' } });
+  const el = makeEl({ text: '今天的安排', attrs: { 'data-i18n': 'today.section.schedule' } });
   const app = createApp({ els: [el] });
   app.load('config/index.js');
   app.loadGroups();
   app.load('config/apply.js');
-  assert.equal(el.textContent, '今日待办', '值相同，内容不变');
+  assert.equal(el.textContent, '今天的安排', '值相同，内容不变');
   assert.equal(app.win.OLText.missing().keys.length, 0, '不应有误报缺失');
 });
 
@@ -312,13 +312,13 @@ test('嵌套子标签：只替换首段文本，子元素与结构保留', () =>
   const strong = makeEl({ tag: 'STRONG', text: '保留的强调文字' });
   const el = makeEl({
     tag: 'BUTTON',
-    attrs: { 'data-i18n': 'today.section.tasks' },
+    attrs: { 'data-i18n': 'today.section.schedule' },
     kids: [textNode('原始文本'), strong]
   });
   const app = createApp({ els: [el] });
   app.load('config/index.js');
   app.loadGroups();
-  const configured = app.win.OLText.messages['today.section.tasks'];
+  const configured = app.win.OLText.messages['today.section.schedule'];
   assert.notEqual(configured, '原始文本');
 
   app.win.OLText.applyDom(app.doc);
@@ -353,7 +353,7 @@ test('多属性替换：data-i18n-attr="title,aria-label" 两个属性都写入'
 });
 
 test('幂等：JS 改过文案后，再次 applyDom 不覆盖', () => {
-  const el = makeEl({ text: '今日待办', attrs: { 'data-i18n': 'today.section.tasks' } });
+  const el = makeEl({ text: '今天的安排', attrs: { 'data-i18n': 'today.section.schedule' } });
   const app = createApp({ els: [el] });
   app.load('config/index.js');
   app.loadGroups();
@@ -366,7 +366,7 @@ test('幂等：JS 改过文案后，再次 applyDom 不覆盖', () => {
 });
 
 test('apply.js 的 DOMContentLoaded 补跑是幂等的', () => {
-  const el = makeEl({ text: '今日待办', attrs: { 'data-i18n': 'today.section.tasks' } });
+  const el = makeEl({ text: '今天的安排', attrs: { 'data-i18n': 'today.section.schedule' } });
   const app = createApp({ els: [el] });
   app.load('config/index.js');
   app.loadGroups();
@@ -376,15 +376,15 @@ test('apply.js 的 DOMContentLoaded 补跑是幂等的', () => {
   assert.equal(el.textContent, '动态值');
 });
 
-/* UI 精简后旧中文 key 由 150 降至 146：主题色/首页提醒及其说明共 4 条随功能删除；
-   OLT 兼容接口本身与中文兜底机制保持不变。 */
+/* UI 精简后旧中文 key 由 150 降至 145：主题色/首页提醒及其说明共 4 条、
+   休息日开关 1 条随功能删除；OLT 兼容接口本身与中文兜底机制保持不变。 */
 test('旧接口 OLT 仍能命中现有中文 key', () => {
   const app = createApp();
   app.load('config/index.js');
   app.loadGroups();
   assert.equal(app.win.OLText.text('取消'), '取消');
-  assert.equal(app.win.OLText.text('今日待办'), '今日待办');
-  assert.equal(Object.keys(app.win.OLText.flat).length, 146, '旧中文 key 去重后 146 条（UI 精简删除主题色/首页提醒 4 条）');
+  assert.equal(app.win.OLText.text('今天的安排'), '今天的安排');
+  assert.equal(Object.keys(app.win.OLText.flat).length, 145, '旧中文 key 去重后 145 条（UI 精简删除主题色/首页提醒 4 条 + 休息日 1 条）');
 });
 
 /* ============================================================================

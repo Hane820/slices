@@ -228,3 +228,20 @@ test('normalize：空清单回退默认，用户删光的菜单不会被种子�
   assert.deepEqual(after.settings.foodItems, [], 'foodItems 空清单保留（不塞回种子）');
   assert.deepEqual(after.settings.mealSlots, ['早餐', '午餐'], 'mealSlots 空清单回退默认');
 });
+
+test('normalize：每周重复的星期数组被校验，坏数据兜底成周一', () => {
+  const old = defaults();
+  old.tasks = [
+    { id: 'w1', title: '跑步', cat: 'want', repeat: 'weekly', weekdays: [1, 1, 9, -1, '3'], done: {} },
+    { id: 'w2', title: '大扫除', cat: 'want', repeat: 'weekly', weekdays: [], done: {} },
+    { id: 'd1', title: '喝水', cat: 'want', repeat: 'daily', weekdays: [2], done: {} },
+  ];
+  const after = runNormalize(old);
+  const w1 = after.tasks.find((t) => t.id === 'w1');
+  assert.equal(JSON.stringify(w1.weekdays), '[1]', '去重、越界与非数字被剔除');
+  assert.equal(w1.cat, 'routine', '重复项归到 routine 分类');
+  const w2 = after.tasks.find((t) => t.id === 'w2');
+  assert.equal(JSON.stringify(w2.weekdays), '[1]', '空数组兜底成周一');
+  const d1 = after.tasks.find((t) => t.id === 'd1');
+  assert.equal(d1.weekdays, undefined, '每天重复不需要星期数组');
+});

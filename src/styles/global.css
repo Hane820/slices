@@ -1,28 +1,53 @@
+/* ============================================================================
+ * global.css — Astro 静态站点（介绍页 / 文章列表）的全局样式
+ * ----------------------------------------------------------------------------
+ * 与 App 无关：这里只服务 src/pages 下的页面，变量来自 tokens.css。
+ * 顺序：基础重置 → 排版 → 版心容器 → 页头小标签 → 列表与标签
+ * 缩略语：.container 是宽版心（72rem），.narrow 是窄版心（48rem）
+ * ========================================================================== */
 @import './tokens.css';
 @import './prose.css';
 
+/* 站点根元素：字体（英文衬线 + 中文思源宋体）、允许浏览器按系统切换明暗 */
 :root { font-family: 'Iowan Old Style', 'Noto Serif SC', Georgia, serif; color-scheme: light dark; }
+/* 统一盒模型：宽度包含内边距与边框，避免加 padding 撑破布局 */
 * { box-sizing: border-box; }
+/* 锚点跳转时平滑滚动（点击目录跳到小节时会滚下去而不是瞬移） */
 html { scroll-behavior: smooth; }
+/* 页面基础：底纸色、正文色、17px 字号、1.7 行距（长文阅读的常用节奏） */
 body { margin: 0; background: var(--paper); color: var(--ink); font-size: 17px; line-height: 1.7; }
+/* 链接继承正文颜色，只在悬停/聚焦时用下划线提示；offset 让下划线离文字略远 */
 a { color: inherit; text-underline-offset: 0.18em; }
 button, input { font: inherit; }
 button { color: inherit; }
+/* 键盘 Tab 聚焦时的外框：用强调色，留 4px 间距，保证无障碍可辨识 */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+/* 宽版心：max 72rem 且左右各留 2rem，居中
+   min(100% - 2rem, 72rem) 的意思是「屏窄时按屏宽算，屏宽时按 72rem 封顶」 */
 .container { width: min(100% - 2rem, 72rem); margin: 0 auto; }
+/* 窄版心：用于正文阅读区（48rem），比宽版心更易读 */
 .narrow { width: min(100% - 2rem, 48rem); margin: 0 auto; }
+/* 「跳到正文」无障碍链接：平时藏在屏幕上方外，键盘 Tab 到时才出现
+   position:absolute + top:-5rem 是标准做法，不能用 display:none（否则键盘取不到焦点） */
 .skip-link { position: absolute; left: 1rem; top: -5rem; padding: .5rem .75rem; background: var(--ink); color: var(--paper); z-index: 10; }
 .skip-link:focus { top: 1rem; }
 .muted { color: var(--muted); }
+/* 标题上方的小标签（等宽字体、大写、字距拉开），常用于分类或栏目标记 */
 .eyebrow { color: var(--accent); font: 700 .75rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; }
+/* 栏目标题行：左侧大标题、右侧「查看全部」链接；顶部一条分隔线把栏目分开 */
 .section-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; border-top: 1px solid var(--line); padding-top: .9rem; margin-top: 4rem; }
 .section-heading h2 { margin: 0; font-size: clamp(1.7rem, 4vw, 2.8rem); letter-spacing: -.04em; }
 .section-heading a { color: var(--muted); font-size: .9rem; }
+/* 文章列表：顶部一条线，条目自己带下边框，形成连续的分隔 */
 .list { border-top: 1px solid var(--line); }
+/* 一条列表项：左列固定 8rem 放日期/分类，右列放标题与摘要；窄屏会变成上下排列 */
 .list-item { display: grid; grid-template-columns: 8rem 1fr; gap: 1rem; padding: 1.25rem 0; border-bottom: 1px solid var(--line); }
 .list-item h3 { margin: 0 0 .25rem; font-size: 1.2rem; letter-spacing: -.02em; }
 .list-item p { margin: .2rem 0 0; color: var(--muted); }
+/* 元信息小字（日期、作者、阅读时长之类） */
 .meta { color: var(--muted); font-size: .82rem; }
+/* 标签行：自动换行、间距 0.45rem */
 .tags { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .75rem; }
 .tag { color: var(--accent); font-size: .8rem; }
+/* 窄屏（<40rem≈640px）：列表项改成单列，栏目标题上边距收小 */
 @media (max-width: 40rem) { .list-item { grid-template-columns: 1fr; gap: .2rem; } .section-heading { margin-top: 2.5rem; } }

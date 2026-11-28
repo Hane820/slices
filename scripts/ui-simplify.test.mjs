@@ -16,6 +16,15 @@ const FALLBACK = {
   'today.card.tasks': '待办事项',
   'today.empty.tasks': '还没有待办，点下面加一条。',
   'today.placeholder.task': '要做什么',
+  'today.repeat.daily': '每天',
+  'today.repeat.weekly': '每周',
+  'today.repeat.once': '不重复',
+  'today.repeat.weekPrefix': '每周',
+  'today.section.routine': '每天重复',
+  'today.empty.routine': '还没有每天重复的事，下面加一条。',
+  'today.action.addRoutine': '加一条重复',
+  'common.weekday.sun': '日', 'common.weekday.mon': '一', 'common.weekday.tue': '二',
+  'common.weekday.wed': '三', 'common.weekday.thu': '四', 'common.weekday.fri': '五', 'common.weekday.sat': '六',
   'common.action.collapse': '收起 ▴',
   'common.action.expand': '展开 ▾',
 };
@@ -68,6 +77,7 @@ function loadToday(stateOverrides = {}) {
   }, stateOverrides);
   const els = {
     remindWrap: makeEl(), taskWrap: makeEl(), toggleDone: makeEl(), foldTasks: makeEl(),
+    goalWrap: makeEl(),
   };
   const ctx = {
     console, JSON, Math, Date, String, Number, Array, Object, Boolean, RegExp,
@@ -78,6 +88,12 @@ function loadToday(stateOverrides = {}) {
     TODAY: () => T0,
     addDays: (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); },
     U: (k) => FALLBACK[k] || k,
+    UH: (k) => FALLBACK[k] || k,
+    /* 重点条目的计算函数在 core.js，测试桩只关心结构 */
+    focusSum: () => 0, focusUnit: () => '分钟', focusHasGoal: () => true,
+    focusTarget: () => 30, fmtNum: (n) => String(n), clamp: (v) => v,
+    focusGoalText: () => '目标 30 分钟',
+    openFocusEdit: () => {},
     el: (tag, cls, txt) => { const e = makeEl(tag, txt || ''); if (cls) String(cls).split(/\s+/).forEach((c) => e.classList.add(c)); return e; },
     $: (id) => els[id] || null,
     isDone: (t, d) => !!(t.done && t.done[d]),
@@ -91,7 +107,14 @@ function loadToday(stateOverrides = {}) {
     openPlanView: () => {}, pluginOn: () => false, fmt: (d) => String(d),
     parse: (d) => new Date(d + 'T00:00:00Z'),
     diffDays: (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000),
-    durText: (n) => String(n), weekdayCN: () => '', nowHHMM: () => '12:00',
+    /* 与 core.js 的 durText 同实现，测试才能断言真实文案（如「25 分钟」） */
+    durText: (sec) => {
+      sec = Math.max(0, Math.round(+sec || 0));
+      if (!sec) return '';
+      if (sec % 60 === 0) return (sec / 60) + ' 分钟';
+      const m = Math.floor(sec / 60);
+      return (m ? m + ' 分 ' : '') + (sec % 60) + ' 秒';
+    }, weekdayCN: () => '', nowHHMM: () => '12:00',
   };
   ctx.window = ctx;
   vm.createContext(ctx);
@@ -127,7 +150,8 @@ test('提醒：当天及以前未完成计划显示，完成/未来计划不显�
   assert.ok(text.includes('今天的安排：'));
 });
 
-test('提醒：休息日与当天关闭都抑制提醒；旧健身学习提醒不再出现', () => {
+test('提醒：仅当天手动关闭抑制提醒；休息日开关已移除、旧健身学习提醒不再出现', () => {
+  // 「今天算休息日」功能已删除：restDays 存量数据不再影响提醒
   const a = loadToday({
     plans: [{ id: 'p1', date: T0, title: '计划A', done: false }],
     restDays: [T0],
@@ -135,7 +159,7 @@ test('提醒：休息日与当天关闭都抑制提醒；旧健身学习提醒�
     studyLogs: [{ date: T0, minutes: 1 }],
   });
   a.run('renderRemind()');
-  assert.equal(a.els.remindWrap.children.length, 0, '休息日不渲染');
+  assert.ok(a.els.remindWrap.children.length > 0, '已删除的休息日不再抑制提醒');
 
   const b = loadToday({
     plans: [{ id: 'p1', date: T0, title: '计划A', done: false }],
@@ -172,6 +196,27 @@ test('待办合并：旧三分类数据全部保留、ID/完成状态不变，�
   assert.equal(plain(S.tasks).length, 3, '没有重复插入');
   assert.equal(S.tasks.find((t) => t.id === 't2').done[T0], 1, '完成状态保留');
   assert.ok(!run('JSON.stringify(S)').includes('"cat":"today"'), '未把合并视图写成新分类字段');
+});
+
+test('待办排序：未完成排上面、已完成沉到下面，隐藏已完成入口已移除', () => {
+  const { S, els, run } = loadToday({
+    tasks: [
+      { id: 'd1', title: '已完成1', cat: 'want', repeat: 'once', done: { [T0]: 1 }, createdAt: 1 },
+      { id: 'u1', title: '未完成1', cat: 'want', repeat: 'once', done: {}, createdAt: 2 },
+      { id: 'd2', title: '已完成2', cat: 'want', repeat: 'once', done: { [T0]: 1 }, createdAt: 3 },
+      { id: 'u2', title: '未完成2', cat: 'want', repeat: 'once', done: {}, createdAt: 4 },
+    ],
+  });
+  const js = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
+  const html = fs.readFileSync(path.join(APP, 'index.html'), 'utf8');
+  assert.ok(!js.includes('function toggleDoneFilter'), '隐藏已完成函数已删除');
+  assert.ok(!js.includes("case 'toggle-done'"), '隐藏已完成事件分发已删除');
+  assert.ok(!html.includes('toggleDone'), '隐藏已完成按钮已删除');
+  run('renderTasks()');
+  const walk = (nodes) => nodes.flatMap((n) => [n, ...walk(n.children || [])]);
+  const rows = walk(els.taskWrap.children).filter((n) => n.dataset && n.dataset.tid);
+  assert.deepEqual(rows.map((n) => n.dataset.tid), ['u1', 'u2', 'd1', 'd2'], '未完成在前、已完成在后，组内保序');
+  assert.equal(S.tasks.length, 4, '任务数据未增删');
 });
 
 test('待办合并：新增走 want 分类，勾选保留原 ID', () => {
@@ -253,16 +298,17 @@ test('主题：固定橘子汽水，旧主题设置不再影响显示', () => {
   assert.ok(!/S\.settings\.theme/.test(core.match(/function applyTheme\(\)\{[\s\S]*?\}/)[0]), 'applyTheme 不读取旧设置');
 });
 
-/* ---------- 卡片堆叠动画（沿 Z 轴重排） ---------- */
+/* ---------- 卡片堆叠动画（主卡在上、底牌在下方） ---------- */
 
-test('卡片堆叠：Z 轴参数与 CSS 层定义一致（12/24px、.96/.92、.7/.4）', () => {
+test('卡片堆叠：层参数与 CSS 定义一致（6/10px、12/20px、.95/.9、.9/.8）', () => {
   const js = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
   const css = fs.readFileSync(path.join(APP, 'today.css'), 'utf8');
-  assert.ok(js.includes('var DECK_MS = 400;'), '动画时长统一 400ms');
+  assert.ok(js.includes('var DECK_MS = 1200;'), '动画放慢到 1200ms');
   assert.ok(js.includes('cubic-bezier(.22,1,.36,1)'), '缓动曲线与参考一致');
-  assert.ok(css.includes('transform:translateY(-12px) scale(.96);opacity:.7'), 'CSS 第二层');
-  assert.ok(css.includes('transform:translateY(-24px) scale(.92);opacity:.4'), 'CSS 第三层');
-  assert.ok(css.includes('cubic-bezier(.22,1,.36,1)'), 'CSS 缓动曲线需匹配 JS');
+  assert.ok(css.includes('transform:translate(6px,10px) scale(.95) rotate(1.5deg);opacity:.9'), 'CSS 第二层');
+  assert.ok(css.includes('transform:translate(12px,20px) scale(.9) rotate(3deg);opacity:.8'), 'CSS 第三层');
+  /* 时长与缓动只在 JS（DECK_MS / DECK_EASE），CSS 不再重复定义，避免两套来源打架 */
+  assert.ok(!css.includes('--deck-ms') && !css.includes('--deck-ease'), 'CSS 不重复定义时长与缓动');
 });
 
 test('卡片堆叠：收拢/展开同一入口，不重建 DOM、无硬编码延时', () => {
@@ -314,15 +360,19 @@ test('卡片堆叠：持久 DOM 含主卡、两张装饰底牌与两视图，折
   assert.equal(S.settings.tasksFold, false);
 });
 
-test('卡片堆叠：移动端取消重叠，prefers-reduced-motion 关闭动画', () => {
+test('卡片堆叠：移动端取消重叠，减少动态效果时不播放动画', () => {
   const css = fs.readFileSync(path.join(APP, 'today.css'), 'utf8');
+  const js = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
   assert.ok(/@media\(max-width:640px\)\{[\s\S]*?\.deck-l\{display:none\}/.test(css), '移动端隐藏堆叠层');
-  assert.ok(/@media\(prefers-reduced-motion:reduce\)\{[\s\S]*?animation:none/.test(css), '减少动态效果时关闭动画');
+  /* 动画是 JS 用 WAAPI 播的，所以「减少动态效果」由 deckCanAnimate() 判断，不再靠 CSS 关动画 */
+  assert.ok(js.includes("window.matchMedia('(prefers-reduced-motion: reduce)').matches"),
+    '减少动态效果时跳过动画');
+  assert.ok(js.slice(js.indexOf('function deckCanAnimate')).includes('return !!(window.Element'), '判断入口在 deckCanAnimate');
 });
 
 test('卡片堆叠：运行时双向插值——起点取当前帧、终点取目标静态、结束 cancel', () => {
   const src = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
-  const start = src.indexOf('var DECK_MS = 400;');
+  const start = src.indexOf('var DECK_MS = 1200;');
   const end = src.indexOf('function unfoldTasks()', start);
   const machine = src.slice(start, end);
 
@@ -339,13 +389,14 @@ test('卡片堆叠：运行时双向插值——起点取当前帧、终点取�
   const deck = {
     dataset: { fold: '0' },
     querySelectorAll: () => [l1, body], // 两个节点足够验证插值
+    querySelector: () => null, // 书签按钮不在插值范围
   };
   // computed 随 data-fold 变化，模拟 CSS 规则；中间帧用 animate 桩覆盖
   const staticFor = (n) => deck.dataset.fold === '1'
     ? { transform: 'matrix(.96,0,0,.96,0,-12)', opacity: '0.7', height: '40px' }
     : { transform: 'none', opacity: '1', height: '100px' };
   const ctx = {
-    console, DECK_MS: 400, DECK_EASE: 'cubic-bezier(.22,1,.36,1)',
+    console, DECK_MS: 1200, DECK_EASE: 'cubic-bezier(.22,1,.36,1)',
     DECK_ANIM_PROPS: ['transform', 'opacity', 'height'],
     getComputedStyle: () => staticFor(),
     Element: { prototype: { animate() {} } },
@@ -363,7 +414,7 @@ test('卡片堆叠：运行时双向插值——起点取当前帧、终点取�
   assert.equal(anims.length, 2, '两节点都参与插值');
   assert.equal(anims[0].from.opacity, '1', '起点 = 旧静态（展开）');
   assert.equal(anims[0].to.opacity, '0.7', '终点 = 新静态（折叠第二层）');
-  assert.equal(anims[0].opt.duration, 400);
+  assert.equal(anims[0].opt.duration, 1200);
   assert.equal(anims[0].opt.easing, 'cubic-bezier(.22,1,.36,1)');
   assert.equal(anims[0].opt.fill, 'both');
 
@@ -376,4 +427,196 @@ test('卡片堆叠：运行时双向插值——起点取当前帧、终点取�
   assert.equal(anims[2].from.opacity, '0.85', '反向起点 = 动画中间帧，不瞬移');
   assert.equal(anims[2].to.opacity, '0.85', '桩 computed 固定时终点等于当前（真实浏览器按 data-fold 变化）');
   assert.ok(cancels >= 2, '旧动画在切状态前被取消');
+});
+
+test('卡片堆叠：连点两次时上一批的 finished 不得取消新一批动画', async () => {
+  const src = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
+  const start = src.indexOf('var DECK_MS = 1200;');
+  const end = src.indexOf('function unfoldTasks()', start);
+  const machine = src.slice(start, end);
+
+  // 每个动画都拿到一个可手动 resolve 的 finished，用来模拟"上一批动画姗姗来迟地结束"
+  const batches = [];
+  let cur = null;
+  const makeNode = (name) => ({
+    name,
+    animate(frames, opt) {
+      cur.push({ name, frames, opt, cancelled: false, resolve: null });
+      const rec = cur[cur.length - 1];
+      rec.finished = new Promise((res) => { rec.resolve = res; });
+      return {
+        finished: rec.finished,
+        cancel() { rec.cancelled = true; if (rec.resolve) rec.resolve(); },
+      };
+    },
+  });
+  const l1 = makeNode('l1'), body = makeNode('body');
+  const deck = {
+    dataset: { fold: '0' },
+    querySelectorAll: () => [l1, body],
+    querySelector: () => null,
+  };
+  const ctx = {
+    console, DECK_MS: 1200, DECK_EASE: 'cubic-bezier(.22,1,.36,1)',
+    DECK_ANIM_PROPS: ['transform', 'opacity'],
+    getComputedStyle: () => (deck.dataset.fold === '1'
+      ? { transform: 'matrix(.96,0,0,.96,0,-12)', opacity: '0.7' }
+      : { transform: 'none', opacity: '1' }),
+    Element: { prototype: { animate() {} } },
+    S: { settings: { tasksFold: false } }, save() {},
+    document: { getElementById: () => ({ textContent: '' }) },
+  };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(machine + '\n$ = function(){ return globalThis.wrap; };', ctx);
+  ctx.wrap = { querySelector: () => deck };
+
+  cur = []; vm.runInContext('setDeckFold(true)', ctx);
+  const first = cur.slice();
+  cur = []; vm.runInContext('setDeckFold(false)', ctx);
+  const second = cur.slice();
+  assert.equal(first.length, 2, '第一批动画 2 个');
+  assert.equal(second.length, 2, '第二批动画 2 个');
+
+  // 让第一批的 finished 异步落地（连点时旧动画被 cancel 后会走 settle）
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+
+  assert.ok(first.every((a) => a.cancelled), '第一批已被取消');
+  assert.ok(second.every((a) => !a.cancelled), '第二批不能被上一批的 settle 取消');
+  assert.equal(deck.dataset.fold, '0', '状态停在最后一次点击的目标');
+});
+
+/* ---------- 今日重点：卡内右上角书签 + 末尾新建卡 ---------- */
+
+test('今日重点：每张卡内部右上角有书签可编辑，末尾常驻新建卡', () => {
+  const { els, run } = loadToday({
+    settings: {
+      remindDismissed: '', goals: { trainMin: 30, studyMin: 40 }, showDone: true,
+      tasksFold: false, libFilter: '全部',
+      focusItems: [
+        { id: 'a', text: '健身', goal: { value: 30, unit: '分钟' }, unit: '分钟', mode: 'multi', options: ['胸'] },
+        { id: 'b', text: '学习', goal: { value: 40, unit: '分钟' }, unit: '分钟', mode: 'text' },
+      ],
+    },
+  });
+  run('renderGoals()');
+  const kids = els.goalWrap.children;
+  assert.equal(kids.length, 3, '两张重点卡 + 一张新建卡');
+
+  kids.slice(0, 2).forEach((card, i) => {
+    assert.ok(card.classList.contains('goal'), '卡片直接是网格子项，不再包 .goal-cell');
+    assert.equal(card.dataset.action, 'goal-open', '点卡片仍是记一次');
+    /* 桩不解析 innerHTML，这里断言生成的 HTML 结构：
+       书签必须写在卡片内部，且和第二行的数字是同级兄弟 */
+    const html = card.innerHTML;
+    assert.ok(html.includes('class="goal-head"'), '卡片第一行是名字 + 书签的容器');
+    assert.ok(html.includes('class="goal-bm"'), '卡片内部有书签');
+    assert.ok(html.indexOf('class="goal-head"') < html.indexOf('class="goal-v'),
+      '书签所在行在数字之前');
+    assert.ok(html.includes('data-action="goal-edit"'), '书签用于改这条重点');
+    assert.ok(html.includes('data-iid="' + (i === 0 ? 'a' : 'b') + '"'), '书签绑定对应条目 id');
+  });
+
+  const add = kids[2];
+  assert.ok(add.classList.contains('goal-add'), '末尾是新建卡');
+  assert.equal(add.dataset.action, 'goal-new', '新建卡直接打开加一条');
+});
+
+test('今日重点：没有条目时只留新建卡，不再显示去设置里加', () => {
+  const { els, run } = loadToday();
+  run('renderGoals()');
+  assert.equal(els.goalWrap.children.length, 1, '仅一张新建卡');
+  assert.ok(els.goalWrap.children[0].classList.contains('goal-add'));
+});
+
+/* ---------- 每天重复：独立成排 + 每周规则 ---------- */
+
+test('每天重复：独立成排，不混进普通待办；每周项只在选定星期出现', () => {
+  const { run } = loadToday({
+    tasks: [
+      { id: 'n1', title: '买菜', cat: 'want', repeat: 'once', done: {}, createdAt: 1 },
+      { id: 'r1', title: '喝水', cat: 'routine', repeat: 'daily', done: {}, createdAt: 2 },
+      { id: 'r2', title: '周六大扫除', cat: 'routine', repeat: 'weekly', weekdays: [6], done: {}, createdAt: 3 },
+      { id: 'r3', title: '周三跑步', cat: 'routine', repeat: 'weekly', weekdays: [3], done: {}, createdAt: 4 },
+    ],
+  });
+  // T0 = 2026-11-28 是周六
+  assert.deepEqual(run('tasksOfPlain("today", TODAY()).map(function(t){return t.id;})'), ['n1'],
+    '普通待办只留一次性任务');
+  assert.deepEqual(run('tasksOfRoutine(TODAY()).map(function(t){return t.id;})'), ['r1', 'r2'],
+    '每天项 + 今天命中的每周项；周三项今天不出现');
+  assert.equal(run('weekLabel(S.tasks[2])'), '每周六', '每周项显示星期几');
+  assert.equal(run('weekLabel(S.tasks[1])'), '每天');
+});
+
+test('每天重复：勾完当天，第二天自动回到未完成', () => {
+  const { run } = loadToday({
+    tasks: [{ id: 'r1', title: '喝水', cat: 'routine', repeat: 'daily', done: { '2026-11-28': 1 }, createdAt: 1 }],
+  });
+  assert.equal(run('isDone(S.tasks[0], "2026-11-28")'), true, '今天已勾');
+  assert.equal(run('isDone(S.tasks[0], "2026-11-29")'), false, '第二天是未完成');
+  assert.deepEqual(run('tasksOfRoutine("2026-11-29").map(function(t){return t.id;})'), ['r1'],
+    '第二天照样出现');
+});
+
+test('每天重复：卡片内有独立区块和自己的加一条', () => {
+  const { els, run } = loadToday({
+    tasks: [{ id: 'r1', title: '喝水', cat: 'routine', repeat: 'daily', done: {}, createdAt: 1 }],
+  });
+  run('renderTasks()');
+  const walk = (nodes) => nodes.flatMap((n) => [n, ...walk(n.children || [])]);
+  const all = walk([els.taskWrap]);
+  const sec = all.find((n) => n.classList.contains('routine-sec'));
+  assert.ok(sec, '存在 .routine-sec 区块');
+  const add = all.find((n) => n.classList.contains('routine-add'));
+  assert.ok(add, '存在「加一条重复」');
+  assert.equal(add.dataset.cat, 'routine', '加的是重复项分类');
+  assert.ok(all.some((n) => n.dataset && n.dataset.tid === 'r1'), '重复项渲染在卡内');
+});
+
+/* ---------- 专注时长只服务一次性任务 ---------- */
+
+test('专注时长：重复项行内不显示时长，一次性任务照常显示', () => {
+  const { els, run } = loadToday({
+    tasks: [
+      { id: 'r1', title: '刷牙', cat: 'routine', repeat: 'daily', duration: 180, done: {}, createdAt: 1 },
+      { id: 'n1', title: '写周报', cat: 'want', repeat: 'once', duration: 1500, done: {}, createdAt: 2 },
+    ],
+  });
+  run('renderTasks()');
+  const walk = (nodes) => nodes.flatMap((n) => [n, ...walk(n.children || [])]);
+  const all = walk([els.taskWrap]);
+  const textOf = (id) => {
+    const row = all.find((n) => n.dataset && n.dataset.tid === id);
+    assert.ok(row, '找到 ' + id + ' 这一行');
+    return walk([row]).map((n) => n.textContent || '').join(' ');
+  };
+  assert.ok(!textOf('r1').includes('3 分钟'), '重复项不带时长标签');
+  assert.ok(textOf('n1').includes('25 分钟'), '一次性任务保留时长标签');
+});
+
+test('专注时长 / 截止日期：编辑表单只在「不重复」时显示，保存重复项会清空', () => {
+  const src = fs.readFileSync(path.join(APP, 'today.js'), 'utf8');
+  assert.ok(src.includes('<div class="field" id="teDurF">'), '时长字段有可切换显隐的容器');
+  assert.ok(src.includes('<div class="field" id="teDueF">'), '截止日期有可切换显隐的容器');
+  assert.ok(src.includes("if(dueField) dueField.style.display = once ? '' : 'none';"), '重复项隐藏截止日期');
+  assert.ok(src.includes("if(durField) durField.style.display = once ? '' : 'none';"), '重复项隐藏时长');
+  assert.ok(src.includes("t.due = rep === 'once' ? (body.querySelector('#teDue').value || '') : '';"),
+    '重复项保存时清掉截止日期');
+  assert.ok(src.includes("t.duration = rep === 'once' ? durFromInputs("),
+    '重复项保存时不再写入时长（清 0）');
+  assert.ok(src.includes('if(t.duration && !isRoutineTask(t))'), '行内标签排除重复项时长');
+  assert.ok(src.includes('if(t.due && !isRoutineTask(t))'), '行内标签排除重复项截止日期');
+});
+
+/* ---------- 重点卡 hover 与待办卡阴影 ---------- */
+
+test('今日重点：hover 与普通卡片一致，待办卡阴影已收紧', () => {
+  const css = fs.readFileSync(path.join(APP, 'today.css'), 'utf8');
+  assert.ok(css.includes('.goal:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:var(--line)}'),
+    '重点卡 hover 与 .card 同一组参数（上浮 2px + 阴影加深 + 边框色）');
+  assert.ok(css.includes('transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .4s var(--ease)'),
+    '过渡时长与属性对齐 .card，避免只有位移在动');
+  assert.ok(css.includes('box-shadow:0 10px 24px -6px rgba(26,26,46,.10)'),
+    '待办卡阴影：下移 10px / 模糊 24px / 负扩散 6px');
 });

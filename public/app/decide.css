@@ -1,31 +1,62 @@
-/* decide.css — 决策页：情境 / 随机结果 / 番茄钟 / 建议库 */
-/* ---------- 返回首页 ---------- */
+/* ============================================================================
+ * decide.css — 「决策」页（底部导航第 2 个）专属样式
+ * ----------------------------------------------------------------------------
+ * 这一页做两件事：让 App 替你挑一件事；以及吃什么的随机/记录（插件）
+ * 阅读顺序：
+ *   1 返回链接  2 情境提问卡  3 抽取结果卡  4 飞点与导航脉冲
+ *   5 番茄钟浮窗（普通 / 降级大窗 / 全屏）  6 建议库列表
+ *   7 情境卡与情境管理  8 吃什么（插件）
+ * 注意：番茄钟有三套外观（浮动小窗 .pomo、.pomo.big、:fullscreen），
+ *       改样式时先确认改的是哪一套，否则可能只在某种状态下生效。
+ * ========================================================================== */
+/* 页面头部左上角的「← 返回今日」文字链接（决策页/记录页共用） */
 .hd-back{display:inline-block;font-size:11.5px;color:var(--sage-d);cursor:pointer;margin-bottom:12px}
 .hd-back:active{opacity:.6}
 
-/* ---------- 情境提问 ---------- */
+/* ===== 1~2. 情境提问卡 =====
+ * 位置：「做什么」分段顶部，白色大卡片，里面是一句问话 + 情境标签
+ * .editing 是「正在管理情境」模式下的换色态（见文件后半）
+ * ===== */
 .ask{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:14px;box-shadow:var(--sh1)}
 .ask-t{font-size:14px;font-weight:600;line-height:1.5;color:var(--ink)}
 
-/* ---------- 抽取结果 ---------- */
+/* ===== 3. 抽取结果 =====
+ * .dec-bar 是结果上方那条操作条（重抽 / 设置），不是结果本身
+ * 真正的结果卡是下面的 .res
+ * ===== */
 .dec-bar{display:flex;align-items:center;gap:10px;margin-top:10px;background:var(--paper);border:1px solid var(--line);border-radius:var(--r1);padding:9px;box-shadow:var(--sh1)}
 .dec-bar .btn{margin:0}
+/* 结果项逐个淡入的关键帧（配合 .dec-pane 的进场） */
 @keyframes decItem{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+/* 抽取结果卡：阴影比普通卡重（.sh2），进场淡入
+   .res-k 小标签（「今天就做这个」）、.res-t 主标题、.res-d 说明、.res-acts 按钮行
+   注意：它和 .ask 都是白卡，但 .res 会浮得更高、更像「结果」 */
 .res{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:18px 16px;box-shadow:var(--sh2);animation:page-entry var(--dur-3) var(--ease) both}
 .res-k{font-size:10px;letter-spacing:2.2px;color:var(--sage);font-weight:600}
+/* 结果主标题（衬线体大字号），也就是 App 替你挑的那件事 */
 .res-t{font-family:var(--serif);font-size:calc(22px * var(--ui-scale));font-weight:600;line-height:1.4;margin-top:9px;letter-spacing:.3px}
 .res-d{font-size:12.5px;color:var(--ink2);line-height:1.75;margin-top:9px}
 .res-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
 .mtag{font-size:11px;color:var(--sage-d);background:var(--sage-l);padding:4px 10px;border-radius:100px}
+/* 结果卡底部按钮行：接受 / 重抽，两个按钮均分 */
 .res-acts{display:flex;gap:9px;margin-top:16px}
 .res-acts .btn{flex:1;padding:12px 0}
 
-/* ---------- 飞点 / 导航脉冲 ---------- */
+/* ===== 4. 飞点与导航脉冲 =====
+ * .flydot 是从结果卡飞向底部导航的小圆点（纯装饰，JS 设置起止位置后移除）
+ * position:fixed + transform/opacity 过渡，1 秒内完成一次「飞过去」
+ * ===== */
 .flydot{position:fixed;width:12px;height:12px;border-radius:50%;background:var(--sage);box-shadow:0 4px 14px -2px rgba(var(--sage-rgb),.7);z-index:210;pointer-events:none;transition:transform .95s var(--ease),opacity .95s var(--ease)}
+/* 飞点落地后，目标导航图标脉冲一下（JS 加 .pulse，0.8s 后移除） */
 .nav button.pulse svg{animation:navPulse .8s var(--ease)}
 @keyframes navPulse{0%{transform:scale(1)}45%{transform:scale(1.16)}100%{transform:scale(1)}}
 
-/* ---------- 番茄钟浮框 ---------- */
+/* ===== 5. 番茄钟浮窗 =====
+ * 位置：默认浮在屏幕右下（right:calc(50% - 222px) 让它相对内容居中区域贴边）
+ * 结构：任务名 .pomo-n / 大数字 .pomo-t / 进度条 .pomo-bar / 三个按钮 .pomo-acts
+ * 三套外观：本段=浮动小窗；.pomo.big=全屏 API 不可用时的降级大窗；:fullscreen=真正全屏
+ * z-index:90 —— 高于页面与底部导航，低于提示条
+ * ===== */
 .pomo{position:fixed;right:calc(50% - 222px);bottom:calc(96px + env(safe-area-inset-bottom));width:180px;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:12px 13px;box-shadow:0 16px 40px -18px rgba(46,44,40,.55);z-index:90;animation:pomoIn var(--dur-2) var(--ease) both}
 @keyframes pomoIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
 .pomo-h{display:flex;align-items:flex-start;gap:8px}
@@ -36,16 +67,22 @@
 }
 .pomo-ico:active{opacity:1}
 .pomo-ico.wide{display:none;font-size:11px;letter-spacing:.5px}
+/* 倒计时数字（30px 衬线体、等宽数字，避免每秒跳动时抖动） */
 .pomo-t{font-family:var(--serif);font-size:calc(30px * var(--ui-scale));font-weight:600;letter-spacing:1px;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--ink)}
+/* 进度条：轨道 + 内部 <i> 的宽度由 JS 按剩余时间写 */
 .pomo-bar{height:3px;border-radius:2px;background:var(--line2);margin:8px 0 10px;overflow:hidden}
 .pomo-bar i{display:block;height:100%;background:var(--sage);border-radius:2px;transition:width 1s linear}
+/* 浮窗底部三个小按钮（暂停 / 结束 / 放大），flex:1 均分 */
 .pomo-acts{display:flex;gap:7px}
+/* 番茄钟按钮；.p 是主操作实心，.ghost 是弱化按钮 */
 .pomo-btn{flex:1;border:1px solid var(--line);background:var(--paper2);border-radius:9px;padding:8px 0;font-family:inherit;font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer;transition:all .18s var(--ease)}
 .pomo-btn.p{background:var(--sage);border-color:var(--sage);color:#fff}
 .pomo-btn.ghost{background:transparent;border-color:transparent;color:var(--ink3);font-weight:500}
+/* 窄屏：浮窗改成贴右边缘 14px，避免跑到屏幕外 */
 @media(max-width:470px){.pomo{right:14px}}
 
-/* 全屏 API 用不了时的降级：同一张浮窗放大、换成主题深色，其余页面元素照旧可见 */
+/* 降级大窗（全屏 API 用不了时）：同一个节点放大、换成主题深色底
+   注意：它靠 .big 类切换，不是新元素；改这里只影响降级模式 */
 .pomo.big{
   left:0;right:0;width:min(92vw,420px);margin:0 auto;
   padding:24px 22px 28px;border-radius:22px;
@@ -57,6 +94,7 @@
 .pomo.big .pomo-ico{color:rgba(255,255,255,.7)}
 .pomo.big #pomoFs{display:none}
 .pomo.big .pomo-ico.wide{display:inline-block}
+/* 大窗里的数字放到 62px，居中显示 */
 .pomo.big .pomo-t{color:#fff;font-size:62px;text-align:center;margin:20px 0 4px}
 .pomo.big .pomo-bar{height:4px;background:rgba(255,255,255,.18);margin:16px 0 26px}
 .pomo.big .pomo-bar i{background:#fff}
@@ -69,13 +107,17 @@
 .pomo.big .pomo-btn.ghost{
   background:transparent;border-color:transparent;color:rgba(255,255,255,.62);
 }
+/* 大窗结束瞬间的整块变色（配合下面的 .finishing 淡出） */
 .pomo.big.finishing{background:var(--sage);border-color:var(--sage)}
 
-/* 完成动画：内容淡出，只剩一块实心色块，随后收缩、飞向条目 */
+/* 结束动画：内容全透明，只剩一块实心色块，随后由 JS 收缩并飞向对应条目
+   关键点：这里是「只留背景色」，所以背景色要和主色一致才不突兀 */
 .pomo.finishing{background:var(--sage);border-color:var(--sage);box-shadow:0 12px 30px -14px rgba(46,44,40,.5);pointer-events:none}
 .pomo.finishing>*{opacity:0;transition:opacity .16s linear}
 
-/* 全屏专注：整屏铺满，超大时间，三个键居中 */
+/* 真正全屏：铺满整屏、深色底、时间居中巨大
+   :fullscreen 与 :-webkit-full-screen 两个前缀要成对写，Safari 只认后者
+   下面一整段 .pomo:fullscreen .xxx 都是「全屏态下的局部改写」 */
 .pomo:fullscreen,.pomo:-webkit-full-screen{
   right:auto;left:0;top:0;bottom:auto;width:100%;height:100%;
   border:none;border-radius:0;box-shadow:none;padding:0;margin:0;
@@ -88,6 +130,7 @@
 .pomo:fullscreen .pomo-ico,.pomo:-webkit-full-screen .pomo-ico{color:rgba(255,255,255,.7)}
 .pomo:fullscreen #pomoFs{display:none}
 .pomo:fullscreen .pomo-ico.wide{display:inline-block}
+/* 全屏态的数字 86px；顶部任务名和进度条宽度也单独调过（见相邻几条） */
 .pomo:fullscreen .pomo-t,.pomo:-webkit-full-screen .pomo-t{
   color:#fff;font-size:86px;letter-spacing:3px;margin:0;
 }
@@ -105,35 +148,49 @@
   background:transparent;border-color:transparent;color:rgba(255,255,255,.62);
 }
 
-/* ---------- 建议库 ---------- */
+/* ===== 6. 建议库 =====
+ * 位置：决策页「做什么」下方的建议列表（也可以从设置进入）
+ * 一行结构：标题 .lib-t + 分类标签 .lib-cat + 备注/时间 .lib-d
+ * .off = 已停用的建议（标题划线变灰）
+ * ===== */
 .lib-item{padding:12px 0;border-top:1px solid var(--line2)}
 .lib-item:first-child{border-top:none}
 .lib-h{display:flex;align-items:center;gap:8px}
+/* 建议标题；flex:1 占满并把右边的操作挤到末尾 */
 .lib-t{font-size:13.5px;flex:1;min-width:0;line-height:1.4}
+/* 已停用：划线 + 变灰（停用不等于删除，记录还在） */
 .lib-item.off .lib-t{color:var(--ink3);text-decoration:line-through;text-decoration-color:var(--line)}
+/* 标题下面那行小字：分类、饭点、备注等，自动换行 */
 .lib-d{font-size:10.5px;color:var(--ink3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-/* 分类标签：小型色块，给每行一个视觉锚点，和后面的饭点、备注拉开层次。
-   颜色取主题变量，换主题自动跟着走；c0–c5 六档，同一分类永远同色。 */
+/* 分类小色块：给每行一个视觉锚点，和后面的饭点、备注拉开层次
+   颜色取主题变量，换主题会自动跟着走
+   下面 c0–c5 六档，同一分类永远是同一个颜色（c4 借用错误色做标签，与状态无关） */
 .lib-cat{
   display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:7px;
   background:var(--paper2);color:var(--ink2);
   font-size:10px;font-weight:600;letter-spacing:.2px;white-space:nowrap;
 }
+/* 六个分类色：c0 主色 / c1 青 / c2 琥珀 / c3 绿 / c4 陶红 / c5 中性 */
 .lib-cat.c0{background:var(--sage-l);color:var(--sage-d)}      /* 主色：身体 / 清淡 */
 .lib-cat.c1{background:var(--accent-l);color:var(--accent-d)}  /* 青：学习 / 蛋白质 */
 .lib-cat.c2{background:var(--warn-l);color:var(--warn-d)}      /* 琥珀：生活 / 外卖 */
 .lib-cat.c3{background:var(--ok-l);color:var(--ok-d)}          /* 绿：健身 / 减脂 */
 .lib-cat.c4{background:var(--err-l);color:var(--err-d)}        /* 陶红：心情 / 聚餐（借色值做标签，与状态无关） */
 .lib-cat.c5{background:var(--paper2);color:var(--ink2)}        /* 中性：随便吃 / 其它 */
-/* 关掉的条目：标签退成中性灰，别比标题还抢眼 */
 .lib-item.off .lib-cat{background:var(--paper2);color:var(--ink3)}
+/* 建议库顶部的搜索框（样式独立，不复用 base 的 .inp） */
 .lib-search{width:100%;border:1px solid var(--line);background:var(--paper);border-radius:11px;padding:10px 12px;font-family:inherit;font-size:16px;color:var(--ink);outline:none;margin-bottom:9px}
 .lib-search:focus{border-color:var(--sage)}
 .lib-search::placeholder{font-size:13px;color:var(--ink3)}
 
-/* ---------- 情境列表 / 情境卡 ---------- */
+/* 决策页里字距略收的区块标题变体 */
 .sec-t.strong{letter-spacing:.5px}
+/* ===== 7. 情境卡（「想不清楚」时选一个场景）与情境管理 =====
+ * .scene-grid 是两列网格，每张 .scene-card 是一张可点的方形卡
+ * .on = 当前选中；.lift = 手指/鼠标按住时的浮起态（由 JS 写 inline transform 跟手）
+ * ===== */
 .scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* 一张情境卡：浅底（比白卡更沉），点一下选中 */
 .scene-card{
   background:var(--paper2);border:1px solid var(--line);border-radius:12px;padding:10px 11px;
   cursor:pointer;text-align:left;font-family:inherit;
@@ -141,9 +198,9 @@
              background-color .16s var(--ease),border-color .16s var(--ease);
 }
 .scene-card:active{transform:scale(.97)}
-/* 悬停浮起：位移与缩放由 JS 写到 inline transform（跟手），这里负责阴影、层级和快速跟随的过渡。
-   注意：这块刻意不用 translateZ / will-change —— 一旦把卡片提升为合成层，
-   浏览器会按 1x 栅格化再交给合成器放大，10px 的小字就会发虚。 */
+/* 按住浮起：阴影 + 层级 + 更快的过渡
+   注意：位移与缩放由 JS 写到 inline transform（为了跟手），这里不写 transform
+   也刻意不用 translateZ / will-change：一旦提升为合成层，小字会被放大发虚 */
 .scene-card.lift{
   position:relative;z-index:3;
   box-shadow:0 16px 30px -18px rgba(var(--sage-rgb),.75);
@@ -153,11 +210,14 @@
 @media (prefers-reduced-motion:reduce){
   .scene-card,.scene-card.lift{transition:background-color .16s,border-color .16s}
 }
+/* 选中的情境：浅主色底 + 主色边框 */
 .scene-card.on{background:var(--sage-l);border-color:rgba(var(--sage-rgb),.4)}
 .scene-card .n{font-size:13px;font-weight:600;color:var(--ink)}
 .scene-card.on .n{color:var(--sage-d)}
 .scene-card .d{font-size:10px;color:var(--ink3);margin-top:3px;line-height:1.4}
+/* 情境区上方的一行说明文字 */
 .scene-note{font-size:11px;color:var(--ink3);line-height:1.7;margin:-2px 0 10px}
+/* 情境管理列表里的一行（在设置/管理模式下出现） */
 .scene-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line2)}
 .scene-item:first-child{border-top:none}
 .scene-main{flex:1;min-width:0}
@@ -166,42 +226,47 @@
 .scene-acts{display:flex;gap:6px;flex:0 0 auto}
 .scene-acts .btn{padding:7px 9px;font-size:11px;white-space:nowrap}
 
+/* 很窄的手机：结果标题收一号 */
 @media(max-width:360px){
   .res-t{font-size:20px}
 }
 
-/* HH:MM:SS 比 MM:SS 长，长格式时把时间数字收一号避免撑破浮窗 */
+/* 时间格式变长（HH:MM:SS）时把数字收一号，避免撑破浮窗
+   三套外观各有一条，改字号要三处一起改 */
 .pomo-t.long{font-size:calc(22px * var(--ui-scale));letter-spacing:0}
 .pomo.big .pomo-t.long{font-size:44px}
 .pomo:fullscreen .pomo-t.long,.pomo:-webkit-full-screen .pomo-t.long{font-size:60px}
 
-/* ---------- 吃什么（插件） ---------- */
 #decSeg{margin-top:2px}
+/* 「做什么 / 吃什么」两个分段的容器，切换时播一次进场 */
 .dec-pane{animation:page-entry var(--dur-2) var(--ease) both}
+/* 现在这个时间点对应的餐次，右侧那个小「现在」标记 */
 .eat-now{
   display:inline-block;margin-left:6px;vertical-align:2px;
   font-size:9px;font-weight:600;letter-spacing:.6px;
   color:var(--sage-d);background:var(--sage-l);border-radius:100px;padding:2px 6px;
 }
+/* 今天已经吃过什么的一行小记录（胶囊形式） */
 .eat-log{display:flex;flex-wrap:wrap;gap:7px;align-items:center;font-size:11px;color:var(--ink3);line-height:1.6}
 .eat-log-k{letter-spacing:1px}
 .eat-log-i{
   background:var(--paper2);border:1px solid var(--line2);border-radius:100px;
   padding:3px 9px;color:var(--ink2);font-size:10.5px;
 }
-/* 筛选条：未选中也带一层淡底，从页面背景里浮出来；选中仍用主色实心。
-   只作用于 #eatFilter / #libFilter，不动全站其它 .chip（设置、待办那边保持原样）。 */
+/* ===== 8. 吃什么（插件）与筛选条 =====
+ * 这里的筛选胶囊比全站默认多一层淡底，让它从页面背景里浮出来
+ * 只作用于 #eatFilter / #libFilter，不影响设置页、待办里的其他胶囊
+ * ===== */
 #eatFilter .chip,#libFilter .chip{background:var(--paper2);border-color:var(--line2);color:var(--ink2)}
 #eatFilter .chip:hover,#libFilter .chip:hover{background:var(--line);border-color:var(--line);color:var(--ink)}
 #eatFilter .chip.on,#libFilter .chip.on{background:var(--sage);border-color:var(--sage);color:var(--paper);font-weight:600}
 #eatFilter .chip.on:hover,#libFilter .chip.on:hover{background:var(--sage-d);border-color:var(--sage-d)}
 
-/* 情景管理：与正常决策同一张卡片，换色 + 管理列表，一眼能分清模式 */
 .ask-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+/* 情景管理模式：提问卡换成浅主色底，提示「现在在编辑而不是在决策」 */
 .ask.editing{border-color:rgba(var(--sage-rgb),.42);background:var(--sage-l)}
 .ask.editing .ask-t{color:var(--sage-d)}
-.scm-h{display:flex;align-items:center;justify-content:space-between;margin:12px 0 2px}
-.scm-h .scm-t{font-size:13px;font-weight:600;color:var(--sage-d)}
+/* 情景管理列表的一行：名字 + 说明 + 右侧操作 */
 .scm-row{
   display:flex;align-items:center;gap:10px;padding:9px 0;
   border-bottom:1px solid var(--line);
@@ -210,6 +275,7 @@
 .scm-m{flex:1;min-width:0}
 .scm-n{font-size:13px;font-weight:600;color:var(--ink);line-height:1.5}
 .scm-d{font-size:10.5px;color:var(--ink3);line-height:1.6;margin-top:2px;word-break:break-all}
+/* 情景名后面的小标签（如「内置」「自定义」） */
 .scm-tag{
   display:inline-block;margin-left:6px;padding:0 5px;border-radius:5px;
   background:var(--paper2);color:var(--ink3);font-size:9.5px;font-weight:400;vertical-align:1px;
@@ -217,6 +283,7 @@
 .scm-a{flex:none;display:flex;gap:10px}
 .scm-b{font-size:11.5px;color:var(--sage-d);cursor:pointer;white-space:nowrap;padding:2px 0}
 .scm-b:active{color:var(--ink)}
+/* 情景列表末尾的「+ 新建情况」文字入口 */
 .scm-add{
   text-align:center;font-size:12px;color:var(--sage-d);cursor:pointer;
   padding:10px 0 2px;letter-spacing:.5px;

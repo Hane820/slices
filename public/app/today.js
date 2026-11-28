@@ -1,10 +1,7 @@
-/* today.js — 今日：提醒/待办/重点/计划/日程/学习/汇总/标签速记 */
+/* today.js — 今日：提醒/待办/重点/计划/日程/汇总/标签速记 */
 /* ==================== 今日：提醒 ====================
    提醒内容来自计划安排（S.plans）：当天及以前到期、尚未完成的计划。
    不读健身/学习统计、不混入普通待办；无符合条件的计划时整个区域不渲染。 */
-function minutesStudy(date){
-  return sum(S.studyLogs.filter(function(l){ return l.date === date; }).map(function(l){ return l.minutes || 0; }));
-}
 function duePlansToday(){
   var t0 = TODAY();
   return planSorted().filter(function(p){ return !p.done && p.date <= t0; });
@@ -14,7 +11,6 @@ function renderRemind(){
   if(!box) return;
   box.innerHTML = '';
   var t0 = TODAY();
-  if(S.restDays.indexOf(t0) >= 0) return;
   if(S.settings.remindDismissed === t0) return;
   var list = duePlansToday();
   if(!list.length) return;
@@ -47,15 +43,56 @@ var APP_BOUND = false;
 
 function taskVisible(t, t0){
   if(t.archived) return false;
-  if(t.repeat === 'daily') return true;
+  if(isRoutineTask(t)) return taskOnDay(t, t0);   // 重复项：到日子就出现，勾选按天记
   if(isDone(t, t0)) return true;
   // 一次性任务：只要以前完成过就不再出现
   return doneCountOn(t) === 0;
+}
+/* 重复任务：daily = 每天；weekly = 只在选中的星期几出现 */
+function isRoutineTask(t){
+  return t.repeat === 'daily' || t.repeat === 'weekly';
+}
+function taskOnDay(t, date){
+  if(t.repeat === 'daily') return true;
+  if(t.repeat === 'weekly'){
+    if(!Array.isArray(t.weekdays) || !t.weekdays.length) return false;
+    return t.weekdays.indexOf(parse(date).getDay()) >= 0;
+  }
+  return true;
+}
+var WEEK_CN = ['日','一','二','三','四','五','六'];
+/* 星期文案用静态 key 取（动态 key 规范不允许） */
+function weekName(d){
+  if(d === 0) return U('common.weekday.sun');
+  if(d === 1) return U('common.weekday.mon');
+  if(d === 2) return U('common.weekday.tue');
+  if(d === 3) return U('common.weekday.wed');
+  if(d === 4) return U('common.weekday.thu');
+  if(d === 5) return U('common.weekday.fri');
+  return U('common.weekday.sat');
+}
+function weekLabel(t){
+  if(t.repeat === 'daily') return U('today.repeat.daily');
+  if(t.repeat === 'weekly'){
+    var wd = (Array.isArray(t.weekdays) ? t.weekdays : []).slice().sort();
+    if(!wd.length) return U('today.repeat.weekly');
+    return U('today.repeat.weekPrefix') + wd.map(function(n){ return WEEK_CN[n]; }).join('、');
+  }
+  return '';
 }
 function tasksOf(cat, t0){
   return S.tasks.filter(function(t){
     /* 'today' = 合并视图：旧分类字段原样保留，只是不再分开展示 */
     return (cat === 'today' || t.cat === cat) && taskVisible(t, t0) && !isSkipped(t, t0);
+  });
+}
+/* 合并视图里「普通待办」= 不含重复项；重复项单独成排 */
+function tasksOfPlain(cat, t0){
+  return tasksOf(cat, t0).filter(function(t){ return !isRoutineTask(t); });
+}
+function tasksOfRoutine(t0){
+  return S.tasks.filter(function(t){
+    return isRoutineTask(t) && taskVisible(t, t0) && !isSkipped(t, t0);
   });
 }
 function dueText(t){
@@ -72,19 +109,6 @@ function renderTasks(){
   rvMarkKeep(box);
   box.innerHTML = '';
   var t0 = TODAY();
-  var total = 0, doneN = 0;
-  [CAT_MUST, CAT_WANT, CAT_ROUTINE].forEach(function(cat){
-    var list = tasksOf(cat, t0);
-    total += list.length;
-    doneN += list.filter(function(t){ return isDone(t, t0); }).length;
-  });
-
-  var foldEl = $('foldTasks');
-  if(foldEl){
-    foldEl.textContent = S.settings.tasksFold ? '展开 ▾' : '收起 ▴';
-    foldEl.style.display = total ? '' : 'none';
-  }
-  $('toggleDone').textContent = S.settings.showDone ? '隐藏已完成' : '显示已完成';
 
   /* 折叠态与展开态共用同一批节点：这里只按当前状态生成静态结构，
      折叠/展开动作本身不再重建 DOM，改由 setDeckFold 做双向插值。 */
@@ -95,7 +119,7 @@ function renderTasks(){
 function buildTaskCard(cat, t0){
   var card = el('div','card tcard');
   card.dataset.cat = cat;
-  var list = tasksOf(cat, t0);
+  var list = tasksOfPlain(cat, t0);
 
   var head = el('div','th');
   head.appendChild(el('div','th-n', cat === 'today' ? U('today.card.tasks') : CAT_LABEL[cat]));
@@ -107,7 +131,11 @@ function buildTaskCard(cat, t0){
   head.appendChild(all);
   card.appendChild(head);
 
-  var shown = list.filter(function(t){ return S.settings.showDone || !isDone(t, t0); });
+  /* 隐藏已完成入口已移除：全部显示，但未完成的排前面、已完成的沉到下面。
+     用稳定排序，组内保持原有先后顺序。 */
+  var shown = list.slice().sort(function(a, b){
+    return (isDone(a, t0) ? 1 : 0) - (isDone(b, t0) ? 1 : 0);
+  });
   if(!shown.length){
     var hint = cat === 'today' ? U('today.empty.tasks') : '这一组都做完了';
     if(!list.length && cat !== 'today'){
@@ -123,7 +151,37 @@ function buildTaskCard(cat, t0){
   add.dataset.cat = cat;
   add.innerHTML = '<b>+</b> 加一条';
   card.appendChild(add);
+
+  /* 每天都显示的那一排：重复项单独成段，和普通待办分开 */
+  if(cat === 'today') card.appendChild(buildRoutineSection(t0));
   return card;
+}
+
+/* 每日重复区：标题 + 各条重复 + 自己的「加一条」 */
+function buildRoutineSection(t0){
+  var list = tasksOfRoutine(t0);
+  var sec = el('div','routine-sec');
+
+  var head = el('div','routine-head');
+  head.appendChild(el('div','routine-t', U('today.section.routine')));
+  var doneN = list.filter(function(t){ return isDone(t, t0); }).length;
+  head.appendChild(el('div','routine-c', list.length ? doneN + '/' + list.length : ''));
+  sec.appendChild(head);
+
+  if(!list.length){
+    sec.appendChild(el('div','routine-empty', U('today.empty.routine')));
+  }
+  list.slice().sort(function(a, b){
+    return (isDone(a, t0) ? 1 : 0) - (isDone(b, t0) ? 1 : 0);
+  }).forEach(function(t){ sec.appendChild(buildTaskRow(t, CAT_ROUTINE)); });
+
+  if(taskUI.inline && taskUI.inline.cat === CAT_ROUTINE) sec.appendChild(buildInlineAdd(taskUI.inline));
+  var add = el('div','addline routine-add');
+  add.dataset.action = 'add-open';
+  add.dataset.cat = CAT_ROUTINE;
+  add.innerHTML = '<b>+</b> ' + UH('today.action.addRoutine');
+  sec.appendChild(add);
+  return sec;
 }
 
 /* 输入行只是投影：没有闭包、没有监听、没有焦点副作用 */
@@ -155,9 +213,11 @@ function buildTaskRow(t, cat){
   main.appendChild(el('div','task-t', t.title));
 
   var metaBits = [];
-  if(t.due) metaBits.push({ txt: dueText(t), cls:'due' });
-  if(cat === CAT_ROUTINE && t.repeat === 'daily') metaBits.push({ txt:'每天', cls:'' });
-  if(t.duration) metaBits.push({ txt: durText(t.duration), cls:'' });
+  /* 截止日期与时长都只属于一次性任务：重复项每天都来，两者都没有去处，不占位 */
+  if(t.due && !isRoutineTask(t)) metaBits.push({ txt: dueText(t), cls:'due' });
+  var wl = weekLabel(t);
+  if(wl) metaBits.push({ txt: wl, cls:'rep' });
+  if(t.duration && !isRoutineTask(t)) metaBits.push({ txt: durText(t.duration), cls:'' });
   if(t.note) metaBits.push({ txt: t.note, cls:'' });
   if(metaBits.length){
     var m = el('div','task-m');
@@ -179,7 +239,7 @@ function buildTaskRow(t, cat){
 /* 卡片堆叠：展开态与折叠态共用同一批持久节点。
    .deck[data-fold] 同时承载两种静态视觉（层参数只写在 today.css，避免两套来源竞争）；
    切换只改状态 + 用 WAAPI 从当前视觉值插值到目标静态值，不再销毁 DOM 重建。 */
-var DECK_MS = 400;
+var DECK_MS = 1200;
 var DECK_EASE = 'cubic-bezier(.22,1,.36,1)';
 var DECK_ANIM_PROPS = ['transform','opacity','height','paddingTop','paddingBottom','marginTop','borderTopWidth','borderBottomWidth'];
 function deckCanAnimate(){
@@ -224,6 +284,14 @@ function buildTaskDeck(t0){
     stage.appendChild(tagCard);
   }
   deck.appendChild(stage);
+
+  /* 卡片上边缘书签：点一下展开 / 收起，始终常驻不随动画重建 */
+  var bm = el('button','deck-bookmark');
+  bm.dataset.action = 'fold-tasks';
+  bm.setAttribute('aria-label', S.settings.tasksFold ? '展开待办' : '收起待办');
+  bm.textContent = S.settings.tasksFold ? '▾' : '▴';
+  deck.appendChild(bm);
+
   return deck;
 }
 function deckBackCard(k){
@@ -258,35 +326,50 @@ function setDeckFold(toFold){
   deck.dataset.fold = want;
   S.settings.tasksFold = toFold;
   save();
-  var foldEl = $('foldTasks');
-  if(foldEl) foldEl.textContent = toFold ? '展开 ▾' : '收起 ▴';
+  var bm = deck.querySelector('.deck-bookmark');
+  if(bm){
+    bm.textContent = toFold ? '▾' : '▴';
+    bm.setAttribute('aria-label', toFold ? '展开待办' : '收起待办');
+  }
 
   if(!deckCanAnimate()) return;
 
   var after = nodes.map(deckVisual);
-  deckAnims = nodes.map(function(n, i){
+  /* 每批动画各自持有一份数组；settle 只回收自己那一批，
+     避免连点时上一批的 finished 回调把刚创建的新动画取消掉。 */
+  var batch = nodes.map(function(n, i){
     return n.animate([before[i], after[i]], { duration: DECK_MS, easing: DECK_EASE, fill: 'both' });
   });
-  var last = deckAnims[deckAnims.length - 1];
+  deckAnims = batch;
   var settle = function(){
-    if(deckAnims){ deckAnims.forEach(function(a){ a.cancel(); }); deckAnims = null; }
+    if(deckAnims !== batch) return;
+    batch.forEach(function(a){ a.cancel(); });
+    deckAnims = null;
   };
+  var last = batch[batch.length - 1];
   if(last && last.finished && typeof last.finished.then === 'function') last.finished.then(settle, settle);
   else if(last) last.onfinish = settle;
   else settle();
 }
 function unfoldTasks(){ setDeckFold(false); }
 
-/* 重算某张卡的计数和全勾按钮 */
+/* 重算某张卡的计数和全勾按钮（重复项有自己的一行计数） */
 function syncGroupHead(card){
   if(!card || !card.dataset.cat || card.dataset.cat === 'due') return;
   var cat = card.dataset.cat, t0 = TODAY();
-  var list = tasksOf(cat, t0);
+  var list = tasksOfPlain(cat, t0);
   var doneN = list.filter(function(t){ return isDone(t, t0); }).length;
   var cnt = card.querySelector('.th-c');
   if(cnt) cnt.textContent = list.length ? doneN + '/' + list.length : '';
   var all = card.querySelector('.allbtn');
   if(all) all.classList.toggle('on', !!list.length && doneN === list.length);
+
+  var rc = card.querySelector('.routine-c');
+  if(rc){
+    var rl = tasksOfRoutine(t0);
+    var rd = rl.filter(function(t){ return isDone(t, t0); }).length;
+    rc.textContent = rl.length ? rd + '/' + rl.length : '';
+  }
 }
 
 function buildTagFoot(){
@@ -345,7 +428,7 @@ function toggleTask(t, row){
 }
 function toggleAll(cat, card){
   var t0 = TODAY();
-  var list = tasksOf(cat, t0);
+  var list = tasksOfPlain(cat === 'today' ? 'today' : cat, t0);
   if(!list.length){ toastCfg('focusEmptyHint'); return; }
   var allDone = list.every(function(t){ return isDone(t, t0); });
   list.forEach(function(t){
@@ -416,16 +499,9 @@ function cancelInline(silent){
     renderTasks();
   }
 }
-function toggleDoneFilter(){
-  S.settings.showDone = !S.settings.showDone;
-  save();
-  renderTasks();
-}
 function toggleTasksFold(){
   /* 收拢 / 展开走同一套双向状态机，不因方向不同而重建 DOM */
   setDeckFold(!S.settings.tasksFold);
-  var sec = $('toggleDone').closest('.sec');
-  if(sec) window.scrollTo({ top: sec.getBoundingClientRect().top + window.scrollY - 8, behavior:'smooth' });
 }
 
 /* ==================== 单一事件委托 ====================
@@ -445,7 +521,6 @@ function onAppClick(e){
     case 'add-open':      openInline(hit.dataset.cat); return;
     case 'add-ok':        commitInline(); return;
     case 'add-cancel':    cancelInline(); return;
-    case 'toggle-done':   toggleDoneFilter(); return;
     case 'fold-tasks':    toggleTasksFold(); return;
     case 'deck-open':     unfoldTasks(); return;
     case 'tags-sheet':    openTagsSheet(); return;
@@ -476,6 +551,13 @@ function onAppClick(e){
     case 'goal-open':
       t = byId(S.settings.focusItems, hit.dataset.iid);
       if(t) tapFocusItem(t, hit);
+      return;
+    case 'goal-edit':
+      t = byId(S.settings.focusItems, hit.dataset.iid);
+      if(t) openFocusEdit(t, false);
+      return;
+    case 'goal-new':
+      openFocusEdit(null, true);
       return;
     case 'lib-fold':      toggleLibFold(hit); return;
     case 'menu-fold':     toggleMenuFold(hit); return;
@@ -520,7 +602,7 @@ function bindAppActions(){
 function openTaskActions(t){
   var body = openSheet(
     '<div class="shd"><div class="shd-t">' + esc(t.title) + '</div>' +
-    '<div class="shd-s">' + (t.cat === CAT_ROUTINE ? '每天重复，' + S.settings.resetHour + ' 点清零' : '一次性任务') + '</div></div>' +
+    '<div class="shd-s">' + (isRoutineTask(t) ? weekLabel(t) + '，' + S.settings.resetHour + ' 点清零' : '一次性任务') + '</div></div>' +
     '<div class="card plain" style="padding:0 14px" id="taAct"></div>'
   );
   var box = body.querySelector('#taAct');
@@ -536,15 +618,15 @@ function openTaskActions(t){
     box.appendChild(r);
     return r;
   }
-  row('编辑', '改名字、时长、备注', function(){ closeSheet(); setTimeout(function(){ openTaskEdit(t); }, 180); });
-  if(t.cat !== CAT_ROUTINE){
+  row('编辑', '改名字、重复方式、时长、备注', function(){ closeSheet(); setTimeout(function(){ openTaskEdit(t); }, 180); });
+  if(!isRoutineTask(t)){
     row('延期到明天', '不改内容，只往后推一天', function(){
       if(t.due) t.due = addDays(t.due, 1);
       else t.due = addDays(TODAY(), 1);
       save(function(){ toastCfg('taskPostponed'); }); closeSheet(); renderTasks();
     });
-  }else{
-    row('今天跳过', '今天不显示这条，明天照常', function(){
+  }else if(taskOnDay(t, TODAY())){
+    row('今天跳过', '今天不显示这条，下次照常', function(){
       t.done[TODAY()] = 2; save(function(){ toastCfg('taskSkippedToday'); }); closeSheet(); renderTasks();
     });
   }
@@ -557,27 +639,95 @@ function openTaskActions(t){
 }
 
 function openTaskEdit(t){
+  var rep = (t.repeat === 'daily' || t.repeat === 'weekly') ? t.repeat : 'once';
+  var wds = (Array.isArray(t.weekdays) ? t.weekdays.slice() : []);
   var body = openSheet(
     '<div class="shd"><div class="shd-t">编辑这条</div></div>' +
     '<div class="field"><div class="field-l">内容</div><input class="inp" id="teTitle" maxlength="30" value="' + esc(t.title) + '"></div>' +
-    '<div class="field"><div class="field-l">截止日期</div><input class="inp" id="teDue" type="date" value="' + esc(t.due || '') + '"></div>' +
-    '<div class="field"><div class="field-l">专注时长</div><div class="dur-row">' +
+    '<div class="field"><div class="field-l">重复</div>' +
+      '<div class="chips" id="teRep">' +
+        '<button class="chip" data-r="once">' + UH('today.repeat.once') + '</button>' +
+        '<button class="chip" data-r="daily">' + UH('today.repeat.daily') + '</button>' +
+        '<button class="chip" data-r="weekly">' + UH('today.repeat.weekly') + '</button>' +
+      '</div>' +
+      '<div class="chips" id="teWds"></div>' +
+    '</div>' +
+    '<div class="field" id="teDueF"><div class="field-l">截止日期</div><input class="inp" id="teDue" type="date" value="' + esc(t.due || '') + '"></div>' +
+    '<div class="field" id="teDurF"><div class="field-l">专注时长</div><div class="dur-row">' +
       '<input class="inp" id="teMin" type="number" inputmode="numeric" min="0" max="599" value="' + durParts(t.duration).m + '"><span>分</span>' +
       '<input class="inp" id="teSec" type="number" inputmode="numeric" min="0" max="59" value="' + durParts(t.duration).s + '"><span>秒</span>' +
     '</div></div>' +
     '<div class="field"><div class="field-l">备注</div><input class="inp" id="teNote" maxlength="30" value="' + esc(t.note || '') + '"></div>' +
     '<div class="acts"><button class="btn g" id="teNo">取消</button><button class="btn p" id="teOk">保存</button></div>'
   );
+
+  /* 重复方式：不重复 / 每天 / 每周（选星期几） */
+  var repBox = body.querySelector('#teRep');
+  var wdBox = body.querySelector('#teWds');
+  var durField = body.querySelector('#teDurF');
+  var dueField = body.querySelector('#teDueF');
+  function paintRep(){
+    [].forEach.call(repBox.children, function(b){
+      b.classList.toggle('on', b.dataset.r === rep);
+    });
+    wdBox.innerHTML = '';
+    wdBox.style.display = rep === 'weekly' ? '' : 'none';
+    /* 截止日期、专注时长都只对一次性任务有意义：
+       - 时长：一次性任务会进决策页抽取池，作为番茄钟计划时长
+       - 截止：重复项每天都会来，没有「什么时候到期」这回事
+       重复项不进抽取池，这两个字段都不会被任何地方读取，所以直接不显示。 */
+    var once = rep === 'once';
+    if(dueField) dueField.style.display = once ? '' : 'none';
+    if(durField) durField.style.display = once ? '' : 'none';
+    if(rep !== 'weekly') return;
+    for(var i = 0; i < 7; i++){
+      (function(d){
+        var b = el('button','chip' + (wds.indexOf(d) >= 0 ? ' on' : ''), weekName(d));
+        b.dataset.wd = String(d);
+        b.addEventListener('click', function(){
+          var k = wds.indexOf(d);
+          if(k >= 0) wds.splice(k, 1); else wds.push(d);
+          paintRep();
+        });
+        wdBox.appendChild(b);
+      })(i);
+    }
+  }
+  repBox.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-r]');
+    if(!b) return;
+    rep = b.dataset.r;
+    if(rep === 'weekly' && !wds.length) wds = [parse(TODAY()).getDay()];
+    paintRep();
+  });
+  paintRep();
+
   if(window.OLDatePicker) OLDatePicker.attach(body.querySelector('#teDue'), { allowEmpty: true });
   body.querySelector('#teNo').addEventListener('click', closeSheet);
   body.querySelector('#teOk').addEventListener('click', function(){
     var v = body.querySelector('#teTitle').value.trim();
     if(!v){ toastCfg('contentEmpty'); return; }
     t.title = v;
-    t.due = body.querySelector('#teDue').value || '';
-    t.duration = durFromInputs(body.querySelector('#teMin'), body.querySelector('#teSec'));
+    /* 截止日期与时长只有一次性任务会用到；重复项不写，避免留下读不到的死数据 */
+    t.due = rep === 'once' ? (body.querySelector('#teDue').value || '') : '';
+    /* 时长只有一次性任务会用到（决策页抽取 → 番茄钟计划时长）；重复项不写 */
+    t.duration = rep === 'once' ? durFromInputs(body.querySelector('#teMin'), body.querySelector('#teSec')) : 0;
     t.note = body.querySelector('#teNote').value.trim();
-    if(!t.repeat) t.repeat = t.cat === CAT_ROUTINE ? 'daily' : 'once';
+
+    if(rep === 'weekly' && !wds.length) wds = [parse(TODAY()).getDay()];
+    if(rep === 'once'){
+      t.repeat = 'once';
+      delete t.weekdays;
+      if(t.cat === CAT_ROUTINE){
+        /* 从重复改回一次性：清掉旧的按天完成记录，否则会被当成「早就做完」隐藏 */
+        t.cat = CAT_WANT; t.done = {}; t.doneTime = {};
+      }
+    }else{
+      t.repeat = rep;
+      t.cat = CAT_ROUTINE;
+      if(rep === 'weekly') t.weekdays = wds.slice().sort();
+      else delete t.weekdays;
+    }
     save(function(){ toastCfg('taskEdited'); }); closeSheet(); renderTasks();
   });
 }
@@ -591,7 +741,14 @@ function goalCardHtml(it){
   var v = focusSum(it, TODAY());
   var unit = focusUnit(it);
   var has = focusHasGoal(it);
-  return '<div class="goal-l">' + esc(it.text) + '</div>' +
+  /* 第一行 = 名字 + 右上角书签。书签是卡片的子节点（不是兄弟），
+     所以卡片缩放 / 动画时它天然跟着走，不需要额外同步位置。 */
+  return '<div class="goal-head">' +
+      '<div class="goal-l">' + esc(it.text) + '</div>' +
+      '<button class="goal-bm" data-action="goal-edit" data-iid="' + esc(it.id) + '"' +
+        ' aria-label="' + UH('today.action.editFocus') + ' ' + esc(it.text) + '"' +
+        ' title="' + UH('today.action.editFocus') + '"></button>' +
+    '</div>' +
     '<div class="goal-v' + (v ? '' : ' dim') + '">' + fmtNum(v) + '<em>' + esc(unit) + '</em></div>' +
     (has
       ? '<div class="goal-bar"><i style="width:' + clamp(Math.round(v / focusTarget(it) * 100), 0, 100) + '%"></i></div>' +
@@ -603,17 +760,24 @@ function renderGoals(){
   rvMarkKeep(box);
   box.innerHTML = '';
   var items = S.settings.focusItems || [];
-  if(!items.length){
-    box.appendChild(el('div','empty',U('today.empty.focusEmpty')));
-    return;
-  }
+
+  /* 卡片内部右上角有书签按钮，所以卡片本身用 div（按钮里不能嵌按钮），
+     点击行为仍靠 data-action 委托，跟原来一致。 */
   items.forEach(function(it){
-    var b = el('button','goal' + (focusHasGoal(it) ? '' : ' free'));
+    var b = el('div','goal' + (focusHasGoal(it) ? '' : ' free'));
     b.dataset.iid = it.id;
     b.dataset.action = 'goal-open';
+    b.setAttribute('role', 'button');
+    b.setAttribute('tabindex', '0');
     b.innerHTML = goalCardHtml(it);
     box.appendChild(b);
   });
+
+  /* 末尾常驻「新建」卡：把设置页那套自定义搬到当前界面 */
+  var add = el('button','goal goal-add');
+  add.dataset.action = 'goal-new';
+  add.innerHTML = '<div class="goal-plus">+</div><div class="goal-add-t">' + UH('today.action.addFocus') + '</div>';
+  box.appendChild(add);
 }
 
 /* 点今日重点：计时类开记录表单；计数类直接 +1（再点一下就是 2 杯） */
@@ -1078,26 +1242,6 @@ function openSchEdit(s){
 }
 function todayReal(){ return fmt(new Date()); }
 function openSchCreate(){ openSchEdit(null); }
-
-/* ==================== 学习 / 备注 ==================== */
-function openStudy(itemId){
-  var t0 = TODAY();
-  openLogSheet({
-    title: '记一点学习',
-    sub: '今天已经记了 ' + minutesStudy(t0) + ' 分钟。',
-    date: t0, time: nowHHMM(), minutes: '',
-    minutesLabel: '时长（分钟，必填）',
-    tagLabel: '学了什么', tagFree: true, tagPlaceholder: '高数 / 单词…（可留空）',
-    note: '', noteLabel: '备注', notePlaceholder: '记一句，可留空',
-    needMinutes: true, okText: '记上',
-    onSave: function(d){
-      S.studyLogs.push({ id: uid('st'), date: d.date, minutes: d.minutes, time: d.time || nowHHMM(), what: d.tagFree, note: d.note, itemId: itemId || '' });
-      save(function(){ toastCfg('focusSavedMinutes', { minutes: d.minutes, unit: OLToastText.text('分钟') }); }); closeSheet();
-      renderGoals(); renderRemind();
-      if(currentPage === 'pRecords') renderProject();
-    }
-  });
-}
 
 /* ==================== 今日汇总渲染 ==================== */
 function renderToday(){

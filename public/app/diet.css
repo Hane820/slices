@@ -1,78 +1,109 @@
-/* ==================== 饮食记录（插件）样式 ====================
-   延续 base.css 的卡片 / sec / chips 语言，窄屏优先。 */
+/* ============================================================================
+ * diet.css — 饮食记录（插件）样式
+ * ----------------------------------------------------------------------------
+ * 只在「吃什么」插件打开时出现，页面在决策页下方与项目页里。
+ * 分段顺序：概览 → 今日/历史记录行 → 添加表单 → 历史导航 → 统计 → 餐次弹层
+ * 这一套大量使用 var(--xxx, 默认值) 的写法：变量存在就用主题色，不存在就用兜底值，
+ * 所以它能在不同宿主页面里保持同一副长相。
+ * ========================================================================== */
 
-/* 概览 */
+/* ===== 1. 今日概览（几项并排的小指标）=====
+ * 用 flex 平铺，每项 flex:1 均分宽度；窄屏会自动压缩
+ * ===== */
 .diet-ov-grid{
   display:flex; gap:10px; padding:4px 0 8px;
 }
 .diet-ov-grid > div{ flex:1; min-width:0; }
+/* 指标名（上面那行灰色小字） */
 .diet-k{
   font-size:10.5px; color:var(--ink3); letter-spacing:.05em; line-height:1.6;
 }
+/* 指标数值（下面那行大数字，等宽数字避免跳动） */
 .diet-v{
   font-size:17px; font-weight:600; color:var(--ink); line-height:1.5;
   font-variant-numeric:tabular-nums;
 }
+/* 「距下次记录还有 …」这类实时提示条，浅底圆角 */
 .diet-live{
   font-size:10.5px; color:var(--ink3); line-height:1.7;
   padding:6px 8px; background:var(--paper2, rgba(0,0,0,.035)); border-radius:8px;
   margin:4px 0;
 }
+/* 概览下方的补充说明小字 */
 .diet-tip{
   font-size:10px; color:var(--ink3); line-height:1.7; margin-top:8px;
 }
+/* 警告文字（用 --warn-d 琥珀深调） */
 .diet-warn{
   font-size:10.5px; color:var(--warn-d); line-height:1.7;
 }
+/* 空白提示：「今天还没记」 */
 .diet-none{
   font-size:12px; color:var(--ink3); line-height:1.8; padding:4px 0;
 }
 
-/* 今日/历史记录行 */
+/* ===== 2. 记录行（今日列表与历史列表共用）=====
+ * 一行：左边内容 + 右边操作；行与行之间一条极淡的下边框，最后一行不画
+ * ===== */
 .diet-list .diet-row, .diet-hist .diet-row{
   display:flex; align-items:flex-start; gap:8px;
   padding:9px 2px; border-bottom:1px solid var(--line, rgba(0,0,0,.06));
 }
 .diet-list .diet-row:last-child, .diet-hist .diet-row:last-child{ border-bottom:none; }
+/* 行主体：flex:1 占满，min-width:0 允许长文字换行 */
 .diet-row-m{ flex:1; min-width:0; }
+/* 行标题：时间 + 吃了什么（时间用 b 包起来加粗） */
 .diet-row-t{
   font-size:12px; color:var(--ink); line-height:1.7;
   font-variant-numeric:tabular-nums;
 }
 .diet-row-t b{ font-weight:600; margin-right:6px; }
+/* 行副文字：食物明细与份量；word-break 防止长串英文撑破 */
 .diet-row-f{ font-size:11.5px; color:var(--ink2, var(--ink)); line-height:1.7; word-break:break-all; }
+/* 份量小标签（一个小圆角方框） */
 .diet-pt{
   font-size:10px; color:var(--ink3); margin-left:4px;
   border:1px solid var(--line, rgba(0,0,0,.12)); border-radius:4px; padding:0 3px;
 }
+/* 行备注 */
 .diet-row-n{ font-size:10.5px; color:var(--ink3); line-height:1.6; margin-top:2px; }
+/* 行右侧操作区（编辑 / 删除），不参与收缩 */
 .diet-row-a{ flex:none; display:flex; gap:8px; padding-top:2px; }
+/* 行内文字操作按钮（编辑 / 删除） */
 .diet-act{
   font-size:11px; color:var(--ink3); cursor:pointer;
 }
 .diet-act:active{ color:var(--ink); }
 
-/* 添加表单 */
+/* ===== 3. 添加表单 =====
+ * 一条记录 = 若干「食物 + 份量」行 + 备注；每行都能单独删掉
+ * ===== */
 .diet-frow{ padding:5px 0; }
 .diet-frow .field-l{ margin-bottom:4px; }
+/* 一条食物输入行：名称（宽一些）+ 份量 + × */
 .diet-food{
   display:flex; gap:6px; align-items:center; margin-bottom:6px;
 }
 .diet-food-n{ flex:1.4; min-width:0; }
 .diet-food-p{ flex:1; min-width:0; }
+/* 食物行末尾的 ×：删掉这一行（不是删整条记录） */
 .diet-food-x{
   flex:none; width:22px; height:22px; line-height:22px; text-align:center;
   color:var(--ink3); font-size:14px; cursor:pointer; border-radius:6px;
 }
 .diet-food-x:active{ background:var(--paper2, rgba(0,0,0,.05)); }
+/* 「+ 再加一样」文字入口 */
 .diet-addfood{
   font-size:11px; color:var(--ink3); cursor:pointer; padding:2px 0 4px;
 }
 .diet-addfood:active{ color:var(--ink); }
+/* 表单底部按钮（整行通栏的保存） */
 .diet-btns{ padding-top:8px; }
 .diet-btns .btn{ width:100%; padding:13px 0; }
 
-/* 历史导航 */
+/* ===== 4. 历史导航（按天往前翻）=====
+ * 结构：左箭头 / 中间日期 / 右箭头，与日历弹层的 .dp-head 长得像但互不复用
+ * ===== */
 .diet-hnav{
   display:flex; align-items:center; gap:10px; padding:2px 0 8px;
 }
@@ -81,19 +112,24 @@
   background:var(--paper2, rgba(0,0,0,.045)); color:var(--ink);
   font-size:15px; cursor:pointer;
 }
+/* 中间当前查看的日期 */
 .diet-hdate{
   flex:1; text-align:center; font-size:13px; font-weight:600; color:var(--ink);
   font-variant-numeric:tabular-nums;
 }
+/* 当天的汇总一句话（共几餐、总共多少） */
 .diet-hsum{ font-size:11px; color:var(--ink2, var(--ink)); line-height:1.9; padding-bottom:6px; }
 .diet-hist-more{ font-size:10.5px; color:var(--ink3); line-height:1.7; padding-top:4px; }
 
-/* 统计 */
+/* ===== 5. 统计 =====
+ * 一组数值平铺，每项竖排「数值上、标签下」
+ * ===== */
 .diet-stats-g{
   display:flex; flex-wrap:wrap; gap:8px 14px; padding:6px 0 2px;
 }
 .diet-stats-g > div{ display:flex; flex-direction:column; min-width:72px; }
 .diet-stats-g .diet-v{ font-size:15px; }
+/* 「最近记录的日子」小胶囊列表 */
 .diet-days{
   display:flex; flex-wrap:wrap; gap:5px; padding-top:8px;
 }
@@ -102,9 +138,10 @@
   background:var(--paper2, rgba(0,0,0,.04)); border-radius:6px; padding:2px 6px;
   font-variant-numeric:tabular-nums;
 }
+/* 那天数据异常时胶囊变琥珀色（只是一个视觉提示） */
 .diet-day-bad{ color:var(--warn-d); }
 
-/* 餐次弹层 */
+/* ===== 6. 餐次弹层 ===== 选「早餐 / 午餐 / 加餐」的一行，最后一行不画下边框 */
 .diet-slotrow{
   display:flex; align-items:center; justify-content:space-between;
   padding:9px 2px; border-bottom:1px solid var(--line, rgba(0,0,0,.06));

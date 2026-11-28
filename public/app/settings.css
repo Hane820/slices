@@ -1,30 +1,57 @@
-/* settings.css — 设置页专属：开关 / 颜色与表情选择 */
+/* ============================================================================
+ * settings.css — 「设置」页专属样式
+ * ----------------------------------------------------------------------------
+ * 设置页大部分内容复用 base.css 的 .row / .pool / .pill / .btn，
+ * 这个文件只管三类「别处没有」的东西：
+ *   1 开关 .sw（外观像 iOS 的那种小滑块）
+ *   2 标记编辑弹层里的预览块、调色盘、表情选择 .pv-* / .swatches / .em*
+ *   3 「改这条重点」弹层里的目标输入组 .fx-*（数字 + 单位 + 不设目标）
+ * 注意：.fx-* 虽然写在设置文件里，实际是在首页点重点卡的书签时弹出的面板里用到。
+ * ========================================================================== */
 
-/* 开关 */
+/* ===== 1. 开关（滑块）=====
+ * 用在设置页的开关行右侧，也被决策页/食物插件的设置弹层复用（凡是「打开/停用」都用它）
+ * JS 切换 .on 表示打开
+ * 做法：一个圆角矩形轨道，::after 画一个白色圆点，打开时把圆点右移 13px
+ * 注意：它只是「长得像开关」的 <button>，没有任何原生行为 */
 .sw{width:31px;height:18px;border-radius:100px;background:#E2DACC;border:none;cursor:pointer;position:relative;flex:0 0 auto;transition:background .22s;padding:0;opacity:.9}
 .sw::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .22s cubic-bezier(.3,1.3,.5,1);box-shadow:0 1px 3px rgba(0,0,0,.16)}
+/* 打开状态：轨道变主色，白点右移 13px（位移量 = 宽 31 - 点 14 - 边距） */
 .sw.on{background:var(--sage);opacity:1}
 .sw.on::after{transform:translateX(13px)}
 
-/* 标记编辑：预览 → 颜色 → 符号（可选）→ 名字，分区标题小号灰字、间距 20px */
+/* ===== 2. 标记编辑弹层 =====
+ * 顺序：预览块 → 颜色 → 符号 → 名字
+ * .pv-sec 是每一步上方的小标题（灰字、字距略开）
+ * ===== */
 .pv-sec{font-size:11px;color:var(--ink3);margin:20px 0 10px;letter-spacing:.5px}
+/* 预览块：一个小卡片，模拟日历格子上「荧光笔道 + 符号 + 名字」的样子
+   position:relative 让里面三道元素能绝对定位叠在一起 */
 .pv-cell{
   position:relative;width:96px;height:80px;margin:4px auto 0;border-radius:12px;
   background:var(--paper);border:1px solid var(--line);box-shadow:var(--sh1);
   display:flex;align-items:center;justify-content:center;overflow:hidden;
 }
+/* 预览里的荧光笔横条：倾斜 -1.8°，透明 0.5，让下面的名字仍能看清 */
 .pv-cell .pv-swipe{position:absolute;left:9%;right:9%;top:34%;height:38%;border-radius:999px;opacity:.5;transform:rotate(-1.8deg)}
 .pv-cell .pv-emo{position:absolute;top:5px;left:0;right:0;text-align:center;font-size:13px;line-height:1;z-index:1}
+/* 预览里的名字；text-shadow 是一圈浅白光，压在彩色笔道上更清楚 */
 .pv-cell .pv-name{position:relative;z-index:1;font-weight:600;font-size:14px;color:var(--ink);text-shadow:0 0 3px rgba(255,253,249,.9)}
+/* 调色盘：5 列圆形色块 */
 .swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+/* 一个颜色圆点；选中时由 JS 加内联边框/阴影（样式不在这里） */
 .sw-c{aspect-ratio:1;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:transform .15s,box-shadow .2s}
+/* 表情选择：7 列网格 */
 .emos{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+/* 一个表情按钮；.sel = 当前选中（浅主色底） */
 .em{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:17px;border-radius:10px;cursor:pointer;border:none;background:transparent;transition:background .15s}
 .em.sel{background:var(--sage-l)}
+/* 「不选表情」的虚线小圆：表示把表情清空 */
 .em.none{border:2px dashed var(--ink3);border-radius:50%;width:24px;height:24px;margin:auto;position:relative}
 .em.none.sel{border-color:var(--sage-d);background:var(--sage-l)}
 
-/* 编辑弹层底部的弱化删除入口（需进确认框才会真的删） */
+/* 编辑弹层底部的删除入口（弱化成红色小字）
+   点了还会再弹一次确认框，不会直接删 */
 .fx-del{
   display:block;margin:16px auto 0;border:none;background:transparent;
   color:var(--err);font-size:calc(12.5px * var(--ui-scale));font-family:inherit;
@@ -32,14 +59,19 @@
 }
 .fx-del:active{opacity:.5}
 
-/* 输入方式：多选模式的选项编辑 */
+/* ===== 3. 「改这条重点」弹层里的控件 =====
+ * .opt-add 是「加一个选项」的输入框 + 按钮一行
+ * ===== */
 .opt-add{display:flex;gap:7px;margin-top:9px}
 .opt-add .inp{flex:1}
 .opt-add .btn{flex:0 0 auto;padding:0 14px}
+/* 选项胶囊右侧的 × （删掉这个选项） */
 .chip .opt-x{color:var(--ink3);margin-left:4px;font-size:11px}
 
-/* 每天目标：数字 + 单位下拉 + 不设目标，固定一行；切换只淡入淡出，行高不变 */
+/* 每天目标这一行：左边数字+单位、右边「不设目标」按钮
+   固定 min-height:36px，切换「设/不设」时行高不变，避免弹层跳动 */
 .fx-goal-row{display:flex;align-items:center;gap:8px;min-height:36px;margin-top:10px}
+/* 数字 + 单位那组；.off 时整体淡出并向左缩 6px（不设目标时） */
 .fx-goal-main{
   display:flex;align-items:center;gap:8px;min-width:0;
   transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s;
@@ -48,6 +80,8 @@
   opacity:0;transform:translateX(-6px);pointer-events:none;visibility:hidden;
   transition:opacity .18s var(--ease),transform .18s var(--ease),visibility 0s .18s;
 }
+/* 目标数字输入框：宽 72px、右对齐（数字贴着单位）
+   隐藏了浏览器自带的上下小箭头（appearance:textfield + 下面两条 webkit 规则） */
 .fx-num{
   flex:0 0 72px;width:72px;height:36px;padding:0 9px;text-align:right;
   border:1px solid transparent;background:var(--paper2);border-radius:10px;
@@ -58,27 +92,26 @@
 }
 .fx-num::-webkit-outer-spin-button,.fx-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .fx-num::placeholder{color:var(--ink3);font-size:13px}
+/* 聚焦：主色边框 + 一圈淡主色光晕（和全站输入框的聚焦风格不同，这里更强调） */
 .fx-num:focus{border-color:var(--sage);background:var(--paper);box-shadow:0 0 0 3px rgba(var(--sage-rgb),.14)}
+/* 校验失败：边框和底色变浅陶红（JS 在数值不合法时加这个类） */
 .fx-num.err{border-color:#CF8A76;background:#FBF1ED}
+/* 单位下拉的外层；::after 用两条边框画一个向下的小三角箭头 */
 .fx-unit{position:relative;display:inline-flex;flex:0 0 auto}
 .fx-unit::after{
   content:"";position:absolute;right:11px;top:50%;width:5px;height:5px;
   border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);
   transform:translateY(-70%) rotate(45deg);pointer-events:none;
 }
+/* 单位下拉本体：去掉系统外观（appearance:none），右侧留 24px 给自绘箭头 */
 .fx-unit-sel{
   display:block;appearance:none;-webkit-appearance:none;
   width:84px;height:36px;padding:0 24px 0 12px;text-align:left;
   cursor:pointer;color:var(--ink);
 }
+/* 「自定义单位」输入框：默认隐藏占位（visibility:hidden），选自定义时才显示 */
 .fx-num-custom{flex:0 0 76px;width:76px;text-align:center;visibility:hidden;opacity:0;transition:opacity .16s var(--ease)}
 .fx-num-custom.on{visibility:visible;opacity:1}
+/* 「不设目标」按钮，用 margin-left:auto 推到最右；.on 时边框变实线 */
 .fx-no-goal{flex:0 0 auto;margin-left:auto}
 .fx-no-goal.on{border-style:solid}
-
-/* 决策情况：行内排序按钮 */
-.sc-move{
-  font-size:12px; color:var(--ink3); cursor:pointer; padding:2px 4px;
-  font-variant-numeric:tabular-nums;
-}
-.sc-move:active{ color:var(--ink); }

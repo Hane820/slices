@@ -1,7 +1,36 @@
-/* base.css — 全局骨架与通用组件：变量 / 布局 / 头部 / 卡片 / 按钮 / 弹层 */
+/* ============================================================================
+ * base.css — 全站公共骨架（所有页面都会加载）
+ * ----------------------------------------------------------------------------
+ * 这个文件不用找具体页面：它定义了整套 App 的地基和通用零件。
+ * 阅读顺序：
+ *   1 主题变量（颜色 / 圆角 / 阴影 / 动效时长）
+ *   2 页面骨架（body、#app、.page 切页）
+ *   3 通用排版零件（头部 .hd、区块标题 .sec）
+ *   4 通用容器（卡片 .card、底部导航 .nav、分段 .seg）
+ *   5 通用控件（按钮 .btn、胶囊 .chip、设置行 .row、标签 .pill）
+ *   6 弹层系统（遮罩 .mask、底部抽屉 .sheet、居中弹窗 .modal、提示 .toast）
+ *   7 选择器弹层（时间滚轮 .tp-*、日历 .dp-*）
+ * 想换配色请去第 1 节改 CSS 变量，不要在后面的规则里到处改色值。
+ * ========================================================================== */
+/* 全局清零：去掉浏览器默认边距
+   box-sizing:border-box 让「宽」包含内边距和边框（否则加 padding 会把元素撑宽，很常见的新手坑）
+   -webkit-tap-highlight-color:transparent 去掉手机上点击时的灰色高亮块 */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* ===== 1. 主题变量（改颜色 / 圆角 / 阴影 / 动效时长）=====
+ * 全站颜色都从这里取，改一处全站生效；用法是 color:var(--ink)
+ * 命名速记：
+ *   --bg 页面底色 / --paper 卡片纸色 / --paper2 更浅的分区块底 / --frame 页面外的边条
+ *   --ink 主文字 / --ink2 次文字 / --ink3 最淡的说明文字
+ *   --line 边框线 / --line2 更淡的分隔线
+ *   --sage 主色（陶土橘）/ --sage-d 主色深（文字用，可读性更好）/ --sage-l 主色浅底
+ *   --accent 青色点缀 / --clay 陶红（提醒、逾期、危险）
+ *   --ok / --warn / --err 语义色（成功 / 警告 / 错误）
+ *   --r1 --r2 --r3 三档圆角（12 / 18 / 26px）
+ *   --sh1 --sh2 两档阴影（卡片日常 / 浮起时）
+ *   --ui-scale 字号总倍率，设置页「字号」滑块改的就是它（1.0–1.2）
+ * 注意：下面 --dur-3/2/1 三个时长也定义在这里，改它们会整体变快变慢。
+ * ===== */
 :root{
-  /* 固定主题：橘子汽水（陶土橘）——原 html.theme-clay 全套变量 */
   --bg:#FDF8F1; --paper:#FFFEFB; --paper2:#F7EDE0; --frame:#F2E9DD;
   --ink:#392D27; --ink2:#7B6557; --ink3:#B09A8B; --line:#EEE0D2; --line2:#F8F0E6;
   --sage:#C1795C; --sage-d:#8A4B36; --sage-l:#F8E7DC; --sage-rgb:193,121,92;
@@ -22,13 +51,24 @@
   --dur-1:.55s;  /* 轻反馈 */
   --ui-scale:1.2;
 }
+/* 禁止 iOS 横屏时自动放大文字 */
 html{-webkit-text-size-adjust:100%}
+/* 这些「会换色」的元件统一加颜色过渡：换主题时是渐变而不是硬切
+   只过渡颜色相关属性，不影响布局 */
 body,.card,.nav,.chip,.btn,.mask,.sheet,.page{transition:background-color .3s ease,border-color .3s ease,color .3s ease}
+/* 页面最外层：flex + justify-content:center 把 #app 居中
+   手机上是满宽，电脑上看起来像居中一条手机屏
+   overflow-x:hidden 防止横向溢出时出现左右滚动条 */
 body{
   font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;
   background:var(--frame);color:var(--ink);display:flex;justify-content:center;
   min-height:100vh;-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.7;letter-spacing:.15px;
 }
+/* App 主体容器：真正的「屏幕」
+   max-width:460px = 手机宽度；line-height / letter-spacing 是全局中文排版节奏
+   background-image 那两行是背景细点阵（radial-gradient 画一个点 + 20px 平铺）
+   padding-bottom 留出底部导航的高度，否则最后一行内容会被导航盖住
+   大屏断点在文件后半：≥900px 时 max-width 变 560px */
 #app{
   width:100%;max-width:460px;min-height:100vh;position:relative;overflow-x:hidden;
   background-color:var(--bg);
@@ -37,16 +77,24 @@ body{
   padding-bottom:calc(86px + env(safe-area-inset-bottom));
   box-shadow:0 0 60px rgba(60,50,40,.09);
 }
+/* ===== 2. 页面切换（四个 page 容器）=====
+ * 每个页面是一个 <section class="page" id="pXxx">
+ * 默认 display:none 全部隐藏，当前页加 .on 才显示（JS：showPage）
+ * 所以「某页不显示」时，先检查它的 .on 有没有加上
+ * ===== */
 .page{display:none;opacity:1}
+/* 当前页：显示 + 播放一次进场动画（淡入 + 上移 10px，关键帧在本条下面） */
 .page.on{display:block;animation:page-entry var(--dur-3) var(--ease) both}
 @keyframes page-entry{0%{opacity:0;transform:translateY(10px)}60%{opacity:.85}to{opacity:1;transform:none}}
 
+/* 内容左右内边距 18px：所有贴边内容都套这个类，保证与屏幕边缘留白一致 */
 .pad{padding-left:18px;padding-right:18px}
 
-/* 模块之间的淡分割线 */
+/* 模块之间的淡分割线（1px，颜色极淡） */
 .hr{height:1px;background:var(--line2);margin:26px 2px 0}
 
-/* 回到顶端：滚过一屏才出现 */
+/* 右下角「回到顶端」按钮：固定定位，始终贴在屏幕右下
+   默认透明且 pointer-events:none（点不到）；滚动超过一屏后 JS 加 .on 才浮现 */
 .to-top{
   position:fixed;right:14px;bottom:calc(94px + env(safe-area-inset-bottom));
   width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
@@ -56,78 +104,133 @@ body{
   opacity:0;transform:translateY(12px) scale(.9);pointer-events:none;
   transition:opacity .4s var(--ease),transform .4s var(--ease);
 }
+/* 出现状态：从下方 12px + 0.9 倍缩放回到原位 */
 .to-top.on{opacity:1;transform:none;pointer-events:auto}
+/* 番茄钟专注模式下隐藏它，避免压住计时浮窗 */
 body.pomo-on .to-top{opacity:0;pointer-events:none}
+/* 系统开启「减少动态效果」：全站动画时长压到 0.01ms
+   用 !important 覆盖所有动画，等于「逻辑照跑、视觉不动」 */
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
-/* ---------- 头部 ---------- */
+/* ===== 3. 页面头部（每页最上面那块）=====
+ * 今日页：日期 + 问候语（同一行，见 .hd-inline）
+ * 记录页 / 决策页 / 设置页：英文小标签 + 大标题 + 一句副题
+ * 四个页面共用这一套，改这里会同时影响所有页
+ * ===== */
 .hd{padding-top:26px;padding-bottom:14px}
+/* 头部最上面的小字：今日页是「11月28日 · 周六」，其它页是 RECORDS / SETTINGS 这类英文标签 */
 .hd-date{font-size:calc(11px * var(--ui-scale));letter-spacing:2px;color:var(--ink2);text-transform:uppercase;font-weight:500}
+/* 头部大标题：今日页放「晚上好」这类问候语，其它页放页面名（衬线体） */
 .hd-hi{font-family:var(--serif);font-size:calc(20px * var(--ui-scale));font-weight:600;letter-spacing:.5px;margin-top:8px;line-height:1.25}
+/* 标题下面那句灰色副题（今日页没有这一行） */
 .hd-sub{font-size:calc(12.5px * var(--ui-scale));color:var(--ink2);margin-top:7px;letter-spacing:.3px}
-/* 进入页面时：日期 → 问候语 → 副题，依次平缓浮现（博客式） */
+/* 今日页专用：让「日期」和「问候语」排在同一行
+   HTML 里是 class="pad hd hd-inline"
+   align-items:baseline 是按文字基线对齐，不是顶对齐
+   下面两行把日期的 margin-top 归零、并让问候语可以收缩 */
+.hd-inline{display:flex;align-items:baseline;gap:12px;flex-wrap:nowrap}
+.hd-inline .hd-date{flex:0 0 auto}
+.hd-inline .hd-hi{margin-top:0;min-width:0}
+/* 进场：日期 → 问候语 → 副题 依次浮现（三者延迟不同，形成错落感）
+   只在切到该页时播一次，关键帧 hdIn 在本条下面 */
 .page.on .hd-date{animation:hdIn .9s var(--ease) both}
 .page.on .hd-hi{animation:hdIn 1.05s .14s var(--ease) both}
 .page.on .hd-sub{animation:hdIn 1.05s .26s var(--ease) both}
 @keyframes hdIn{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
 
-/* ---------- 区块标题 ---------- */
+/* ===== 区块标题（每个内容块上方那一行）=====
+ * 结构：标题字 .sec-t + 会伸缩的细线 .sec-line + 右侧小操作 .sec-a
+ * 细线用 flex:1 吃掉中间空间，所以标题靠左、操作靠右
+ * 注意：首页待办 / 重点 / 随手记三块已不使用这个标题，别改错地方
+ * ===== */
 .sec{display:flex;align-items:center;gap:10px;margin:28px 0 12px}
+/* 区块标题文字（衬线体、加粗、字距略开） */
 .sec-t{font-family:var(--serif);font-size:calc(21px * var(--ui-scale));letter-spacing:1.5px;color:var(--ink);font-weight:700;white-space:nowrap}
+/* 标题右边那条细线；flex:1 = 占满剩余宽度 */
 .sec-line{flex:1;height:1px;background:var(--line2)}
+/* 标题行右侧的小操作，如「+ 加一条」「展开 ▾」 */
 .sec-a{font-size:11.5px;color:var(--accent-d);cursor:pointer;padding:2px 0;white-space:nowrap;font-family:inherit}
 .sec-a:active{color:var(--ink)}
 
-/* ---------- 卡片 ---------- */
+/* ===== 4. 通用卡片（全站白色块的基础）=====
+ * 首页待办卡、记录页图表、设置页分组都用它
+ * 默认内边距只有左右 17px、上下 6px（因为卡片里通常是一行行列表）
+ * 需要「整块留白」时再加 .plain（见下一条）
+ * :hover 会整体上浮 2px —— 电脑鼠标才有，手机不会触发
+ * ===== */
 .card{
   background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);
   box-shadow:var(--sh1);padding:6px 17px;
   transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .4s var(--ease);
 }
+/* 四边都留 18px 的卡片：放图表、段落这种「一整块内容」时用 */
 .card.plain{padding:18px}
+/* 相邻两张卡片之间的距离（只对紧挨着的下一张生效） */
 .card+.card{margin-top:13px}
+/* 鼠标悬停：上浮 2px + 阴影变深（触屏设备无此效果） */
 .card:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:var(--line)}
 
-/* ---------- 底部导航 ---------- */
+/* 底部导航：固定在屏幕底部
+   left:50% + translateX(-50%) 让它相对 #app 居中，而不是相对整个视口
+   max-width 与 #app 保持一致，电脑上不会拉得比内容还宽
+   z-index:40：高于页面内容，但低于弹层（弹层是 60 / 70 / 90） */
 .nav{
   position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:460px;z-index:40;
   display:flex;background:var(--bg);
   border-top:1px solid var(--line);padding:6px 4px calc(7px + env(safe-area-inset-bottom));
 }
+/* 一个导航项：图标在上、文字在下；flex:1 让四项均分宽度 */
 .nav button{
   flex:1;border:none;background:none;font-family:inherit;cursor:pointer;color:var(--ink2);
   display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0 4px;transition:color .25s var(--ease),transform .25s var(--ease);
 }
 .nav svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+/* 导航项下面的文字 */
 .nav span{font-size:11px;letter-spacing:.5px;font-weight:500}
+/* 当前所在页：文字与图标换成主色深调，比未选中的更重 */
 .nav button.on{color:var(--sage-d)}
 .nav button.on span{font-weight:600}
 .nav button.on svg{stroke-width:1.9}
 .nav button:active{opacity:.6}
 
-/* ---------- 分段切换 ---------- */
+/* 分段切换（记录页「计划/时间轴/月历/项目」、决策页「做什么/吃什么」）
+   外层是浅色凹槽，选中项是浮起来的白块 */
 .seg{display:flex;background:var(--paper2);border-radius:12px;padding:3px;gap:2px;margin:0 18px 14px}
+/* 一个分段按钮；flex:1 均分宽度 */
 .seg button{
   flex:1;border:none;background:transparent;font-family:inherit;font-size:12.5px;color:var(--ink2);
   padding:8px 0;border-radius:9px;cursor:pointer;transition:all .2s;
 }
+/* 选中的那一段：白底 + 轻阴影，看起来从凹槽里浮出来 */
 .seg button.on{background:var(--paper);color:var(--ink);font-weight:600;box-shadow:0 1px 4px rgba(46,44,40,.09)}
 
-/* ---------- 按钮 / 胶囊 ---------- */
+/* ===== 5. 通用按钮与胶囊 =====
+ * 按钮基类 .btn，再用后缀区分用途：
+ *   .p 主按钮（实心主色，用于保存 / 确定）
+ *   .g 次按钮（浅灰底，用于取消）
+ *   .o 描边按钮   .d 危险按钮（陶红）
+ *   .sm 小号
+ * 所有按钮都有 :hover 上浮 1px、:active 缩到 0.97 的按压感
+ * ===== */
 .btn{
   border:none;border-radius:11px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;
   padding:11px 16px;transition:transform .25s var(--ease),background .2s,box-shadow .25s var(--ease);
 }
 .btn:hover{transform:translateY(-1px)}
 .btn:active{transform:scale(.97)}
+/* 主按钮：实心主色 + 主色光晕阴影；:disabled 时半透明 */
 .btn.p{background:var(--sage);color:var(--paper);box-shadow:0 4px 14px -6px rgba(var(--sage-rgb),.7)}
 .btn.p:disabled{opacity:.4;cursor:default;box-shadow:none}
+/* 次按钮：浅底深字（取消类操作） */
 .btn.g{background:var(--paper2);color:var(--ink)}
 .btn.o{background:transparent;border:1px solid var(--line);color:var(--ink2)}
 .btn.d{background:var(--clay-l);border:1px solid var(--line);color:var(--clay)}
 .btn.sm{padding:8px 12px;font-size:12px}
-/* ---------- 全站唯一的 Chip 组件 ---------- */
+/* 胶囊的容器：自动换行、间距 10px（决策页选项、设置页标签都用它） */
 .chips{display:flex;flex-wrap:wrap;gap:10px}
+/* 全站唯一的胶囊组件：选项、筛选、标签都是它
+   高度固定 36px、两端全圆（border-radius:100px）
+   状态：:hover 浅底 → :active 缩到 0.95 → .on 选中变主色实心 */
 .chip{
   display:inline-flex;align-items:center;justify-content:center;gap:5px;
   height:36px;padding:0 12px;white-space:nowrap;
@@ -137,19 +240,27 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
 }
 .chip:hover{background:var(--paper2)}
 .chip:active{transform:scale(.95)}
+/* 选中态：主色实心 + 白字加粗 */
 .chip.on{background:var(--sage);border-color:var(--sage);color:var(--paper);font-weight:600}
 .chip.on:hover{background:var(--sage-d);border-color:var(--sage-d)}
+/* 虚线描边的「空胶囊」，用于「不设目标」「+ 新建」这类占位项 */
 .chip.ghost{border-style:dashed;color:var(--ink3)}
 .chip b{font-size:10px;font-weight:600}
 
-/* ---------- 设置行 / 胶囊池 ---------- */
+/* 「设置行」：左边标题 + 说明、右边箭头或开关的整行
+   用于设置页、长按菜单（openTaskActions）；相邻行之间自动加一条淡上边框
+   整行可点，不是只有右边箭头可点 */
 .row{display:flex;align-items:center;gap:12px;padding:16px 0;border-top:1px solid var(--line2);cursor:pointer}
 .row:first-child{border-top:none}
 .row-main{flex:1;min-width:0}
+/* 设置行的标题 */
 .row-t{font-size:calc(14.5px * var(--ui-scale));line-height:1.6}
+/* 设置行的说明小字（灰色、可换行） */
 .row-s{font-size:calc(11px * var(--ui-scale));color:var(--ink3);margin-top:5px;line-height:1.8}
 .row-a{font-size:11.5px;color:var(--ink3);flex:0 0 auto}
+/* 胶囊池（设置页「我的标记 / 标签」那一堆圆角标签的容器） */
 .pool{display:flex;flex-wrap:wrap;gap:7px;padding:2px 0 4px}
+/* 胶囊池里的一颗：左边小圆点（标记色）+ 名字 + 右边 × */
 .pill{
   display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--line);
   border-radius:100px;padding:7px 6px 7px 12px;font-family:inherit;font-size:12.5px;color:var(--ink);
@@ -157,6 +268,7 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
 }
 .pill:active{transform:scale(.96)}
 .pill .dotc{width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;flex:0 0 auto}
+/* 胶囊右侧的 × 删除按钮（18px 圆形） */
 .pill .x{
   width:18px;height:18px;border-radius:50%;border:none;background:var(--paper2);color:var(--ink3);
   font-size:11px;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0;
@@ -164,56 +276,89 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
 .pill .x:active{background:var(--clay-l);color:var(--clay)}
 .pill.add{border-style:dashed;color:var(--ink3);padding:7px 12px}
 
-/* ---------- 遮罩 / 弹层 ---------- */
+/* ===== 6. 弹层系统（遮罩 / 抽屉 / 弹窗 / 提示）=====
+ * 三层结构：.mask 遮罩（铺满全屏、半透明）> 里面放 .sheet（底部抽屉）或 .modal（居中弹窗）
+ * 显示方式：给 .mask 加 .on 才出现（opacity + visibility 一起切）
+ * z-index 约定：遮罩 60 < 选择器浮层 70 < 打印预览 90 < 提示 95~96
+ * 想改弹层出现的「位置/方式」，先看 .mask 的 align-items
+ * ===== */
 .mask{
   position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;
   justify-content:center;background:rgba(240,235,226,.88);opacity:0;visibility:hidden;transition:opacity .5s var(--ease);
 }
+/* 打开状态：由 JS 加 .on（closeSheet 时移除） */
 .mask.on{opacity:1;visibility:visible}
+/* 让内容垂直居中而不是贴底：居中弹窗（.modal）用它 */
 .mask.mid{align-items:center}
+/* 底部抽屉（大部分编辑表单都在这里）
+   圆角只有上面两角；max-height:90vh 防止内容超出屏幕
+   进场：translateY(24px) → 0，即从下方轻轻推上来
+   overflow-y:auto 让抽屉自己滚动，不带动背后页面 */
 .sheet{
   width:100%;max-width:460px;background:var(--bg);border-radius:var(--r3) var(--r3) 0 0;
   padding:8px 18px calc(20px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;
   transform:translateY(24px);transition:transform var(--dur-2) var(--ease);-webkit-overflow-scrolling:touch;
   background-image:radial-gradient(rgba(170,150,120,.075) .8px,transparent .8px);background-size:20px 20px;
 }
+/* 打开时推到位（0 = 原位） */
 .mask.on .sheet{transform:translateY(0)}
+/* 平板 / 电脑：抽屉变成浮起来的卡片（四角都圆、宽度收窄、底部留间距）
+   注意：这是「弹层形态」的断点，和手机布局断点 640px 是两回事 */
 @media(min-width:600px){
   .sheet{border-radius:var(--r3);max-width:440px;margin-bottom:24px}
   .mask.on .sheet{transform:none}
 }
+/* 大屏：App 主容器和底部导航一起加宽到 560px（与 #app 的 max-width 对应） */
 @media(min-width:900px){
   #app{max-width:560px}
   .nav{max-width:560px}
 }
+/* 抽屉顶部那根灰色小横条，暗示「可以往下拖」 */
 .handle{width:36px;height:4px;border-radius:100px;background:var(--line);margin:4px auto 14px}
+/* 抽屉 / 弹窗里的标题区：.shd-t 标题、.shd-s 副说明 */
 .shd{margin-bottom:14px}
 .shd-t{font-family:var(--serif);font-size:calc(19px * var(--ui-scale));font-weight:600;letter-spacing:.3px}
 .shd-s{font-size:11.5px;color:var(--ink3);margin-top:5px;line-height:1.6}
+/* 表单里的一组「标签 + 输入框」 */
 .field{margin-bottom:13px}
+/* 表单字段的小标题（灰字、字距拉开） */
 .field-l{font-size:10.5px;letter-spacing:1.2px;color:var(--ink3);margin:0 0 6px 2px}
+/* 输入框 / 多行文本 / 下拉 三种控件共用的外观
+   font-size:16px 是刻意的：小于 16px 时 iOS 聚焦会自动放大页面
+   :focus 时边框变主色（见下方 :focus 那条） */
 .inp,.ta,.sel{
   width:100%;border:1px solid var(--line);background:var(--paper);border-radius:11px;padding:11px 12px;
   font-family:inherit;font-size:16px;color:var(--ink);outline:none;transition:border-color .2s;
 }
+/* 禁用态：灰底灰字，光标也不再是输入态 */
 .inp:disabled{background:var(--line2);color:var(--ink3);cursor:default}
+/* 聚焦态：边框变主色，是唯一的焦点提示（没有外发光） */
 .inp:focus,.ta:focus,.sel:focus{border-color:var(--sage)}
+/* 多行文本框：禁止手动拖拽改变大小，行距放宽 */
 .ta{resize:none;line-height:1.7}
 .inp::placeholder,.ta::placeholder{color:var(--ink3);font-size:13px}
+/* 一行放两个控件（如开始 / 结束时间）；子元素各占一半，min-width:0 允许收缩 */
 .row2{display:flex;gap:9px}
 .row2>*{flex:1;min-width:0}
+/* 弹层底部的按钮行（取消 / 保存）；两个按钮均分宽度 */
 .acts{display:flex;gap:9px;margin-top:6px}
 .acts .btn{flex:1;padding:13px 0}
 .acts .btn.fx{flex:0 0 84px}
+/* 居中弹窗（确认框 confirmBox 用它，需配合 .mask.mid）
+   宽度左右各留 46px、最大 370px；进场从 0.95 倍放大到 1 */
 .modal{
   width:calc(100% - 46px);max-width:370px;background:var(--bg);border-radius:22px;padding:20px 18px 16px;
   transform:scale(.95) translateY(8px);transition:transform .6s var(--ease);box-shadow:var(--sh2);
   max-height:86vh;overflow-y:auto;
 }
 .mask.on .modal{transform:none}
+/* 弹窗标题（.m-s 副说明 / .m-msg 正文，正文保留换行） */
 .m-t{font-family:var(--serif);font-size:calc(17px * var(--ui-scale));font-weight:600}
 .m-s{font-size:11.5px;color:var(--ink3);margin:6px 0 14px;line-height:1.65}
 .m-msg{font-size:13px;color:var(--ink2);line-height:1.75;margin-bottom:16px;white-space:pre-line}
+/* 轻提示（保存成功、已删除…）：固定贴在底部导航上方
+   pointer-events:none 不挡点击；文字不换行
+   .on 时淡入，几秒后 JS 自动移除 .on */
 .toast{
   position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translate(-50%,10px);
   background:rgba(46,44,40,.94);color:#fff;font-size:12.5px;padding:9px 18px;border-radius:100px;
@@ -221,36 +366,45 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
   box-shadow:0 8px 24px rgba(0,0,0,.18);
 }
 .toast.on{opacity:1;transform:translate(-50%,0)}
-/* 类型区分：success / warning / error（info 用默认深色）。色值取自现有莫兰迪色板的深色调，白字对比达标 */
+/* 按类型换底色：success 绿、warning 琥珀、error 陶红，info 用默认深色 */
 .toast.t-success{background:rgba(74,103,86,.96)}
 .toast.t-warning{background:rgba(146,110,58,.96)}
 .toast.t-error{background:rgba(139,73,63,.96)}
 .toast .t-ico{
   display:inline-block;margin-right:7px;font-weight:700;transform:translateY(-.5px);
 }
+/* 点击后飘上去的「+1」小字（floatText 生成，1.5s 后自动移除）
+   position:fixed，left/top 由 JS 写入；动画见下面的 fu 关键帧 */
 .float{
   position:fixed;pointer-events:none;font-size:13px;font-weight:700;color:var(--sage-d);z-index:96;
   animation:fu 1.5s var(--ease) forwards;text-shadow:0 1px 4px rgba(255,255,255,.9);
 }
+/* 「+1」飘动：原地淡起 → 上移 32px 同时淡出 */
 @keyframes fu{0%{opacity:1;transform:translate(-50%,0)}65%{opacity:1}100%{opacity:0;transform:translate(-50%,-32px)}}
 
+/* 很窄的手机：分段按钮字号收一号，避免「时间轴」这类文字换行 */
 @media(max-width:360px){
   .seg button{font-size:12px}
 }
-/* toast 里的撤销按钮 */
+/* 提示条里的「撤销」按钮（下划线白字，本身可点，所以要 pointer-events:auto） */
 .toast .t-act{
   border:none;background:transparent;color:#fff;font-family:inherit;font-size:12.5px;
   font-weight:700;letter-spacing:.5px;text-decoration:underline;text-underline-offset:3px;
   cursor:pointer;padding:0 0 0 6px;pointer-events:auto;
 }
 
-/* 时长输入：分 + 秒 */
+/* 「分 + 秒」两个输入框挤在一行；flex:1 均分，宽度写 0 是为了能被压缩 */
 .dur-row{display:flex;align-items:center;gap:8px;margin-top:10px}
 .dur-row .inp{flex:1;min-width:0;width:0}
 .dur-row span{flex:0 0 auto;font-size:12px;color:var(--ink3)}
 
-/* ---------- 时间选择：滚轮弹层（替代各浏览器长相不一的原生 time 选择器） ---------- */
+/* ===== 7. 时间选择器（滚轮）=====
+ * 结构：.mask.pk 浮层 > .sheet > 两列滚轮
+ * 为什么自定义：各浏览器原生 time 输入框长相差异太大
+ * 中间那条高亮带是 .tp-wheel::before（36px 高的浅色横带），滚轮项吸附到中心即被选中
+ * ===== */
 .tp-field{position:relative}
+/* 触发时间选择的输入框：右侧留 40px 放时钟图标，光标隐藏以免以为能打字 */
 .tp-field .inp{
   padding-right:40px;cursor:pointer;font-variant-numeric:tabular-nums;
   -webkit-user-select:none;user-select:none;caret-color:transparent;
@@ -260,16 +414,21 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
   display:flex;color:var(--ink3);pointer-events:none;
 }
 .tp-ico svg{width:16px;height:16px;display:block}
+/* 滚轮上方的「时 / 分」列标题 */
 .tp-head{display:flex;gap:12px;justify-content:center}
 .tp-head span{
   flex:1;max-width:110px;text-align:center;
   font-size:10.5px;letter-spacing:1.2px;color:var(--ink3);
 }
+/* 滚轮区：两列并排；::before 是中间那条高亮横带（纯视觉，不接收点击） */
 .tp-wheel{position:relative;display:flex;gap:12px;justify-content:center;margin:2px 0 4px}
 .tp-wheel::before{
   content:'';position:absolute;left:0;right:0;top:50%;height:36px;margin-top:-18px;
   border-radius:10px;background:var(--paper2);pointer-events:none;
 }
+/* 一列滚轮：固定 180px 高、内部滚动
+   scroll-snap-type:mandatory 保证停下时一定对齐到某一项
+   mask-image 让上下边缘渐隐（内容没被裁掉，只是变透明） */
 .tp-col{
   position:relative;z-index:1;flex:1;max-width:110px;height:180px;
   overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;
@@ -278,34 +437,46 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
   mask-image:linear-gradient(to bottom,transparent,#000 20%,#000 80%,transparent);
 }
 .tp-col::-webkit-scrollbar{display:none;width:0;height:0}
+/* 滚轮里的一项，固定 36px 高（与高亮带同高，才会正好落在中间） */
 .tp-item{
   height:36px;line-height:36px;text-align:center;cursor:pointer;
   font-size:16px;color:var(--ink3);font-variant-numeric:tabular-nums;
   scroll-snap-align:center;transition:color .2s,font-weight .2s;
 }
+/* 停在中间被选中的那一项：深色加粗 */
 .tp-item.on{color:var(--ink);font-weight:600}
+/* 滚轮上下各垫 72px 空白，让第一项和最后一项也能滚到中间 */
 .tp-pad{height:72px}
+/* 滚轮下方的「清除时间」文字按钮；日历弹层里的「今天/清除」也复用它 */
 .tp-clear{
   display:block;width:100%;text-align:center;font-size:11.5px;color:var(--ink3);
   padding:6px 0 0;border:none;background:transparent;font-family:inherit;cursor:pointer;
 }
 .tp-clear:active{color:var(--clay)}
 
-/* ---------- 日期选择：月历弹层 ---------- */
+/* ===== 8. 日期选择器（月历）=====
+ * 结构：上一月 / 标题 / 下一月 → 星期行 → 日期网格
+ * 与记录页的大月历（records.css 的 .grid / .day）不是同一套，别改混
+ * ===== */
 .dp-head{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+/* 左右切换月份的小方块按钮 */
 .dp-nav{
   flex:none;width:30px;height:30px;border-radius:9px;border:none;
   background:var(--paper2);color:var(--ink);font-size:15px;line-height:1;
   font-family:inherit;cursor:pointer;transition:transform .15s;
 }
 .dp-nav:active{transform:scale(.94)}
+/* 中间显示的「2026年11月」 */
 .dp-title{
   flex:1;text-align:center;font-size:13px;font-weight:600;color:var(--ink);
   font-variant-numeric:tabular-nums;
 }
+/* 星期行：7 列等宽网格 */
 .dp-wd{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}
 .dp-wd span{text-align:center;font-size:10.5px;color:var(--ink3);letter-spacing:.5px}
+/* 日期网格：7 列等宽，每格 38px 高 */
 .dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+/* 一个日期格；.mute = 不在本月（不可点）、.on = 已选中的日期 */
 .dp-cell{
   height:38px;display:flex;align-items:center;justify-content:center;
   border:none;background:transparent;border-radius:10px;
@@ -313,11 +484,14 @@ body.pomo-on .to-top{opacity:0;pointer-events:none}
   font-variant-numeric:tabular-nums;cursor:pointer;transition:background .15s,color .15s;
 }
 .dp-cell.mute{pointer-events:none}
+/* 今天：用内阴影描一圈细边（不占空间，不会把格子挤歪） */
 .dp-cell.today{box-shadow:inset 0 0 0 1px var(--line);color:var(--sage-d)}
 .dp-cell:active{background:var(--paper2)}
+/* 已选中的日期：主色实心白字 */
 .dp-cell.on{background:var(--sage);color:var(--paper);font-weight:600;box-shadow:none}
 .dp-quick{display:flex;gap:16px;justify-content:center;padding:8px 0 0}
 .dp-quick .tp-clear{width:auto;padding:0;display:inline-block}
 
-/* 选择器浮层：盖在正在编辑的表单之上，关掉后原表单还在 */
+/* 选择器专用浮层：比普通弹层更上层（70），底色更透
+   这样它能盖在「正在编辑的表单」之上，关掉后原表单还在 */
 .mask.pk{z-index:70;background:rgba(240,235,226,.72)}
